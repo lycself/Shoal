@@ -6,7 +6,8 @@
 # Institutes compiled on top of FABM's defaults:
 #   ersem  (pmlmodelling/ersem)          LTL host used by both papers
 #   mizer  (pmlmodelling/fabm-mizer)     size-spectrum HTL (Powley et al. 2026)
-#   e2e    (kernel/e2e or official code) functional-group fish/macrobenthos (Vijayakumaran et al. 2026)
+#   e2e        (kernel/e2e) functional-group fish/macrobenthos re-implemented from the published equations
+#   ecosmoe2e  (src/ecosmo-e2e, optional) the official ECOSMO E2E v2.0 code (Vijayakumaran et al. 2026)
 # ECOSMO (nersc) and ERGOM (msi, iow) ship with FABM itself.
 #
 # Usage:  kernel/build.sh [--env <conda prefix>] [--clean] [--only gotm|pyfabm]
@@ -58,23 +59,26 @@ fetch fabm-mizer   https://github.com/pmlmodelling/fabm-mizer.git    ed8b78a4ba6
 fetch gotm-cases   https://github.com/gotm-model/cases.git           caa8a1d67da4d0bfa7ad7e50b5a1b409c935b0aa  # 2026-03-18
 fetch ersem-setups https://github.com/pmlmodelling/ersem-setups.git  545b4dadb6bdd2387374adcf995c8e0289948faa  # 2026-08-25
 
-# E2E: prefer the official ECOSMO E2E v2.0 source if the user unpacked it into src/ecosmo-e2e
-# (Zenodo 10.5281/zenodo.20413770); otherwise use the paper-equation implementation in kernel/e2e.
-E2E_BASE="$HERE/e2e"
-if [[ -f "$SRC/ecosmo-e2e/CMakeLists.txt" ]]; then
-  E2E_BASE="$SRC/ecosmo-e2e"
-  echo ">> using official ECOSMO E2E source at $E2E_BASE"
-fi
-
+# E2E: the paper-equation implementation in kernel/e2e is always built. The official ECOSMO E2E v2.0
+# code (Zenodo 10.5281/zenodo.20413770, archive ecosmoe2e_gmd.tar.gz) is built next to it when its
+# folder has been copied to src/ecosmo-e2e (needs src/ecosmo-e2e/src/CMakeLists.txt). Both can then be
+# used in one kernel: model names e2e/fish vs ecosmoe2e_fish.
 EXTRA="ersem;mizer;e2e"
+E2E_OFFICIAL=""
+if [[ -f "$SRC/ecosmo-e2e/src/CMakeLists.txt" ]]; then
+  E2E_OFFICIAL="$SRC/ecosmo-e2e"
+  EXTRA="$EXTRA;ecosmoe2e"
+  echo ">> also building the official ECOSMO E2E code from $E2E_OFFICIAL"
+fi
 CMAKE_COMMON=(
   -DCMAKE_BUILD_TYPE=Release
   -DCMAKE_Fortran_COMPILER="$FC"
   -DFABM_EXTRA_INSTITUTES="$EXTRA"
   -DFABM_ERSEM_BASE="$SRC/ersem"
   -DFABM_MIZER_BASE="$SRC/fabm-mizer"
-  -DFABM_E2E_BASE="$E2E_BASE"
+  -DFABM_E2E_BASE="$HERE/e2e"
 )
+[[ -n "$E2E_OFFICIAL" ]] && CMAKE_COMMON+=(-DFABM_ECOSMOE2E_BASE="$E2E_OFFICIAL/src")
 
 if [[ $CLEAN == 1 ]]; then rm -rf "$BUILD"; fi
 
@@ -105,9 +109,9 @@ EOF
 fi
 
 # Record what was built (the backend reads this to report kernel capabilities)
-"$PY" - "$HERE" "$E2E_BASE" <<'PYEOF'
+"$PY" - "$HERE" "$E2E_OFFICIAL" <<'PYEOF'
 import json, subprocess, sys, pathlib, datetime
-here = pathlib.Path(sys.argv[1]); e2e = sys.argv[2]
+here = pathlib.Path(sys.argv[1]); official = sys.argv[2]
 def rev(p):
     try:
         return subprocess.check_output(["git", "-C", str(p), "log", "-1", "--format=%h %cs"], text=True).strip()
@@ -118,8 +122,11 @@ info = {
     "built": datetime.datetime.now(datetime.timezone.utc).isoformat(timespec="seconds"),
     "gotm": rev(src / "gotm"), "fabm": rev(src / "fabm"), "ersem": rev(src / "ersem"),
     "mizer": rev(src / "fabm-mizer"),
-    "e2e": {"source": "official" if "ecosmo-e2e" in e2e else "paper-equations", "path": e2e},
-    "institutes_extra": ["ersem", "mizer", "e2e"],
+    # "official": ECOSMO E2E v2.0 compiled in (model ecosmoe2e_fish / ecosmoe2e_mb); the equation
+    # re-implementation (e2e/fish, e2e/macrobenthos) is always present for comparison
+    "e2e": {"source": "official" if official else "paper-equations", "official_path": official or None,
+            "reimplementation_path": str(here / "e2e")},
+    "institutes_extra": ["ersem", "mizer", "e2e"] + (["ecosmoe2e"] if official else []),
 }
 (here / "install" / "kernel.json").write_text(json.dumps(info, indent=2))
 print(json.dumps(info, indent=2))

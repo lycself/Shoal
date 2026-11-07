@@ -249,7 +249,9 @@ def summary(run_dir: Path, run: dict) -> dict:
     # HTL
     for inst, label in (("F1", "鱼 1（浮游食性）"), ("F2", "鱼 2（底栖/鱼食性）"), ("MB", "大型底栖动物")):
         if f"{inst}_c" in ds:
-            add(f"{inst}_c", f"{label} 生物量", float(ds[f"{inst}_c"].mean()), "mg C m⁻²")
+            # official ECOSMO E2E fish are concentrations (mg C m-3, per layer): integrate over depth
+            da, _ = _column(ds, f"{inst}_c", "integral")
+            add(f"{inst}_c", f"{label} 生物量", float(da.mean()), "mg C m⁻²")
             if f"{inst}_wet_mass" in ds:
                 add(f"{inst}_ww", f"{label} 湿重", float(ds[f"{inst}_wet_mass"].mean()), "g WW m⁻²")
             if f"{inst}_production" in ds:

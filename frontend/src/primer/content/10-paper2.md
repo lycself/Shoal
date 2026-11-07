@@ -91,7 +91,7 @@ ECOSMO E2E v1.0（Daewel et al. 2019）的鱼类和底栖模块是直接写在 E
 | 去掉底栖后鱼 2 的变化 | | | | 几乎崩溃 / 下降 / 几乎崩溃 |
 | 去掉底栖后鱼 1 的变化 | | | | 增加 / 中等下降 / 几乎崩溃 |
 
-**注意**：本软件的 E2E 是照论文方程重写的，不是官方代码，还有几处单位上的理解和数值保护（[第 7 章](chapter:07-functional-groups)、[第 12 章](chapter:12-limitations)）。重做时看趋势和机制，不要指望和论文图里的数字一一对上。
+**注意**：本软件默认用官方 ECOSMO E2E 代码，ERSEM 宿主下能重现官方参考结果的第一年（相差 1–4%）。ECOSMO、ERGOM 宿主用的是 FABM 自带的版本，和论文用的 NECCTON 版本不同，所以这两列只能比较趋势和量级（[第 7 章](chapter:07-functional-groups)、[第 12 章](chapter:12-limitations)）。
 
 ## 容易误解的地方
 

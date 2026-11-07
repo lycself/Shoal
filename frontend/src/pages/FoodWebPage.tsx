@@ -80,7 +80,8 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
     if (tab === "yaml") api.post<string>("/fabm_yaml", spec).then((y) => alive && setYaml(y));
     return () => { alive = false; };
   }, [JSON.stringify(spec), tab]);
-  const defaults = hosts?.htl_defaults?.[spec.host];
+  const engine: string = spec.htl.e2e?.engine ?? hosts?.e2e_engines?.default ?? "reimplementation";
+  const defaults = hosts?.htl_defaults_by_engine?.[engine]?.[spec.host] ?? hosts?.htl_defaults?.[spec.host];
   const hostInfo = hosts?.hosts?.find((h: any) => h.id === spec.host);
   const save = async (asNew = false) => {
     try {
@@ -147,6 +148,16 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                         <Switch key={k} on={spec.htl.e2e[k]} onChange={(v) => upd((s) => { s.htl.e2e[k] = v; })} label={{ macrobenthos: "大型底栖动物（底层，摄食碎屑、沉积物与浮游生物）", fish1: "鱼 1 · 浮游食性（摄食浮游动物）", fish2: "鱼 2 · 底栖 / 鱼食性（摄食鱼 1 与底栖动物）" }[k]} />
                       ))}
                     </span>
+                    <span className="label">计算代码</span>
+                    <span className="control">
+                      <Seg value={engine} onChange={(v: string) => upd((s) => { s.htl.e2e.engine = v; })}
+                        options={[...(hosts?.e2e_engines?.official_available ? [["official", "官方代码", "verified"]] : []), ["reimplementation", "按论文方程重写", "beaker"]] as any} />
+                    </span>
+                    <span /><span className="hint">{engine === "official"
+                      ? "ECOSMO E2E v2.0 作者发布的 Fortran 代码，参数取自其发布的算例。鱼是随深度分布的浓度，跟着饵料走。"
+                      : hosts?.e2e_engines?.official_available
+                        ? "本软件按论文方程自己写的版本，只用于和官方代码对照：结果与官方代码有明显差别（见教程第 12 章）。"
+                        : "内核里没有官方代码，只能用本软件按论文方程重写的版本。把官方压缩包放到 kernel/src/ecosmo-e2e 并重新编译内核即可启用官方代码。"}</span>
                   </>
                 )}
                 {spec.htl.kind === "mizer" && (
@@ -218,7 +229,9 @@ function E2EParams({ spec, defaults, upd }: { spec: any; defaults: any; upd: (fn
   const enabled: Record<string, boolean> = { MB: spec.htl.e2e.macrobenthos, F1: spec.htl.e2e.fish1, F2: spec.htl.e2e.fish2 };
   return (
     <div className="col" style={{ gap: 22, maxWidth: 1100 }}>
-      <Notice kind="plain">默认值来自 Vijayakumaran et al. (2026) 表 1–3（{HOST_LABEL[spec.host]} 列）。θ 与 γ<sub>MB</sub> 文献未给出，为本软件的默认值；修改过的值以蓝框和粗体显示。</Notice>
+      {defaults.engine === "official"
+        ? <Notice kind="plain">默认值取自官方 ECOSMO E2E v2.0 发布的 {HOST_LABEL[spec.host]} 算例。半饱和常数按氮计（mmol N m⁻³），代码内部换算成碳；修改过的值以蓝框和粗体显示。</Notice>
+        : <Notice kind="plain">默认值来自 Vijayakumaran et al. (2026) 表 1–3（{HOST_LABEL[spec.host]} 列）。θ 与 γ<sub>MB</sub> 文献未给出，为本软件的默认值；修改过的值以蓝框和粗体显示。</Notice>}
       {(["MB", "F1", "F2"] as const).filter((k) => enabled[k]).map((k) => {
         const user = spec.htl.e2e.params?.[k] ?? {};
         const set = (key: string, v: number | undefined) => upd((s) => { s.htl.e2e.params ??= {}; s.htl.e2e.params[k] ??= {}; if (v === undefined) delete s.htl.e2e.params[k][key]; else s.htl.e2e.params[k][key] = v; });
@@ -230,7 +243,7 @@ function E2EParams({ spec, defaults, upd }: { spec: any; defaults: any; upd: (fn
                 <table className="table">
                   <thead><tr><th>参数</th><th>含义</th><th className="num">值</th><th>单位</th></tr></thead>
                   <tbody>{defaults[k].params.map((r: any) => (
-                    <tr key={r.key}><td className="mono">{r.key}</td><td>{r.label}</td><td><ParamInput value={user[r.key]} def={r.value} onChange={(v) => set(r.key, v)} /></td><td className="soft small">{r.unit}</td></tr>
+                    <tr key={r.key}><td className="mono" data-tip={r.official ? `官方代码里的参数名：${r.official}` : undefined}>{r.official ?? r.key}</td><td>{r.label}</td><td><ParamInput value={user[r.key]} def={r.value} onChange={(v) => set(r.key, v)} /></td><td className="soft small">{r.unit}</td></tr>
                   ))}</tbody>
                 </table>
               </div>
@@ -246,7 +259,9 @@ function E2EParams({ spec, defaults, upd }: { spec: any; defaults: any; upd: (fn
           </div>
         );
       })}
-      <div className="hint">饵料的 σ 与偏好可在“组成 → 高级参数覆盖”中按 FABM 参数名修改，例如 <code>instances/F1/parameters/prey3_a</code>（编号见 fabm.yaml）。</div>
+      <div className="hint">饵料的摄食率与偏好可在“组成 → 高级参数覆盖”中按 FABM 参数名修改，例如 {defaults.engine === "official"
+        ? <><code>instances/F1/parameters/Gr2</code>、<code>pref2</code>（编号见 fabm.yaml）。</>
+        : <><code>instances/F1/parameters/prey3_a</code>（编号见 fabm.yaml）。</>}</div>
     </div>
   );
 }

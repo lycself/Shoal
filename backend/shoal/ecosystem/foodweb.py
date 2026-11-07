@@ -101,12 +101,24 @@ def build_graph(spec: dict) -> dict:
             continue
         par = inst[name]["parameters"]
         cpl = inst[name]["coupling"]
+        official = str(inst[name].get("model", "")).startswith("ecosmoe2e")
         for i in range(1, int(par.get("nprey", 0)) + 1):
-            prey = cpl.get(f"prey{i}_c")
+            if official:   # ECOSMO E2E v2.0 names: prey<i>, Gr<i>, pref<i>
+                prey, w, sigma = cpl.get(f"prey{i}"), par.get(f"pref{i}", 0), par.get(f"Gr{i}", 0)
+            else:
+                prey, w, sigma = cpl.get(f"prey{i}_c"), par.get(f"prey{i}_a", 0), par.get(f"prey{i}_sigma", 0)
             if prey:
-                edges.append({"from": _node_of(prey), "to": name, "w": float(par.get(f"prey{i}_a", 0)),
-                              "sigma": float(par.get(f"prey{i}_sigma", 0)), "kind": "htl"})
-        det = cpl.get("det_c")
+                edges.append({"from": _node_of(prey), "to": name, "w": float(w), "sigma": float(sigma), "kind": "htl"})
+        if official:
+            # the official code's fixed diet items (detritus, sediment, macrobenthos) are separate parameters
+            fixed = ([("det", "prefMB1Det", "GrMB1Det"), ("sed1", "prefMB1Sed", "GrMB1Sed"), ("dom", "prefMB1Dom", "GrMB1Det")]
+                     if name == "MB" else [("det", "prefF1Det", "GrF1Det"), ("mb", "prefF1MB1", "GrF1MB1")])
+            for key, pref, gr in fixed:
+                src = cpl.get(key)
+                if src and float(par.get(pref, 0)) > 0 and (gr is None or float(par.get(gr, 0)) > 0):
+                    edges.append({"from": _node_of(src), "to": name, "w": float(par[pref]),
+                                  "sigma": float(par.get(gr, 0)) if gr else 0.0, "kind": "htl"})
+        det = cpl.get("det" if official else "det_c")
         if det:
             edges.append({"from": name, "to": _node_of(det), "w": 0.3, "kind": "waste"})
     if "fish" in inst:

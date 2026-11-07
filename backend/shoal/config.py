@@ -73,7 +73,7 @@ def kernel_info() -> dict:
     except Exception:
         info["pygetm_available"] = False
     official = KERNEL_SRC / "ecosmo-e2e"
-    info["e2e_official_present"] = (official / "CMakeLists.txt").exists()
+    info["e2e_official_present"] = (official / "src" / "CMakeLists.txt").exists()
     return info
 
 

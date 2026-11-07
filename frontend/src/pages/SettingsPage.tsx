@@ -64,13 +64,13 @@ export default function SettingsPage() {
         {k && (
           <div className="panel panel-pad">
             <div className="kv">
-              {[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E 模块", k.e2e?.source === "official" ? "官方 ECOSMO E2E" : "按已发表方程实现"], ["可执行文件", k.gotm_path], ["pyfabm", k.pyfabm_available ? "可用" : "不可用"], ["编译时间", k.built ? new Date(k.built).toLocaleString() : "–"]].map(([a1, b]) => (
+              {[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E 模块", k.e2e?.source === "official" ? "官方 ECOSMO E2E v2.0（另含按论文方程重写的对照版本）" : "按论文方程重写（未编入官方代码）"], ["可执行文件", k.gotm_path], ["pyfabm", k.pyfabm_available ? "可用" : "不可用"], ["编译时间", k.built ? new Date(k.built).toLocaleString() : "–"]].map(([a1, b]) => (
                 <Fragment key={String(a1)}><span className="k">{a1}</span><span className="v mono">{b ?? "–"}</span></Fragment>
               ))}
             </div>
           </div>
         )}
-        <div className="hint" style={{ marginTop: 8 }}>重新编译：<code>bash kernel/build.sh</code>。官方 ECOSMO E2E 代码解压到 <code>kernel/src/ecosmo-e2e</code> 后重新编译即可替换按已发表方程实现的版本。</div>
+        <div className="hint" style={{ marginTop: 8 }}>重新编译：<code>bash kernel/build.sh</code>。官方 ECOSMO E2E 压缩包里的文件夹（含 <code>src/</code> 与 <code>testcases/</code>）放到 <code>kernel/src/ecosmo-e2e</code> 后重新编译，就会和按论文方程重写的版本一起编进内核。</div>
       </div>
     </div>
   );
