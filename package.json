@@ -1,8 +1,8 @@
 {
-  "name": "e2e-studio",
+  "name": "shoal",
   "private": true,
   "version": "1.0.0",
-  "description": "E2E Studio — marine end-to-end ecosystem simulation (GOTM + FABM + ERSEM/ECOSMO/ERGOM + MIZER/E2E) with visualization",
+  "description": "Shoal — shelf-sea end-to-end ecosystem modelling workbench (GOTM + FABM + ERSEM/ECOSMO/ERGOM + MIZER/E2E) with visualization",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"pnpm:dev:api\" \"pnpm:dev:web\"",
     "dev:api": "node scripts/dev-api.mjs",

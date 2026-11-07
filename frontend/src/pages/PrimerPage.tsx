@@ -103,7 +103,7 @@ export default function PrimerPage() {
                 <span className="learn-status"><Icon name="warning" />AI 撰写，待审核</span>
                 {cur.summary && <span className="soft small ellipsis">{cur.summary}</span>}
                 <span className="grow" />
-                <Btn size="sm" icon="sparkle" onClick={() => askTutor(`请讲解入门教程“${cur.title}”这一章：核心概念、关键方程，以及它们在 E2E Studio 里对应的设置和结果。`)}>问讲解员</Btn>
+                <Btn size="sm" icon="sparkle" onClick={() => askTutor(`请讲解入门教程“${cur.title}”这一章：核心概念、关键方程，以及它们在 Shoal 里对应的设置和结果。`)}>问讲解员</Btn>
               </div>
             </header>
             <Markdown text={cur.body} onChapter={open} />

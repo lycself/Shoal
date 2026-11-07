@@ -94,7 +94,7 @@ export function Plot({ data, layout, height, fill, config, onClick }: { data: an
     Plotly.react(el, data, l, {
       responsive: true, displaylogo: false, displayModeBar: "hover",
       modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d", "toggleSpikelines"],
-      toImageButtonOptions: { format: "png", scale: 3, filename: "e2e-studio" }, ...(config || {}),
+      toImageButtonOptions: { format: "png", scale: 3, filename: "shoal" }, ...(config || {}),
     });
     if (onClick) {
       (el as any).removeAllListeners?.("plotly_click");

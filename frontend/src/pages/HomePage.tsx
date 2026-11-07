@@ -29,8 +29,8 @@ function Welcome({ onNew }: { onNew: () => void }) {
   const { projects, openProject, setPage } = useApp();
   return (
     <div className="page" style={{ maxWidth: 980, paddingTop: 56 }}>
-      <div style={{ fontSize: 30, fontWeight: 300, color: "var(--fg-strong)" }}>E2E Studio</div>
-      <div className="muted" style={{ marginBottom: 36 }}>海洋端到端生态模拟 · GOTM–FABM · ERSEM / ECOSMO / ERGOM · FABM-MIZER / ECOSMO E2E</div>
+      <div style={{ fontSize: 30, fontWeight: 300, color: "var(--fg-strong)" }}>Shoal</div>
+      <div className="muted" style={{ marginBottom: 36 }}>浅海生态模拟工作台：从营养盐、浮游生物一直算到鱼，全球任意陆架海都能研究</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 48 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 10 }}>开始</div>

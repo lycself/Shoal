@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-const api = `http://127.0.0.1:${process.env.E2E_API_PORT || "8765"}`;
+const api = `http://127.0.0.1:${process.env.SHOAL_API_PORT || "8765"}`;
 
 export default defineConfig({
   plugins: [react()],
