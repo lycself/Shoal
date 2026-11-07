@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, on } from "../api";
-import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Split, StatusBadge, useAsync, HelpLink } from "../components/ui";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Split, StatusBadge, useAsync, HelpLink, PanelToggle } from "../components/ui";
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
 
 export default function ExperimentsPage() {
@@ -32,7 +32,7 @@ export default function ExperimentsPage() {
     <div className="page fill">
       <div className="page-header">
         <div>
-          <div className="row"><div className="page-title">实验与运行</div><HelpLink chapter="00-guide" title="使用说明" /></div>
+          <div className="row"><PanelToggle id="exps" label="实验列表" /><div className="page-title">实验与运行</div><HelpLink chapter="00-guide" title="使用说明" /></div>
         </div>
         <div className="page-actions">
           {p.site_status !== "ready" && <span className="badge warn"><Icon name="warning" />站点未就绪</span>}

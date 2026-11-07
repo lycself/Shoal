@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Markdown, parseFrontMatter } from "../components/Markdown";
 import { Btn, Icon } from "../components/ui";
 import { useApp } from "../store";
@@ -20,16 +20,35 @@ const PARTS: [string, (o: number) => boolean][] = [
   ["方法来源与拓展", (o) => o >= 9],
 ];
 
+// below these page widths the panels float over the article (drawers) instead of taking room from it
+const NAV_DOCK_WIDTH = 720;
+const TOC_DOCK_WIDTH = 1060;
+
 export default function PrimerPage() {
-  const { chapter, setPage } = useApp();
+  const { chapter, setPage, learnPanels, setLearnPanel } = useApp();
   const [id, setId] = useState<string>(chapter && CHAPTERS.some((c) => c.id === chapter) ? chapter : CHAPTERS[0]?.id);
   const [q, setQ] = useState("");
-  const [navOpen, setNavOpen] = useState(true);
-  const [tocOpen, setTocOpen] = useState(true);
   const [active, setActive] = useState("");
   const main = useRef<HTMLDivElement>(null);
+  const host = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(1400);
+  const [drawer, setDrawer] = useState<null | "nav" | "toc">(null);
+  useLayoutEffect(() => {
+    const el = host.current;
+    if (!el) return;
+    if (el.clientWidth) setWidth(el.clientWidth);
+    const ro = new ResizeObserver(() => setWidth(el.clientWidth || 1400));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawer(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [drawer]);
   useEffect(() => { if (chapter && CHAPTERS.some((c) => c.id === chapter)) setId(chapter); }, [chapter]);
-  const open = (cid: string) => { setId(cid); setQ(""); setPage("primer", { chapter: cid }); main.current?.scrollTo({ top: 0 }); };
+  const open = (cid: string) => { setId(cid); setQ(""); setDrawer(null); setPage("primer", { chapter: cid }); main.current?.scrollTo({ top: 0 }); };
   const cur = CHAPTERS.find((c) => c.id === id)!;
   const idx = CHAPTERS.findIndex((c) => c.id === id);
   const part = PARTS.find(([, f]) => f(cur?.order ?? 0))?.[0];
@@ -55,19 +74,31 @@ export default function PrimerPage() {
     h();
     return () => el.removeEventListener("scroll", h);
   }, [id]);
-  const goSection = (t: string) => (Array.from(document.querySelectorAll(".md h2")) as HTMLElement[]).find((h) => h.textContent?.trim() === t)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const goSection = (t: string) => {
+    setDrawer(null);
+    (Array.from(document.querySelectorAll(".md h2")) as HTMLElement[]).find((h) => h.textContent?.trim() === t)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+  // docked panels where there is room (remembered between visits), drawers over the article where there is not
+  const floating = { nav: width < NAV_DOCK_WIDTH, toc: width < TOC_DOCK_WIDTH };
+  const hasToc = toc.length > 0 && !hits;
+  const navOpen = floating.nav ? drawer === "nav" : learnPanels.nav;
+  const tocOpen = hasToc && (floating.toc ? drawer === "toc" : learnPanels.toc);
+  const toggle = (k: "nav" | "toc") => {
+    if (floating[k]) setDrawer((d) => (d === k ? null : k));
+    else setLearnPanel(k, !learnPanels[k]);
+  };
 
   return (
-    <div className="learn">
-      {navOpen && (
-        <aside className="learn-nav">
+    <div className="learn" ref={host}>
+      <aside className={`learn-nav ${navOpen ? "open" : ""} ${floating.nav ? "drawer" : ""}`} aria-label="章节目录" aria-hidden={!navOpen}>
+        <div className="learn-panel-inner">
           <div style={{ padding: "12px 10px 8px" }}><div className="search"><Icon name="search" /><input placeholder="搜索教程" value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
           <div className="split-scroll" style={{ padding: "0 6px 14px" }}>
             {PARTS.map(([name, f]) => (
               <div key={name} style={{ marginBottom: 10 }}>
                 <div className="learn-part">{name}</div>
                 {CHAPTERS.filter((c) => f(c.order)).map((c) => (
-                  <button key={c.id} className={`learn-item ${c.id === id ? "active" : ""}`} onClick={() => open(c.id)} title={c.summary}>
+                  <button key={c.id} className={`learn-item ${c.id === id ? "active" : ""}`} onClick={() => open(c.id)} title={c.summary} tabIndex={navOpen ? 0 : -1}>
                     <span className="mono soft" style={{ width: 18, fontSize: 11 }}>{String(c.order).padStart(2, "0")}</span>
                     <span className="ellipsis">{c.title}</span>
                   </button>
@@ -75,16 +106,16 @@ export default function PrimerPage() {
               </div>
             ))}
           </div>
-        </aside>
-      )}
+        </div>
+      </aside>
       <div className="learn-main" ref={main}>
         <div className="learn-bar">
-          <button className={`learn-bar-btn ${navOpen ? "on" : ""}`} onClick={() => setNavOpen(!navOpen)} title={navOpen ? "隐藏章节目录" : "显示章节目录"}><Icon name="list-tree" />章节</button>
+          <button className={`learn-bar-btn ${navOpen ? "on" : ""}`} onClick={() => toggle("nav")} data-tip={navOpen ? "收起章节目录" : "显示章节目录"} aria-pressed={navOpen}><Icon name="list-tree" /><span>章节</span></button>
           <div className="learn-crumbs ellipsis">
             <span className="soft">{part}</span><Icon name="chevron-right" className="soft" /><span>{cur.title}</span>
             {active && <><Icon name="chevron-right" className="soft" /><span className="soft">{active}</span></>}
           </div>
-          {toc.length > 0 && <button className={`learn-bar-btn ${tocOpen ? "on" : ""}`} onClick={() => setTocOpen(!tocOpen)} title="本页内容">本页内容<Icon name="list-selection" /></button>}
+          {hasToc && <button className={`learn-bar-btn ${tocOpen ? "on" : ""}`} onClick={() => toggle("toc")} data-tip={tocOpen ? "收起“本页内容”" : "显示“本页内容”"} aria-pressed={tocOpen}><span>本页内容</span><Icon name="list-selection" /></button>}
         </div>
         {hits ? (
           <div className="learn-article">
@@ -114,12 +145,15 @@ export default function PrimerPage() {
           </article>
         )}
       </div>
-      {tocOpen && toc.length > 0 && !hits && (
-        <nav className="learn-toc">
-          <div className="learn-part">本页内容</div>
-          {toc.map((t) => <button key={t} className={`learn-item ${active === t ? "active" : ""}`} onClick={() => goSection(t)}><span className="ellipsis">{t}</span></button>)}
+      {hasToc && (
+        <nav className={`learn-toc ${tocOpen ? "open" : ""} ${floating.toc ? "drawer" : ""}`} aria-label="本页内容" aria-hidden={!tocOpen}>
+          <div className="learn-panel-inner">
+            <div className="learn-part">本页内容</div>
+            {toc.map((t) => <button key={t} className={`learn-item ${active === t ? "active" : ""}`} onClick={() => goSection(t)} tabIndex={tocOpen ? 0 : -1}><span className="ellipsis">{t}</span></button>)}
+          </div>
         </nav>
       )}
+      {drawer && <div className="learn-scrim" onClick={() => setDrawer(null)} />}
     </div>
   );
 }

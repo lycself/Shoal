@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api, connectEvents, on, onConnection } from "./api";
 import { Icon, IconBtn, Logo, MenuEntry, MenuList, Modal, Progress, StatusBadge, Toasts, TooltipLayer } from "./components/ui";
-import { Page, useApp } from "./store";
+import { Page, SIDE_COLLAPSED, SIDE_MAX, SIDE_MIN, useApp } from "./store";
 import HomePage from "./pages/HomePage";
 import SitePage from "./pages/SitePage";
 import FoodWebPage from "./pages/FoodWebPage";
@@ -34,6 +34,29 @@ export default function App() {
   const { page, setPage, project, jobs, collapsed, panelOpen, setPanelOpen, assistantOpen, theme, setTheme } = s;
   const [conn, setConn] = useState("connecting");
   const [dialog, setDialog] = useState<"about" | "keys" | null>(null);
+  // sidebar width while its edge is being dragged (null = not dragging, use the stored width)
+  const [liveSide, setLiveSide] = useState<number | null>(null);
+  const sideW = liveSide ?? (collapsed ? SIDE_COLLAPSED : s.sideWidth);
+  const dragSide = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const x0 = e.clientX, start = collapsed ? SIDE_COLLAPSED : s.sideWidth;
+    let result = start;
+    document.body.classList.add("dragging");
+    const move = (ev: MouseEvent) => { result = start + ev.clientX - x0; setLiveSide(Math.max(SIDE_COLLAPSED, Math.min(SIDE_MAX, result))); };
+    const up = () => {
+      document.body.classList.remove("dragging");
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      setLiveSide(null);
+      if (result < (SIDE_COLLAPSED + SIDE_MIN) / 2) s.setCollapsed(true);  // dragged narrow: snap to the icon strip
+      else { s.setSideWidth(result); if (collapsed) s.setCollapsed(false); }
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  // clicking the page you are on while the sidebar is an icon strip opens it, as in AVAS
+  const navTo = (p: Page) => { if (p === page && collapsed) s.setCollapsed(false); else setPage(p); };
 
   useEffect(() => {
     setTheme(theme);
@@ -130,10 +153,10 @@ export default function App() {
       </MenuBar>
 
       <div className="shell-body">
-        <nav className="activity">
+        <nav className={`activity ${liveSide == null ? "animate" : ""}`} style={{ width: sideW }}>
           <div className="side-head">Shoal 1.0 · 内核 {k?.gotm?.split(" ")[0] ?? "…"}</div>
           {PAGES.map((it) => (
-            <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""} ${it.project && !project ? "disabled" : ""}`} data-tip={collapsed ? it.label : undefined} onClick={() => setPage(it.id)}>
+            <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""} ${it.project && !project ? "disabled" : ""}`} data-tip={collapsed ? it.label : undefined} onClick={() => navTo(it.id)}>
               <span className="nav-icon"><Icon name={it.icon} /></span>
               <span className="nav-label">{it.label}</span>
               {it.id === "experiments" && runningRuns > 0 && <span className="nav-count">{runningRuns}</span>}
@@ -141,16 +164,17 @@ export default function App() {
             </div>
           ))}
           <div className="nav-bottom">
-            <div className="nav-item" data-tip={collapsed ? "展开侧栏（Ctrl+B）" : "收起侧栏（Ctrl+B）"} onClick={s.toggleCollapsed}>
-              <span className="nav-icon"><Icon name={collapsed ? "chevron-right" : "chevron-left"} /></span><span className="nav-label">收起侧栏</span>
-            </div>
             {BOTTOM.map((it) => (
-              <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""}`} data-tip={collapsed ? it.label : undefined} onClick={() => setPage(it.id)}>
+              <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""}`} data-tip={collapsed ? it.label : undefined} onClick={() => navTo(it.id)}>
                 <span className="nav-icon"><Icon name={it.icon} /></span><span className="nav-label">{it.label}</span>
               </div>
             ))}
+            <div className="nav-item sidebar-toggle" role="button" aria-label={collapsed ? "展开侧栏" : "收起侧栏"} data-tip={collapsed ? "展开侧栏（Ctrl+B）" : "收起侧栏（Ctrl+B），也可以拖动右边缘"} onClick={s.toggleCollapsed}>
+              <span className="nav-icon"><Icon name={collapsed ? "chevron-right" : "chevron-left"} /></span><span className="nav-label">收起</span>
+            </div>
           </div>
         </nav>
+        <div className="sash" onMouseDown={dragSide} onDoubleClick={s.toggleCollapsed} data-tip="拖动调整侧栏宽度，拖到最窄只留图标；双击收起或展开" />
         <div className="workspace">
           <main className="editor">
             {isProjectPage && !project ? (

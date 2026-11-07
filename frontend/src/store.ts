@@ -58,6 +58,11 @@ interface AppState {
   dark: boolean;
   collapsed: boolean;
   toggleCollapsed: () => void;
+  setCollapsed: (v: boolean) => void;
+  sideWidth: number;
+  setSideWidth: (w: number) => void;
+  learnPanels: { nav: boolean; toc: boolean };
+  setLearnPanel: (k: "nav" | "toc", v: boolean) => void;
   panelOpen: boolean;
   setPanelOpen: (v: boolean) => void;
   selectedRuns: string[];
@@ -71,6 +76,11 @@ interface AppState {
   revision: number;
   bump: () => void;
 }
+
+// main sidebar: icon strip when collapsed, otherwise resizable between these widths
+export const SIDE_COLLAPSED = 48;
+export const SIDE_MIN = 160;
+export const SIDE_MAX = 360;
 
 function lsGet(k: string, d: string) {
   try {
@@ -124,10 +134,21 @@ export const useApp = create<AppState>((set, get) => ({
   },
   dark: false,
   collapsed: lsGet("e2e.collapsed", "0") === "1",
-  toggleCollapsed: () => {
-    const v = !get().collapsed;
+  toggleCollapsed: () => get().setCollapsed(!get().collapsed),
+  setCollapsed: (v) => {
     lsSet("e2e.collapsed", v ? "1" : "0");
     set({ collapsed: v });
+  },
+  sideWidth: Math.max(SIDE_MIN, Math.min(SIDE_MAX, Number(lsGet("e2e.sideWidth", "208")) || 208)),
+  setSideWidth: (w) => {
+    const v = Math.round(Math.max(SIDE_MIN, Math.min(SIDE_MAX, w)));
+    lsSet("e2e.sideWidth", String(v));
+    set({ sideWidth: v });
+  },
+  learnPanels: { nav: lsGet("e2e.learn.nav", "1") === "1", toc: lsGet("e2e.learn.toc", "1") === "1" },
+  setLearnPanel: (k, v) => {
+    lsSet(`e2e.learn.${k}`, v ? "1" : "0");
+    set({ learnPanels: { ...get().learnPanels, [k]: v } });
   },
   panelOpen: false,
   setPanelOpen: (v) => set({ panelOpen: v }),
