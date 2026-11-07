@@ -1,0 +1,17 @@
+node_modules/
+frontend/dist/
+workspace/
+kernel/build/
+kernel/install/
+kernel/src/
+kernel/logs/
+__pycache__/
+*.pyc
+.DS_Store
+
+# papers (publisher copyright) and local tool settings
+refernece/
+.claude/
+*.egg-info/
+.venv/
+fort.*
