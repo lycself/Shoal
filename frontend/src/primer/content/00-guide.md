@@ -25,7 +25,7 @@ summary: 一个项目从建立到出图要走哪几步（项目、站点、食�
 
 第一次使用时按下面三步来：
 
-1. 准备 conda 环境（`pnpm setup:env`），然后编译内核：`pnpm kernel`（等于 `bash kernel/build.sh`）。脚本会下载 GOTM、FABM、ERSEM、FABM-MIZER 的源码，把 `ersem`、`mizer`、`e2e` 三个模块库编进同一个 `gotm` 可执行文件（如果 `kernel/src/ecosmo-e2e` 里放了官方 ECOSMO E2E 代码，也一起编进去，鱼类模块默认就用它），最后写出 `kernel.json`，记下编译结果。如果你把官方的 ECOSMO E2E v2.0 源码（Zenodo 10.5281/zenodo.20413770）解压到 `kernel/src/ecosmo-e2e`，脚本会优先用它；没有的话，就用按论文公式实现的 `kernel/e2e`。
+1. 准备 conda 环境（`pnpm setup:env`），然后编译内核：`pnpm kernel`（等于 `bash kernel/build.sh`）。脚本会下载 GOTM、FABM、ERSEM、FABM-MIZER 的源码，把 `ersem`、`mizer`、`e2e` 三个模块库编进同一个 `gotm` 可执行文件（如果 `kernel/src/ecosmo-e2e` 里放了官方 ECOSMO E2E 代码，也一起编进去，鱼类模块默认就用它；官方文件本身不改，脚本在副本上打一个修正补丁，修正项默认关闭、由配置打开，见第 7 章），最后写出 `kernel.json`，记下编译结果。如果你把官方的 ECOSMO E2E v2.0 源码（Zenodo 10.5281/zenodo.20413770）解压到 `kernel/src/ecosmo-e2e`，脚本会优先用它；没有的话，就用按论文公式实现的 `kernel/e2e`。
 2. 在仓库根目录运行 `pnpm install`，再运行 `pnpm dev`。这一步会同时启动后端（默认 `http://127.0.0.1:8765`）和前端。
 3. 用浏览器打开 `http://localhost:5173`。
 

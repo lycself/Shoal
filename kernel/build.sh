@@ -63,6 +63,9 @@ fetch ersem-setups https://github.com/pmlmodelling/ersem-setups.git  545b4dadb6b
 # code (Zenodo 10.5281/zenodo.20413770, archive ecosmoe2e_gmd.tar.gz) is built next to it when its
 # folder has been copied to src/ecosmo-e2e (needs src/ecosmo-e2e/src/CMakeLists.txt). Both can then be
 # used in one kernel: model names e2e/fish vs ecosmoe2e_fish.
+# The official sources are never edited: patches/ecosmo-e2e-corrections.patch is applied to a copy in
+# build/. It adds optional corrections (mass and sign fixes, see patches/README.md) as FABM parameters
+# that are all off by default, so an unmodified configuration still runs the original code path.
 EXTRA="ersem;mizer;e2e"
 E2E_OFFICIAL=""
 if [[ -f "$SRC/ecosmo-e2e/src/CMakeLists.txt" ]]; then
@@ -78,9 +81,24 @@ CMAKE_COMMON=(
   -DFABM_MIZER_BASE="$SRC/fabm-mizer"
   -DFABM_E2E_BASE="$HERE/e2e"
 )
-[[ -n "$E2E_OFFICIAL" ]] && CMAKE_COMMON+=(-DFABM_ECOSMOE2E_BASE="$E2E_OFFICIAL/src")
+[[ -n "$E2E_OFFICIAL" ]] && CMAKE_COMMON+=(-DFABM_ECOSMOE2E_BASE="$BUILD/ecosmo-e2e-src")
 
 if [[ $CLEAN == 1 ]]; then rm -rf "$BUILD"; fi
+mkdir -p "$BUILD"
+
+if [[ -n "$E2E_OFFICIAL" ]]; then
+  E2E_PATCHED="$BUILD/ecosmo-e2e-src"
+  rm -rf "$E2E_PATCHED.new"
+  cp -Rp "$E2E_OFFICIAL/src" "$E2E_PATCHED.new"
+  patch -s -p1 -d "$E2E_PATCHED.new" < "$HERE/patches/ecosmo-e2e-corrections.patch" \
+    || { echo "!! patches/ecosmo-e2e-corrections.patch does not apply to $E2E_OFFICIAL/src (different version?)"; exit 1; }
+  # only replace files whose content changed, so unchanged sources are not recompiled
+  mkdir -p "$E2E_PATCHED"
+  for f in "$E2E_PATCHED.new"/*; do
+    cmp -s "$f" "$E2E_PATCHED/$(basename "$f")" || cp -p "$f" "$E2E_PATCHED/"
+  done
+  rm -rf "$E2E_PATCHED.new"
+fi
 
 if [[ -z "$ONLY" || "$ONLY" == gotm ]]; then
   echo ">> building GOTM"
@@ -125,7 +143,9 @@ info = {
     # "official": ECOSMO E2E v2.0 compiled in (model ecosmoe2e_fish / ecosmoe2e_mb); the equation
     # re-implementation (e2e/fish, e2e/macrobenthos) is always present for comparison
     "e2e": {"source": "official" if official else "paper-equations", "official_path": official or None,
-            "reimplementation_path": str(here / "e2e")},
+            "reimplementation_path": str(here / "e2e"),
+            # Shoal's optional corrections compiled into the official code (patches/ecosmo-e2e-corrections.patch)
+            "corrections": bool(official)},
     "institutes_extra": ["ersem", "mizer", "e2e"] + (["ecosmoe2e"] if official else []),
 }
 (here / "install" / "kernel.json").write_text(json.dumps(info, indent=2))

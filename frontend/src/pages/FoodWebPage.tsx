@@ -158,6 +158,20 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                       : hosts?.e2e_engines?.official_available
                         ? "本软件按论文方程自己写的版本，只用于和官方代码对照：结果与官方代码有明显差别（见教程第 12 章）。"
                         : "内核里没有官方代码，只能用本软件按论文方程重写的版本。把官方压缩包放到 kernel/src/ecosmo-e2e 并重新编译内核即可启用官方代码。"}</span>
+                    {engine === "official" && (
+                      <>
+                        <span className="label">物质收支</span>
+                        <span className="control">
+                          {hosts?.e2e_engines?.corrections_available
+                            ? <Seg value={spec.htl.e2e.corrected ? "fixed" : "orig"} onChange={(v: string) => upd((s) => { s.htl.e2e.corrected = v === "fixed"; })}
+                                options={[["orig", "原样（重现论文）"], ["fixed", "修正版（收支闭合）", "check"]] as any} />
+                            : <span className="soft">内核编译于修正补丁之前，重新运行 kernel/build.sh 后可选修正版</span>}
+                        </span>
+                        <span /><span className="hint">{spec.htl.e2e.corrected
+                          ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程第 7 章），其余公式和参数不变。碳、氮、磷、硅收支闭合，鱼呼吸消耗氧气；结果与论文图会有差别。"
+                          : "逐行运行作者发布的代码，能重现论文结果。但代码里鱼的一部分粪便和尸体凭空消失，呼吸放出的碳也不回到水里，鱼呼吸反而产生氧气。研究物质循环时请选修正版。"}</span>
+                      </>
+                    )}
                   </>
                 )}
                 {spec.htl.kind === "mizer" && (
@@ -230,7 +244,7 @@ function E2EParams({ spec, defaults, upd }: { spec: any; defaults: any; upd: (fn
   return (
     <div className="col" style={{ gap: 22, maxWidth: 1100 }}>
       {defaults.engine === "official"
-        ? <Notice kind="plain">默认值取自官方 ECOSMO E2E v2.0 发布的 {HOST_LABEL[spec.host]} 算例。半饱和常数按氮计（mmol N m⁻³），代码内部换算成碳；修改过的值以蓝框和粗体显示。</Notice>
+        ? <Notice kind="plain">默认值取自官方 ECOSMO E2E v2.0 发布的 {HOST_LABEL[spec.host]} 算例。半饱和常数按氮计，代码内部乘 79.6 换算成碳。鱼的半饱和常数和整个水柱的食物总量比较，单位是每平方米（mmol N m⁻²），论文表中写的 mmol C m⁻³ 是标错了；大型底栖动物的和海底最底层的浓度比较（mmol N m⁻³）。修改过的值以蓝框和粗体显示。</Notice>
         : <Notice kind="plain">默认值来自 Vijayakumaran et al. (2026) 表 1–3（{HOST_LABEL[spec.host]} 列）。θ 与 γ<sub>MB</sub> 文献未给出，为本软件的默认值；修改过的值以蓝框和粗体显示。</Notice>}
       {(["MB", "F1", "F2"] as const).filter((k) => enabled[k]).map((k) => {
         const user = spec.htl.e2e.params?.[k] ?? {};

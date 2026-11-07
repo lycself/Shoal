@@ -128,7 +128,8 @@ def hosts() -> dict:
             "htl_defaults": {h: builder.htl_parameter_table(h) for h in HOSTS},
             "htl_defaults_by_engine": {e: {h: builder.htl_parameter_table(h, e) for h in HOSTS}
                                        for e in (("official", "reimplementation") if official else ("reimplementation",))},
-            "e2e_engines": {"default": builder.default_e2e_engine(), "official_available": official},
+            "e2e_engines": {"default": builder.default_e2e_engine(), "official_available": official,
+                            "corrections_available": official and builder.official_corrections_available()},
             "param_docs": builder.PARAM_DOCS}
 
 

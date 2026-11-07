@@ -70,6 +70,7 @@ workspace/                项目、数据缓存、设置（运行时生成）
 1. 从 Zenodo 下载 `ecosmoe2e_gmd.tar.gz`，把解压出的 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`（`model_output/` 有 5.9 GB 参考结果，不必复制）。
 2. 重新编译：`bash kernel/build.sh`。脚本检测到 `kernel/src/ecosmo-e2e/src/CMakeLists.txt` 后，把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核。
 3. 在“食物网配置”的“计算代码”里选择用哪一份；默认是官方代码，参数取自官方的 ERSEM / ECOSMO / ERGOM 算例。
+4. 官方代码里有 5 处物质不守恒或符号错误（鱼的 DOM 部分丢失、鱼呼吸产生氧气、硅按 Redfield 比例被扣掉、呼吸的碳丢失、底栖动物温度项常数）。`kernel/build.sh` 在官方源码的副本上打 `kernel/patches/ecosmo-e2e-corrections.patch`，把修正做成默认关闭的 FABM 参数；“食物网 → 物质收支”选“修正版”（新建配置的默认）时打开。关闭时与原代码逐位相同。说明与验证见 [kernel/patches/README.md](kernel/patches/README.md)。
 
 验证（ERSEM 宿主，北海中部 56°N 3°E，2020–2039 年，官方驱动与配置）：第一年与官方参考结果相差 1–4%；官方算例里鱼 2 的两个摄食率写作 0.004，而参考结果用的是 0.0045，改成 0.0045 后高营养级第一年在 1% 以内。20 年后的剩余偏差来自 ERSEM 版本（官方未记录），验证时用的是 ERSEM 8510fbf（2024-11-12）。本软件自动生成的鱼类配置与官方配置在同一内核上相差不到 1%。官方算例里的 ECOSMO、ERGOM 是 NECCTON 项目版本（未公开），本软件用 FABM 自带的 nersc/ecosmo 与 msi/ergom1。详见入门教程第 7、12 章。
 
@@ -86,5 +87,5 @@ workspace/                项目、数据缓存、设置（运行时生成）
 
 - 三维采用水柱集合（每个格点独立一维水柱，无水平输运和鱼类洄游）；NEMO-AMM7 完整三维需要超算。
 - WOA23 气候态同时被用作松弛目标，因此“验证与稳态”里的 WOA 比较只是一致性检查，不是独立验证；独立验证需要现场观测。
-- E2E 模块非官方代码；MIZER 初始鱼类为小量种子，需要足够预热年数；参数未在本站点重新标定。
+- E2E 默认用官方代码加修正补丁，论文的图对应“原样”设置；MIZER 初始鱼类为小量种子，需要足够预热年数；参数未在本站点重新标定。
 - 教程内容由 AI 撰写，每章标注“待审核”，使用前请对照原文核对公式与数值。
