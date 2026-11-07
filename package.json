@@ -1,0 +1,23 @@
+{
+  "name": "e2e-studio",
+  "private": true,
+  "version": "1.0.0",
+  "description": "E2E Studio — marine end-to-end ecosystem simulation (GOTM + FABM + ERSEM/ECOSMO/ERGOM + MIZER/E2E) with visualization",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c cyan,magenta \"pnpm:dev:api\" \"pnpm:dev:web\"",
+    "dev:api": "node scripts/dev-api.mjs",
+    "dev:web": "pnpm --dir frontend dev",
+    "build": "pnpm --dir frontend build",
+    "kernel": "bash kernel/build.sh",
+    "setup:env": "bash scripts/setup-env.sh"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "packageManager": "pnpm@10.32.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}

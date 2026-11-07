@@ -1,0 +1,544 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import { api } from "../api";
+import { FoodWebGraph } from "../components/FoodWebGraph";
+import { sampleScale } from "../components/MapCanvas";
+import { Plot, colorscaleFor, seriesColor } from "../components/Plot";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Stat, Tabs, cssVar, extent, fmt, useAsync } from "../components/ui";
+import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
+import { PlatesTab } from "../components/Plates";
+import { ValidateTab } from "../components/Validate";
+import { ColumnReading, CompareReading, FigAside, HovReading, ProfileReading, ReadingToggle, SeriesReading, SpectrumReading, WebReading, useReadingOpen } from "../components/ResultReading";
+
+type Tab = "compare" | "plates" | "hov" | "column" | "series" | "profile" | "spectrum" | "web" | "validate";
+const MONTH_AXIS = { tickvals: [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335], ticktext: ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"] };
+
+export default function ResultsPage() {
+  const { project, selectedRuns, setSelectedRuns, revision, dark } = useApp();
+  const p = project!;
+  const runs = useAsync(() => api.get<any[]>(`/projects/${p.id}/runs`), [p.id, revision]);
+  const exps = useAsync(() => api.get<any[]>(`/projects/${p.id}/experiments`), [p.id, revision]);
+  const done = (runs.data ?? []).filter((r) => r.status === "done");
+  const sel = selectedRuns.filter((id) => done.some((r) => r.id === id));
+  useEffect(() => { if (runs.data && !sel.length && done.length) setSelectedRuns([done[0].id]); }, [runs.data]);
+  const selRuns = sel.map((id) => done.find((r) => r.id === id)!).filter(Boolean);
+  const [tab, setTab] = useState<Tab>("compare");
+  const [win, setWin] = useState<"analysis" | "all">("analysis");
+  useEffect(() => {
+    const h = (e: Event) => setTab((e as CustomEvent).detail as Tab);
+    window.addEventListener("results-tab", h);
+    return () => window.removeEventListener("results-tab", h);
+  }, []);
+  const [v, setV] = useState("");
+  const vars = useAsync(() => (selRuns[0] ? api.get(`/projects/${p.id}/runs/${selRuns[0].id}/variables`) : Promise.resolve(null)), [p.id, selRuns[0]?.id]);
+  const start = win === "analysis" ? selRuns.map((r) => r.timing?.analysis_start).sort().reverse()[0] : undefined;
+  const hasMizer = selRuns.some((r) => r.spec?.htl?.kind === "mizer");
+  const allVars: any[] = vars.data?.groups.flatMap((g: any) => g.vars) ?? [];
+  const curVar = allVars.find((x) => x.name === v);
+  useEffect(() => {
+    if (!vars.data || curVar) return;
+    const pref = ["Z4_c", "ECO_mesozoo", "ergom_zz", "P1_c", "temp"];
+    setV(pref.find((x) => allVars.some((y) => y.name === x)) ?? allVars[0]?.name ?? "temp");
+  }, [vars.data]);
+
+  useEffect(() => {
+    // depth-only views: fall back to a depth-resolved variable
+    if ((tab === "hov" || tab === "profile") && curVar && !curVar.depth) {
+      const pref = ["temp", "P1_c", "ECO_dia", "ergom_pp", "N3_n"];
+      const d = pref.find((x) => allVars.some((y) => y.name === x && y.depth)) ?? allVars.find((y) => y.depth)?.name;
+      if (d) setV(d);
+    }
+  }, [tab, curVar?.name]);
+
+  if (runs.loading && !runs.data) return <Loading />;
+  if (!done.length) return <div className="page"><Empty icon="graph-line" title="还没有完成的运行">请先到“实验与运行”页运行实验。</Empty></div>;
+
+  return (
+    <div className="page fill">
+      <Split id="results" label="运行与变量列表" initial={300} min={240} max={460} side={
+        <SidePanel runs={done} exps={exps.data ?? []} sel={sel} setSel={setSelectedRuns} vars={vars.data} v={v} setV={setV} win={win} setWin={setWin} dark={dark} />
+      }>
+        <Tabs value={tab} onChange={setTab} tabs={[
+          { id: "compare", label: "指标对比", icon: "table", tip: "各运行的年平均指标，以及相对第一个勾选运行的变化" },
+          { id: "plates", label: "图版", icon: "files", tip: "排好版、可直接放进报告的多面板图" },
+          { id: "hov", label: "时间–深度", icon: "symbol-color", tip: "横轴时间、纵轴深度、颜色表示浓度的图，一眼看出季节和分层" },
+          { id: "column", label: "水柱动画", icon: "play-circle", tip: "像放电影一样看一年里水柱从上到下的变化" },
+          { id: "series", label: "时间序列", icon: "graph-line", tip: "某个量随时间的变化，可以看年循环" },
+          { id: "profile", label: "垂向剖面", icon: "arrow-down", tip: "选几个月份，看从海面到海底的分布" },
+          { id: "spectrum", label: "粒径谱", icon: "graph-scatter", tip: "按鱼的个体大小看生物量分布（MIZER）", hidden: !hasMizer },
+          { id: "web", label: "食物网状态", icon: "type-hierarchy", tip: "谁吃谁，以及各类群的多少" },
+          { id: "validate", label: "验证与稳态", icon: "verified", tip: "预热够不够、与观测气候平均值比得怎么样" },
+        ]} />
+        {!selRuns.length ? <Empty icon="checklist" title="在左侧勾选至少一个运行" /> : (
+          <div className="split-main" style={{ minHeight: 0 }}>
+            {tab === "compare" && <CompareTab pid={p.id} runs={selRuns} />}
+            {tab === "plates" && <PlatesTab pid={p.id} runs={selRuns} start={start} />}
+            {tab === "validate" && <ValidateTab pid={p.id} run={selRuns[0]} />}
+            {tab === "hov" && <HovTab pid={p.id} runs={selRuns} v={v} curVar={curVar} start={start} />}
+            {tab === "column" && <ColumnTab pid={p.id} run={selRuns[0]} allVars={allVars} start={start} />}
+            {tab === "series" && <SeriesTab pid={p.id} runs={selRuns} v={v} curVar={curVar} start={start} />}
+            {tab === "profile" && <ProfileTab pid={p.id} runs={selRuns} v={v} curVar={curVar} start={start} />}
+            {tab === "spectrum" && <SpectrumTab pid={p.id} runs={selRuns.filter((r) => r.spec?.htl?.kind === "mizer")} />}
+            {tab === "web" && <WebTab pid={p.id} runs={selRuns} />}
+          </div>
+        )}
+      </Split>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- side panel
+function SidePanel({ runs, exps, sel, setSel, vars, v, setV, win, setWin, dark }: any) {
+  const [q, setQ] = useState("");
+  const [closed, setClosed] = useState<Record<string, boolean>>({});
+  const groups = useMemo(() => {
+    const out: { id: string; name: string; runs: any[] }[] = [];
+    const used = new Set<string>();
+    for (const e of exps) {
+      const rs = runs.filter((r: any) => r.experiment_id === e.id);
+      if (rs.length) { out.push({ id: e.id, name: e.name, runs: rs }); rs.forEach((r: any) => used.add(r.id)); }
+    }
+    const rest = runs.filter((r: any) => !used.has(r.id));
+    if (rest.length) out.push({ id: "_rest", name: "其他运行", runs: rest });
+    return out;
+  }, [runs, exps]);
+  const toggle = (id: string) => setSel(sel.includes(id) ? sel.filter((x: string) => x !== id) : [...sel, id]);
+  return (
+    <>
+      <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--border)" }}>
+        <Seg value={win} onChange={setWin} size="sm" options={[["analysis", "分析时段"], ["all", "全部年份"]]} />
+      </div>
+      <div style={{ flex: "1 1 50%", minHeight: 120, display: "flex", flexDirection: "column", borderBottom: "1px solid var(--border)" }}>
+        <div className="tree-head">运行<span className="actions"><span className="soft" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>已选 {sel.length}</span>{sel.length > 0 && <IconBtn icon="clear-all" title="清空选择" size="sm" onClick={() => setSel([])} />}</span></div>
+        <div className="split-scroll">
+          {groups.map((g) => (
+            <div key={g.id}>
+              <div className="tree-group" data-tip={closed[g.id] ? "展开这一组" : "收起这一组"} onClick={() => setClosed({ ...closed, [g.id]: !closed[g.id] })}><Icon name={closed[g.id] ? "chevron-right" : "chevron-down"} /><span className="ellipsis">{g.name}</span></div>
+              {!closed[g.id] && g.runs.map((r: any) => {
+                const i = sel.indexOf(r.id);
+                return (
+                  <div key={r.id} className={`tree-item ${i >= 0 ? "active" : ""}`} style={{ paddingLeft: 16 }} onClick={() => toggle(r.id)} title={`${r.id}\n${HOST_LABEL[r.spec?.host]} · ${HTL_LABEL[r.spec?.htl?.kind]}`}>
+                    <Check checked={i >= 0} onChange={() => toggle(r.id)} />
+                    {i >= 0 ? <span className="swatch round" style={{ background: seriesColor(i, dark) }} /> : <span className="swatch round" style={{ background: "var(--border)" }} />}
+                    <div className="grow"><div className="ellipsis">{r.label}</div><div className="meta">{(r.created || "").slice(5, 16).replace("T", " ")}{i === 0 && sel.length > 1 ? " · 基准" : ""}</div></div>
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+      <div style={{ flex: "1 1 50%", minHeight: 120, display: "flex", flexDirection: "column" }}>
+        <div className="tree-head">变量</div>
+        <div style={{ padding: "0 10px 6px" }}><div className="search"><Icon name="search" /><input placeholder="搜索变量（名称或含义）" value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
+        <div className="split-scroll">
+          {!vars ? <Loading /> : vars.groups.map((g: any) => {
+            const vs = g.vars.filter((x: any) => !q || (x.name + x.long_name).toLowerCase().includes(q.toLowerCase()));
+            if (!vs.length) return null;
+            const key = "v_" + g.id;
+            const shut = q ? false : closed[key] ?? !["physics", "fish", "zoo", "phyto"].includes(g.id);
+            return (
+              <div key={g.id}>
+                <div className="tree-group" data-tip={shut ? "展开这一组" : "收起这一组"} onClick={() => setClosed({ ...closed, [key]: !shut })}><Icon name={shut ? "chevron-right" : "chevron-down"} />{g.label}<span className="soft" style={{ marginLeft: "auto", fontWeight: 500 }}>{vs.length}</span></div>
+                {!shut && vs.map((x: any) => (
+                  <div key={x.name} className={`tree-item ${x.name === v ? "active" : ""}`} onClick={() => setV(x.name)} title={`${x.long_name}${x.units ? ` (${x.units})` : ""}`}>
+                    <Icon name={x.depth ? "symbol-array" : "symbol-number"} />
+                    <div className="grow"><div className="ellipsis mono" style={{ fontSize: 12 }}>{x.name}</div><div className="meta ellipsis">{x.long_name}</div></div>
+                  </div>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </>
+  );
+}
+
+function VarTitle({ curVar }: { curVar?: any }) {
+  if (!curVar) return null;
+  return <span className="row" style={{ gap: 6 }}><b className="mono" style={{ color: "var(--fg-strong)" }}>{curVar.name}</b><span className="soft ellipsis">{curVar.long_name}{curVar.units ? ` · ${curVar.units}` : ""}</span></span>;
+}
+
+export function downloadCsv(name: string, rows: any[][]) {
+  const csv = "\ufeff" + rows.map((r) => r.map((c) => (c == null ? "" : /[",\n]/.test(String(c)) ? `"${String(c).replace(/"/g, '""')}"` : c)).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+
+// ------------------------------------------------------------------ compare
+const KPI_KEYS = ["phyto", "zoo", "zoo_Z4_c", "F1_c", "fish_ww", "MB_c", "npp", "co2"];
+function CompareTab({ pid, runs }: { pid: string; runs: any[] }) {
+  const dark = useApp((s) => s.dark);
+  const d = useAsync(() => api.post(`/projects/${pid}/results/compare`, { run_ids: runs.map((r) => r.id) }), [pid, runs.map((r) => r.id).join()]);
+  if (d.loading) return <Loading text="计算分析时段内的年均指标…" />;
+  if (d.error) return <div style={{ padding: 16 }}><Notice kind="danger">{d.error}</Notice></div>;
+  const t: any = d.data;
+  const last0 = runs.length - 1;
+  const kpis = KPI_KEYS.map((k) => t.rows.find((r: any) => r.key === k)).filter((r: any) => r && r.values[last0] !== null).slice(0, 6);
+  const pctRows = t.rows.filter((r: any) => !r.label.startsWith("  ") && r.pct.slice(1).some((x: any) => x !== null) && !["sst", "sbt"].includes(r.key));
+  const last = runs.length - 1;
+  return (
+    <div className="split-scroll" style={{ padding: "16px 18px" }}>
+      <div className="section">
+        <div className="section-header"><Icon name="dashboard" /><h3>{runs.length > 1 ? `“${t.labels[last]}” 相对 “${t.labels[0]}”` : t.labels[0]}</h3><span className="soft small">分析时段年均值</span></div>
+        <div className="stats">
+          {kpis.map((r: any) => <Stat key={r.key} k={r.label.trim()} v={fmt(r.values[last])} unit={r.units} delta={runs.length > 1 ? r.pct[last] : undefined} />)}
+        </div>
+      </div>
+      {runs.length > 1 && pctRows.length > 0 && (
+        <div className="section">
+          <div className="section-header"><Icon name="graph" /><h3>相对基准的百分比变化</h3></div>
+          <Plot height={Math.max(240, pctRows.length * 30 + 70)} data={t.labels.slice(1).map((l: string, k: number) => ({
+            type: "bar", orientation: "h", name: l, y: pctRows.map((r: any) => r.label.trim()), x: pctRows.map((r: any) => r.pct[k + 1]),
+            marker: { color: seriesColor(k + 1, dark) }, hovertemplate: "%{y}: %{x:+.1f}%<extra>" + l + "</extra>",
+          }))} layout={{ barmode: "group", xaxis: { title: { text: `相对“${t.labels[0]}”的变化 (%)` }, zeroline: true, zerolinewidth: 1.5 }, yaxis: { autorange: "reversed" }, margin: { l: 200, t: 34 }, legend: { orientation: "h", y: 1.02, yanchor: "bottom", x: 0 } }} />
+        </div>
+      )}
+      <div className="section"><CompareReading t={t} runs={runs} /></div>
+      <div className="section">
+        <div className="section-header"><Icon name="table" /><h3>指标表</h3><div className="section-actions"><Btn size="sm" icon="export" onClick={() => downloadCsv("指标对比.csv", [["指标", "单位", ...t.labels], ...t.rows.map((r: any) => [r.label.trim(), r.units, ...r.values])])}>导出 CSV</Btn></div></div>
+        <div className="panel" style={{ overflow: "auto" }}>
+          <table className="table">
+            <thead><tr><th>指标</th><th>单位</th>{t.labels.map((l: string, i: number) => <th key={i} className="num"><span className="row" style={{ justifyContent: "flex-end", gap: 6 }}><span className="swatch round" style={{ background: seriesColor(i, dark) }} />{l}</span></th>)}</tr></thead>
+            <tbody>{t.rows.map((r: any) => (
+              <tr key={r.key}>
+                <td style={{ paddingLeft: r.label.startsWith("  ") ? 30 : 12, color: r.label.startsWith("  ") ? "var(--fg-muted)" : undefined }}>{r.label.trim()}</td>
+                <td className="soft small">{r.units}</td>
+                {r.values.map((v: any, i: number) => <td key={i} className="num">{fmt(v)}{i > 0 && r.pct[i] !== null && <span className={`delta ${r.pct[i] > 0 ? "up" : r.pct[i] < 0 ? "down" : "zero"}`}>{r.pct[i] > 0 ? "+" : ""}{r.pct[i]}%</span>}</td>)}
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------- hov
+function HovTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; v: string; curVar: any; start?: string }) {
+  const dark = useApp((s) => s.dark);
+  const [diff, setDiff] = useState(false);
+  const [mld, setMld] = useState(true);
+  const [contour, setContour] = useState(false);
+  const [open, toggle] = useReadingOpen();
+  const [probe, setProbe] = useState<{ t: string; z: number; at: { clientX: number; clientY: number } } | null>(null);
+  const isDepth = curVar?.depth;
+  const data = useAsync(async () => {
+    if (!v || !isDepth) return null;
+    const q = start ? `&start=${start}` : "";
+    const panels = diff && runs.length >= 2
+      ? await Promise.all(runs.slice(1).map((r) => api.post(`/projects/${pid}/results/difference`, { a: runs[0].id, b: r.id, var: v, start }).then((d) => ({ ...d, label: `${r.label} − ${runs[0].label}` }))))
+      : await Promise.all(runs.map((r) => api.get(`/projects/${pid}/runs/${r.id}/hovmoller?var=${encodeURIComponent(v)}${q}`).then((d) => ({ ...d, label: r.label }))));
+    const m = mld ? await api.post(`/projects/${pid}/results/timeseries`, { run_ids: (diff ? runs.slice(1) : runs).map((r) => r.id), var: "mld_surf", mode: "integral", start }).catch(() => null) : null;
+    return { panels, mld: m?.series ?? [] };
+  }, [pid, v, runs.map((r) => r.id).join(), start, diff, mld, isDepth]);
+  const fig = useMemo(() => {
+    if (!data.data) return null;
+    const ps = data.data.panels as any[];
+    const all = ps.flatMap((d) => d.values.flat()).filter((x: any) => x !== null) as number[];
+    let [zmin, zmax] = extent(all);
+    if (diff) { const m = Math.max(Math.abs(zmin), Math.abs(zmax)); zmin = -m; zmax = m; }
+    const n = ps.length, gap = 0.06, h = (1 - gap * (n - 1)) / n;
+    const traces: any[] = [];
+    const layout: any = { margin: { l: 64, r: 16, t: 26, b: 40 }, annotations: [], showlegend: false };
+    ps.forEach((d, i) => {
+      const ya = i ? `y${i + 1}` : "y";
+      traces.push({ type: contour ? "contour" : "heatmap", x: d.time, y: d.depth, z: d.values, xaxis: "x", yaxis: ya, colorscale: colorscaleFor(v, dark, diff), zmin, zmax, zmid: diff ? 0 : undefined,
+        showscale: i === 0, colorbar: { title: { text: d.units, side: "right" }, thickness: 12, len: Math.min(1, 0.95), y: 0.5 }, zsmooth: contour ? undefined : "best",
+        contours: contour ? { coloring: "heatmap", showlines: true } : undefined, line: contour ? { width: 0.4, color: "rgba(0,0,0,.25)" } : undefined,
+        hovertemplate: `%{x}<br>%{y:.1f} m<br>%{z:.4g} ${d.units}<extra>${d.label}</extra>` });
+      const ms = data.data!.mld[i];
+      if (ms && !ms.missing) traces.push({ type: "scatter", mode: "lines", x: ms.time, y: ms.values, xaxis: "x", yaxis: ya, line: { color: dark ? "#ffffff" : "#111111", width: 1.2, dash: "dot" }, hovertemplate: "混合层深度 %{y:.1f} m<extra></extra>" });
+      const y0 = 1 - (i + 1) * h - i * gap, y1 = y0 + h;
+      layout[i ? `yaxis${i + 1}` : "yaxis"] = { domain: [y0, y1], autorange: "reversed", title: { text: "深度 (m)" }, range: [Math.max(...d.depth), 0] };
+      layout.annotations.push({ text: `<b>${d.label}</b>`, xref: "paper", yref: "paper", x: 0, y: y1 + 0.005, xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 12 } });
+    });
+    layout.xaxis = { anchor: n > 1 ? `y${n}` : "y" };
+    if (probe) layout.shapes = [{ type: "line", xref: "x", yref: "paper", x0: probe.t, x1: probe.t, y0: 0, y1: 1, line: { color: dark ? "#fff" : "#111", width: 1, dash: "dash" } }];
+    return { traces, layout };
+  }, [data.data, dark, diff, contour, v, probe]);
+  return (
+    <>
+      <div className="optbar">
+        <VarTitle curVar={curVar} />
+        <span className="grow" />
+        <Check checked={mld} onChange={setMld}>叠加混合层深度</Check>
+        <Check checked={contour} onChange={setContour}>等值线</Check>
+        {runs.length >= 2 && <Check checked={diff} onChange={setDiff}>与基准的差值</Check>}
+        <ReadingToggle open={open} toggle={toggle} />
+      </div>
+      {!isDepth ? <Empty icon="symbol-array" title="请在左侧选择一个随深度变化的变量">时间–深度图（Hovmöller 图）需要三维（时间 × 深度）变量，例如温度、营养盐、浮游生物。</Empty>
+        : data.loading ? <Loading text="读取输出…" /> : data.error ? <div style={{ padding: 16 }}><Notice kind="danger">{data.error}</Notice></div>
+        : fig && <FigAside open={open} toggle={toggle} figure={<>
+            <Plot fill data={fig.traces} layout={fig.layout} onClick={(ev: any) => { const pt = ev.points?.[0]; if (pt) setProbe({ t: String(pt.x), z: +pt.y, at: { clientX: ev.event?.clientX ?? 400, clientY: ev.event?.clientY ?? 300 } }); }} />
+            <div className="soft small" style={{ padding: "2px 10px" }}>点击图中任一点：查看该时刻的垂向剖面和该深度的时间序列</div>
+            {probe && <HovProbe probe={probe} panels={data.data!.panels as any[]} onClose={() => setProbe(null)} />}
+          </>}
+          reading={<HovReading panels={data.data!.panels as any[]} mld={data.data!.mld} v={v} label={curVar?.long_name || v} diff={diff} />} />}
+    </>
+  );
+}
+
+/** Popup for a clicked time–depth point: the profile at that time and the series at that depth, for every panel. */
+function HovProbe({ probe, panels, onClose }: { probe: { t: string; z: number; at: { clientX: number; clientY: number } }; panels: any[]; onClose: () => void }) {
+  const dark = useApp((s) => s.dark);
+  useEffect(() => { const h = (e: KeyboardEvent) => e.key === "Escape" && onClose(); window.addEventListener("keydown", h); return () => window.removeEventListener("keydown", h); }, [onClose]);
+  const p0 = panels[0];
+  const j = Math.max(0, p0.time.findIndex((x: string) => x >= probe.t.slice(0, 10)));
+  const k = p0.depth.reduce((b: number, d: number, i: number) => (Math.abs(d - probe.z) < Math.abs(p0.depth[b] - probe.z) ? i : b), 0);
+  const u = p0.units ?? "";
+  const W = 420, left = Math.min(probe.at.clientX + 18, window.innerWidth - W - 12), top = Math.max(56, Math.min(probe.at.clientY - 80, window.innerHeight - 520));
+  const val = p0.values[k]?.[j];
+  return (
+    <div className="cell-panel" style={{ left, top, width: W, maxHeight: window.innerHeight - top - 12 }} role="dialog" aria-label="剖面与时间序列">
+      <div className="row"><b style={{ color: "var(--fg-strong)" }}>{p0.time[j]} · {p0.depth[k].toFixed(1)} m</b><span className="soft small">{fmt(val)} {u}</span><span className="grow" /><IconBtn icon="close" size="sm" title="关闭（Esc）" onClick={onClose} /></div>
+      <div style={{ display: "grid", gridTemplateColumns: "150px minmax(0,1fr)", gap: 8, marginTop: 6 }}>
+        <Plot height={230} data={panels.map((p, i) => ({ x: p.values.map((row: any[]) => row[j]), y: p.depth, type: "scatter", mode: "lines", name: p.label, line: { color: seriesColor(i, dark), width: 1.8 } }))}
+          layout={{ margin: { l: 34, r: 4, t: 18, b: 28 }, showlegend: false, title: { text: "该时刻剖面", font: { size: 11 } }, xaxis: { type: "linear" }, yaxis: { autorange: "reversed", type: "linear" }, shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: p0.depth[k], y1: p0.depth[k], line: { dash: "dot", width: 1, color: "#888" } }] }} />
+        <Plot height={230} data={panels.map((p, i) => ({ x: p.time, y: p.values[k], type: "scatter", mode: "lines", name: p.label, line: { color: seriesColor(i, dark), width: 1.4 } }))}
+          layout={{ margin: { l: 40, r: 6, t: 18, b: 28 }, showlegend: panels.length > 1, legend: { orientation: "h", y: -0.25, font: { size: 10 } }, title: { text: `${p0.depth[k].toFixed(0)} m 处的时间序列`, font: { size: 11 } }, xaxis: { type: "date" }, yaxis: { type: "linear" }, shapes: [{ type: "line", yref: "paper", x0: p0.time[j], x1: p0.time[j], y0: 0, y1: 1, line: { dash: "dot", width: 1, color: "#888" } }] }} />
+      </div>
+      <div className="soft small" style={{ marginTop: 4 }}>剖面里虚线是所选深度；时间序列里虚线是所选时刻。</div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------------ column
+const FISH_PATH = "M0 0c4-4 10-5 15-2l4-3v10l-4-3c-5 3-11 2-15-2z";
+function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVars: any[]; start?: string }) {
+  const dark = useApp((s) => s.dark);
+  const pick = (prefs: string[]) => prefs.find((x) => allVars.some((y) => y.name === x && y.depth)) ?? null;
+  const keys = useMemo(() => allVars.length ? {
+    temp: "temp", nut: pick(["N3_n", "ECO_no3", "ergom_nn"]), phyto: pick(["P1_c", "ECO_dia", "ergom_pp"]),
+    phyto2: pick(["P2_c", "ECO_fla", "ergom_ff"]), zoo: pick(["Z4_c", "ECO_mesozoo", "ergom_zz"]), det: pick(["R6_c", "ECO_det", "ergom_dd"]),
+  } : null, [allVars]);
+  const fishVar = ["F1_c", "fish_c_tot"].find((x) => allVars.some((y) => y.name === x));
+  const data = useAsync(async () => {
+    if (!keys) return null;
+    const q = start ? `&start=${start}` : "";
+    const ent = await Promise.all(Object.entries(keys).filter(([, v]) => v).map(async ([k, v]) => [k, await api.get(`/projects/${pid}/runs/${run.id}/hovmoller?var=${v}${q}`)] as const));
+    const fish = fishVar ? await api.post(`/projects/${pid}/results/timeseries`, { run_ids: [run.id], var: fishVar, mode: "integral", start }).catch(() => null) : null;
+    const mld = await api.post(`/projects/${pid}/results/timeseries`, { run_ids: [run.id], var: "mld_surf", mode: "integral", start }).catch(() => null);
+    return { ...Object.fromEntries(ent), fish, mld } as any;
+  }, [pid, run.id, keys, start]);
+  const [t, setT] = useState(180);
+  const [play, setPlay] = useState(false);
+  const timer = useRef<number | undefined>(undefined);
+  const n = data.data?.temp?.time?.length ?? 0;
+  useEffect(() => {
+    if (!play) return;
+    timer.current = window.setInterval(() => setT((x) => (x + 1) % Math.max(1, n)), 70);
+    return () => clearInterval(timer.current);
+  }, [play, n]);
+  if (data.loading || !data.data) return <Loading text="读取输出…" />;
+  const d = data.data;
+  const ti = Math.min(t, n - 1);
+  const depth: number[] = d.temp.depth;
+  const H = Math.max(...depth);
+  const col = (k: string) => d[k] ? d[k].values.map((row: any[]) => row[ti]) : [];
+  const maxOf = (k: string) => d[k] ? extent(d[k].values.flat().filter((x: any) => x !== null))[1] : 1;
+  const rel = (k: string) => col(k).map((x: number) => x / (maxOf(k) || 1));
+  const temps = col("temp");
+  const tAll = d.temp.values.flat().filter((x: any) => x !== null);
+  const [tmin, tmax] = extent(tAll);
+  const mldNow = d.mld?.series?.[0]?.values?.[ti];
+  const fishS = d.fish?.series?.[0];
+  const zooRel = keys!.zoo ? rel("zoo") : [];
+  const SVG_H = 520, top = 30, bot = 34, colX = 70, colW = 120;
+  const yOf = (z: number) => top + (z / H) * (SVG_H - top - bot);
+  // fish drawn at depths of high food (zooplankton), size ∝ local share
+  const fishMarks = zooRel.map((w: number, i: number) => ({ w, z: depth[i] })).filter((f: any, i: number) => i % Math.max(1, Math.round(depth.length / 14)) === 0 && f.w > 0.25);
+  const series = [
+    { k: "nut", name: `营养盐 ${keys!.nut}`, c: "--eco-nut", w: 1.6, dash: "solid" },
+    { k: "phyto", name: `浮游植物 ${keys!.phyto}`, c: "--eco-phyto", w: 2.6, dash: "solid" },
+    { k: "phyto2", name: `浮游植物 ${keys!.phyto2}`, c: "--eco-phyto", w: 1.4, dash: "dash" },
+    { k: "zoo", name: `浮游动物 ${keys!.zoo}`, c: "--eco-zoo", w: 2.6, dash: "solid" },
+    { k: "det", name: `碎屑 ${keys!.det}`, c: "--eco-organic", w: 1.4, dash: "dot" },
+  ].filter((s) => d[s.k]);
+  return (
+    <>
+      <div className="optbar">
+        <Btn size="sm" icon={play ? "debug-pause" : "play"} onClick={() => setPlay(!play)}>{play ? "暂停" : "播放"}</Btn>
+        <input type="range" min={0} max={Math.max(0, n - 1)} value={ti} onChange={(e) => { setPlay(false); setT(+e.target.value); }} style={{ flex: 1, accentColor: "var(--accent)", minWidth: 200 }} />
+        <b className="mono" style={{ width: 92, color: "var(--fg-strong)" }}>{d.temp.time[ti]}</b>
+        <span className="soft small ellipsis" style={{ maxWidth: 220 }}>{run.label}</span>
+      </div>
+      <div className="split-scroll" style={{ padding: "10px 14px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "250px minmax(0,1fr)", gap: 16 }}>
+          <svg viewBox={`0 0 250 ${SVG_H}`} style={{ width: 250 }}>
+            <text x={colX + colW / 2} y={10} textAnchor="middle" fontSize={11} fill={cssVar("--fg-muted")} fontWeight={600}>水柱 · 温度 · 鱼类示意</text>
+            {depth.map((z, i) => {
+              const z0 = i === 0 ? 0 : (depth[i - 1] + z) / 2, z1 = i === depth.length - 1 ? H : (z + depth[i + 1]) / 2;
+              const f = (temps[i] - tmin) / (tmax - tmin || 1);
+              return <rect key={i} x={colX} y={yOf(z0)} width={colW} height={Math.max(0.6, yOf(z1) - yOf(z0) + 0.6)} fill={sampleScale(colorscaleFor("temp"), f)} />;
+            })}
+            {mldNow !== undefined && mldNow !== null && (
+              <g>
+                <line x1={colX - 6} x2={colX + colW + 6} y1={yOf(Math.min(H, mldNow))} y2={yOf(Math.min(H, mldNow))} stroke={dark ? "#fff" : "#111"} strokeDasharray="4 3" strokeWidth={1.2} />
+                <text x={colX + colW + 10} y={yOf(Math.min(H, mldNow)) + 4} fontSize={10.5} fill={cssVar("--fg-muted")}>混合层 {mldNow.toFixed(0)} m</text>
+              </g>
+            )}
+            {fishS && fishMarks.map((f: any, i: number) => (
+              <path key={i} d={FISH_PATH} transform={`translate(${colX + 18 + ((i * 37) % (colW - 40))},${yOf(f.z) - 2}) scale(${0.7 + 0.8 * f.w})`} fill={cssVar("--eco-fish")} opacity={0.85} />
+            ))}
+            <rect x={colX} y={SVG_H - bot} width={colW} height={10} fill={cssVar("--eco-benthos")} opacity={0.75} />
+            <rect x={colX} y={top} width={colW} height={SVG_H - top - bot} fill="none" stroke={cssVar("--border-strong")} />
+            {[0, 0.25, 0.5, 0.75, 1].map((f) => <g key={f}><line x1={colX - 4} x2={colX} y1={yOf(f * H)} y2={yOf(f * H)} stroke={cssVar("--border-strong")} /><text x={colX - 7} y={yOf(f * H) + 3.5} textAnchor="end" fontSize={10} fill={cssVar("--fg-soft")}>{(f * H).toFixed(0)}</text></g>)}
+            <text x={18} y={(SVG_H) / 2} fontSize={10.5} fill={cssVar("--fg-soft")} transform={`rotate(-90 18 ${SVG_H / 2})`} textAnchor="middle">深度 (m)</text>
+            <text x={colX + colW / 2} y={SVG_H - 6} textAnchor="middle" fontSize={10.5} fill={cssVar("--fg-soft")}>海底 · 底栖</text>
+            <defs><linearGradient id="tg" x1="0" x2="1">{colorscaleFor("temp").map(([o, c]) => <stop key={o} offset={o} stopColor={c} />)}</linearGradient></defs>
+            <rect x={colX} y={17} width={colW} height={5} rx={1} fill="url(#tg)" />
+            <text x={colX - 4} y={22} textAnchor="end" fontSize={9.5} fill={cssVar("--fg-soft")}>{tmin.toFixed(0)}°</text>
+            <text x={colX + colW + 4} y={22} fontSize={9.5} fill={cssVar("--fg-soft")}>{tmax.toFixed(0)}°C</text>
+          </svg>
+          <div className="col" style={{ gap: 6 }}>
+            <Plot height={SVG_H} data={[
+              { x: temps, y: depth, name: "温度 °C", xaxis: "x", line: { color: cssVar("--eco-phys"), width: 2 } },
+              ...series.map((s) => ({ x: rel(s.k), y: depth, name: s.name, xaxis: "x2", line: { color: cssVar(s.c), width: s.w, dash: s.dash } })),
+            ].map((s) => ({ ...s, type: "scatter", mode: "lines" }))} layout={{
+              yaxis: { autorange: "reversed", title: { text: "深度 (m)" }, range: [H, 0] },
+              xaxis: { title: { text: "温度 (°C)" }, domain: [0, 0.28], range: [tmin - 0.5, tmax + 0.5] },
+              xaxis2: { title: { text: "相对浓度（各变量 ÷ 其分析时段最大值）" }, domain: [0.36, 1], range: [0, 1.05], anchor: "y" },
+              legend: { orientation: "h", y: -0.12 }, margin: { t: 14 },
+            }} />
+          </div>
+        </div>
+        {fishS && !fishS.missing && (
+          <Plot height={190} data={[
+            { x: fishS.time, y: fishS.values, type: "scatter", mode: "lines", line: { color: cssVar("--eco-fish"), width: 1.8 }, fill: "tozeroy", fillcolor: "rgba(24,100,171,.08)", name: "鱼类" },
+          ]} layout={{ title: { text: `鱼类生物量 ${fishVar}（${d.fish.units}）` }, margin: { t: 30, b: 30 }, showlegend: false,
+            shapes: [{ type: "line", x0: d.temp.time[ti], x1: d.temp.time[ti], yref: "paper", y0: 0, y1: 1, line: { color: cssVar("--danger"), width: 1.5, dash: "dot" } }] }} />
+        )}
+        <div className="reading-cols" style={{ marginTop: 12 }}>
+          <ColumnReading date={d.temp.time[ti]} depth={depth} temps={temps} mld={mldNow} phyto={keys!.phyto ? col("phyto") : []} nut={keys!.nut ? col("nut") : []} nutMax={keys!.nut ? maxOf("nut") : 0} hasFish={!!fishS} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ------------------------------------------------------------------ series
+function SeriesTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; v: string; curVar: any; start?: string }) {
+  const dark = useApp((s) => s.dark);
+  const [mode, setMode] = useState<"integral" | "mean" | "surface" | "bottom">("integral");
+  const [kind, setKind] = useState<"annual" | "series">("annual");
+  const [open, toggle] = useReadingOpen();
+  const repeat = useApp((s) => s.project?.simulation?.mode === "repeat");
+  const data = useAsync(() => v ? api.post(`/projects/${pid}/results/${kind === "annual" ? "annual" : "timeseries"}`, { run_ids: runs.map((r) => r.id), var: v, mode, start }) : Promise.resolve(null), [pid, v, mode, kind, runs.map((r) => r.id).join(), start]);
+  const traces: any[] = [];
+  (data.data as any)?.series?.forEach((s: any, i: number) => {
+    if (s.missing) return;
+    const c = seriesColor(i, dark);
+    if (kind === "annual") {
+      if (s.years > 1) {
+        traces.push({ x: s.doy, y: s.max, type: "scatter", mode: "lines", line: { width: 0 }, showlegend: false, hoverinfo: "skip" });
+        traces.push({ x: s.doy, y: s.min, type: "scatter", mode: "lines", line: { width: 0 }, fill: "tonexty", fillcolor: c + "22", showlegend: false, hoverinfo: "skip" });
+      }
+      traces.push({ x: s.doy, y: s.mean, type: "scatter", mode: "lines", name: s.label, line: { color: c, width: 2.2 } });
+    } else traces.push({ x: s.time, y: s.values, type: "scatter", mode: "lines", name: s.label, line: { color: c, width: 1.6 } });
+  });
+  return (
+    <>
+      <div className="optbar">
+        <VarTitle curVar={curVar} />
+        <span className="grow" />
+        {curVar?.depth && <Seg size="sm" value={mode} options={[["integral", "深度积分"], ["mean", "深度平均"], ["surface", "表层"], ["bottom", "底层"]]} onChange={setMode} />}
+        <Seg size="sm" value={kind} options={[["annual", "年循环"], ["series", "完整序列"]]} onChange={setKind} />
+        <IconBtn icon="export" title="导出 CSV" disabled={!data.data} onClick={() => {
+          const ss = ((data.data as any)?.series ?? []).filter((x: any) => !x.missing);
+          const xs = kind === "annual" ? ss[0]?.doy ?? [] : ss[0]?.time ?? [];
+          downloadCsv(`${v}_${kind}.csv`, [[kind === "annual" ? "日序" : "日期", ...ss.map((x: any) => `${x.label} (${(data.data as any).units})`)], ...xs.map((x: any, i: number) => [x, ...ss.map((q: any) => (kind === "annual" ? q.mean : q.values)[i])])]);
+        }} />
+        <ReadingToggle open={open} toggle={toggle} />
+      </div>
+      {data.loading ? <Loading /> : (
+        <FigAside open={open} toggle={toggle} figure={<Plot fill data={traces} layout={{ xaxis: kind === "annual" ? { ...MONTH_AXIS, title: { text: "年内日序" } } : { title: { text: "时间" } }, yaxis: { title: { text: (data.data as any)?.units ?? "" } }, hovermode: "x unified", margin: { t: 16 } }} />}
+          reading={<SeriesReading data={data.data} kind={kind} v={v} label={curVar?.long_name || v} mode={curVar?.depth ? mode : "integral"} repeat={repeat} />} />
+      )}
+    </>
+  );
+}
+
+// ----------------------------------------------------------------- profile
+function ProfileTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; v: string; curVar: any; start?: string }) {
+  const dark = useApp((s) => s.dark);
+  const [months, setMonths] = useState([1, 4, 7, 10]);
+  const [open, toggle] = useReadingOpen();
+  const data = useAsync(() => v && curVar?.depth ? api.post(`/projects/${pid}/results/profiles`, { run_ids: runs.map((r) => r.id), var: v, months, start }) : Promise.resolve(null), [pid, v, months.join(), runs.map((r) => r.id).join(), start, curVar?.depth]);
+  const dashes = ["solid", "dash", "dot", "dashdot", "longdash", "longdashdot"];
+  return (
+    <>
+      <div className="optbar">
+        <VarTitle curVar={curVar} />
+        <span className="grow" />
+        <span className="soft small">月份</span>
+        <div className="segmented sm">
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => <button key={m} className={months.includes(m) ? "on" : ""} onClick={() => setMonths(months.includes(m) ? months.filter((x) => x !== m) : [...months, m].sort((a, b) => a - b))}>{m}</button>)}
+        </div>
+        <ReadingToggle open={open} toggle={toggle} />
+      </div>
+      {!curVar?.depth ? <Empty icon="symbol-array" title="请选择一个随深度变化的变量" /> : data.loading ? <Loading /> : (
+        <FigAside open={open} toggle={toggle} reading={<ProfileReading data={data.data} v={v} label={curVar?.long_name || v} />} figure={
+          <Plot fill data={((data.data as any)?.profiles ?? []).map((pr: any) => {
+            const ri = runs.findIndex((r) => r.label === pr.label);
+            return { x: pr.values, y: pr.depth, type: "scatter", mode: "lines", name: `${pr.label} · ${pr.month}月`, line: { color: seriesColor(Math.max(0, ri), dark), dash: dashes[months.indexOf(pr.month) % dashes.length], width: 2 } };
+          })} layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" } }, xaxis: { title: { text: (data.data as any)?.units } }, legend: { orientation: "v", x: 1.02, y: 1 }, margin: { r: 170, t: 14 } }} />} />
+      )}
+    </>
+  );
+}
+
+// ----------------------------------------------------------------- spectrum
+function SpectrumTab({ pid, runs }: { pid: string; runs: any[] }) {
+  const dark = useApp((s) => s.dark);
+  const [view, setView] = useState<"spectrum" | "time">("spectrum");
+  const [open, toggle] = useReadingOpen();
+  const data = useAsync(() => Promise.all(runs.map((r) => api.get(`/projects/${pid}/runs/${r.id}/spectrum`).then((d) => ({ ...d, label: r.label })))), [pid, runs.map((r) => r.id).join()]);
+  if (!runs.length) return <Empty icon="graph-scatter" title="所选运行中没有 MIZER 粒径谱鱼类" />;
+  if (data.loading) return <Loading />;
+  if (data.error) return <div style={{ padding: 16 }}><Notice kind="danger">{data.error}</Notice></div>;
+  const ds = data.data as any[];
+  return (
+    <>
+      <div className="optbar">
+        <b style={{ color: "var(--fg-strong)" }}>群落粒径谱</b><span className="soft small">FABM-MIZER，100 个粒径级（1 mg – 1 t）</span>
+        <span className="grow" />
+        <Seg size="sm" value={view} options={[["spectrum", "粒径谱"], ["time", "随时间演变"]]} onChange={setView} />
+        <ReadingToggle open={open} toggle={toggle} />
+      </div>
+      <FigAside open={open} toggle={toggle} reading={<SpectrumReading ds={ds} />} figure={
+        view === "spectrum" ? (
+          <Plot fill data={ds.map((d, i) => ({ x: d.w, y: d.density, type: "scatter", mode: "lines", name: d.label, line: { color: seriesColor(i, dark), width: 2.4 } }))}
+            layout={{ xaxis: { type: "log", title: { text: "个体湿重 w (g)" }, exponentformat: "power" }, yaxis: { type: "log", title: { text: "生物量密度 (g m⁻² g⁻¹)" }, exponentformat: "power" }, margin: { t: 16 },
+              shapes: [{ type: "line", x0: 80, x1: 80, yref: "paper", y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--danger"), width: 1.2 } }],
+              annotations: [{ x: Math.log10(80), y: 0.98, yref: "paper", text: " 捕捞下限 80 g", showarrow: false, font: { size: 11, color: cssVar("--danger") }, xanchor: "left" }] }} />
+        ) : (
+          <Plot fill data={[{ type: "heatmap", x: ds[0].time, y: ds[0].w, z: ds[0].log10_biomass_time, colorscale: colorscaleFor("", dark), colorbar: { title: { text: "log₁₀ g m⁻²", side: "right" }, thickness: 12 }, zsmooth: "best" }]}
+            layout={{ title: { text: `${ds[0].label} · 各粒径级生物量` }, yaxis: { type: "log", title: { text: "w (g)" }, exponentformat: "power" }, margin: { t: 34 } }} />
+        )} />
+    </>
+  );
+}
+
+// ----------------------------------------------------------------- food web
+function WebTab({ pid, runs }: { pid: string; runs: any[] }) {
+  const [i, setI] = useState(0);
+  const run = runs[Math.min(i, runs.length - 1)];
+  const data = useAsync(() => api.get(`/projects/${pid}/runs/${run.id}/foodweb`), [pid, run.id]);
+  const [sel, setSel] = useState<string | null>(null);
+  const [open, toggle] = useReadingOpen();
+  return (
+    <>
+      <div className="optbar">
+        <span className="soft small">运行</span>
+        <Select size="sm" value={i} onChange={(x) => setI(+x)}>{runs.map((r, k) => <option key={r.id} value={k}>{r.label}</option>)}</Select>
+        <span className="grow" />
+        <ReadingToggle open={open} toggle={toggle} />
+      </div>
+      <FigAside open={open} toggle={toggle} reading={<WebReading />} figure={<div className="split-scroll">{data.loading ? <Loading /> : data.data && <FoodWebGraph graph={data.data as any} state={(data.data as any).state} onSelect={setSel} selected={sel} />}</div>} />
+    </>
+  );
+}
