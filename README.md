@@ -1,6 +1,8 @@
-# E2E Studio · 海洋端到端生态模拟
+# Shoal · 浅海生态模拟工作台
 
-面向陆架海的端到端（end-to-end）生态模拟工作台：一维水柱与陆架水柱集合，耦合低营养级模型（ERSEM / ECOSMO / ERGOM）与高营养级模块（E2E 功能群 / MIZER 粒径谱），附带入门教程与运行可视化。方法主要依据 Powley et al. (2026) 与 Vijayakumaran et al. (2026)。
+shoal 在英语里既是“浅海、浅滩”，也是“鱼群”：这正是本软件模拟的地方和对象。
+
+面向陆架海的端到端（end-to-end）生态模拟工作台：一维水柱与陆架水柱集合，耦合低营养级模型（ERSEM / ECOSMO / ERGOM）与高营养级模块（E2E 功能群 / MIZER 粒径谱），附带入门教程与运行可视化。方法主要依据 Powley et al. (2026) 与 Vijayakumaran et al. (2026)，两篇论文全文（CC BY 4.0 开放获取）放在 `reference/`。
 
 - **Powley et al. (2026)**, *Progress in Oceanography* 243, 103701 — ERSEM 与 FABM-MIZER 粒径谱鱼类的单向/双向耦合（西北欧陆架）。
 - **Vijayakumaran et al. (2026)**, *EGUsphere* egusphere-2026-3078 — ECOSMO E2E v2.0：鱼类与大型底栖功能群模块，通过 FABM 接入 ECOSMO / ERSEM / ERGOM（北海中部一维水柱）。
@@ -23,7 +25,7 @@ pnpm dev
 
 浏览器打开 <http://localhost:5173>。首次启动会自动创建一个**离线演示项目**（GOTM 官方北海北部算例，不需要联网）。
 
-如果 Python 不在默认位置，设置 `E2E_PYTHON=/path/to/python` 后再 `pnpm dev`。
+如果 Python 不在默认位置，设置 `SHOAL_PYTHON=/path/to/python` 后再 `pnpm dev`。
 
 ## 功能
 
@@ -41,7 +43,7 @@ pnpm dev
 ## 目录
 
 ```
-backend/e2estudio/        FastAPI 后端
+backend/shoal/        FastAPI 后端
   server.py               HTTP / WebSocket 接口
   projects.py             项目、配置、实验、运行的存储与论文模板
   runner.py               后台任务（站点构建、GOTM 运行）与进度
@@ -56,7 +58,7 @@ frontend/src/             React 前端（pages/、components/、primer/ 教程�
 kernel/                   计算内核
   build.sh                获取源码并编译 GOTM 与 pyfabm
   e2e/                    按论文方程实现的 E2E 鱼类与大型底栖 FABM 模块（Fortran）
-  src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.sh 克隆）
+  src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.sh 按锁定的版本下载，不进仓库）
   install/                编译结果（bin/gotm、kernel.json）
 workspace/                项目、数据缓存、设置（运行时生成）
 ```

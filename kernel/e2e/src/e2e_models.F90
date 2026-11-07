@@ -1,7 +1,7 @@
 #include "fabm_driver.h"
 
 !-----------------------------------------------------------------------
-! E2E Studio implementation of the ECOSMO E2E v2.0 higher-trophic-level
+! Shoal implementation of the ECOSMO E2E v2.0 higher-trophic-level
 ! modules (fish and macrobenthos functional groups), written from the
 ! equations published in
 !

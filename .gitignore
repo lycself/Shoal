@@ -9,8 +9,7 @@ __pycache__/
 *.pyc
 .DS_Store
 
-# papers (publisher copyright) and local tool settings
-refernece/
+# local tool settings
 .claude/
 *.egg-info/
 .venv/

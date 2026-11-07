@@ -1,6 +1,6 @@
-"""E2E Studio HTTP + WebSocket API (FastAPI).
+"""Shoal HTTP + WebSocket API (FastAPI).
 
-Run with:  uvicorn e2estudio.server:app --port 8765   (pnpm dev starts it for you)
+Run with:  uvicorn shoal.server:app --port 8765   (pnpm dev starts it for you)
 The server binds to 127.0.0.1 only: it reads and writes files in the workspace.
 """
 from __future__ import annotations
@@ -21,7 +21,7 @@ from .ecosystem.hosts import HOSTS, host_summary
 from .runner import get_runner
 from .threed import resources, shelf
 
-app = FastAPI(title="E2E Studio", version="1.0.0")
+app = FastAPI(title="Shoal", version="1.0.0")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],

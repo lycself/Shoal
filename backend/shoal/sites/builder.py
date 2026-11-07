@@ -225,7 +225,7 @@ def make_gotm_yaml(run_dir: Path, site_dir: Path, site: dict, sim: dict, host_in
         g = yamlio.load(TEMPLATE_DIR / "gotm_base.yaml")
     else:
         g = yamlio.load(site_dir / "gotm.yaml")
-    g["title"] = f"E2E Studio — {site['name']}"
+    g["title"] = f"Shoal — {site['name']}"
     loc = g["location"]
     loc["name"] = site["name"]
     loc["latitude"] = float(site["lat"])

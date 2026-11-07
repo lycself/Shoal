@@ -1,10 +1,10 @@
-"""Paths and runtime settings for E2E Studio.
+"""Paths and runtime settings for Shoal.
 
 Everything location-dependent goes through this module so the backend can be
 moved (another workspace, another kernel build) with environment variables:
 
-    E2E_WORKSPACE   folder holding projects, data cache and settings (default <repo>/workspace)
-    E2E_KERNEL      kernel install prefix containing bin/gotm and kernel.json (default <repo>/kernel/install)
+    SHOAL_WORKSPACE   folder holding projects, data cache and settings (default <repo>/workspace)
+    SHOAL_KERNEL      kernel install prefix containing bin/gotm and kernel.json (default <repo>/kernel/install)
 """
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ KERNEL_SRC = KERNEL_DIR / "src"
 
 
 def workspace() -> Path:
-    p = Path(os.environ.get("E2E_WORKSPACE", REPO / "workspace")).expanduser()
+    p = Path(os.environ.get("SHOAL_WORKSPACE", REPO / "workspace")).expanduser()
     p.mkdir(parents=True, exist_ok=True)
     return p
 
@@ -37,7 +37,7 @@ def cache_dir() -> Path:
 
 
 def kernel_prefix() -> Path:
-    return Path(os.environ.get("E2E_KERNEL", KERNEL_DIR / "install")).expanduser()
+    return Path(os.environ.get("SHOAL_KERNEL", KERNEL_DIR / "install")).expanduser()
 
 
 def gotm_executable() -> Path | None:
@@ -104,7 +104,7 @@ def load_settings() -> dict:
                     data[k] = v
         except json.JSONDecodeError:
             pass
-    env_key = os.environ.get("E2E_ASSISTANT_API_KEY") or os.environ.get("OPENAI_API_KEY")
+    env_key = os.environ.get("SHOAL_ASSISTANT_API_KEY") or os.environ.get("OPENAI_API_KEY")
     if env_key and not data["assistant"].get("api_key"):
         data["assistant"]["api_key"] = env_key
         data["assistant"]["api_key_from_env"] = True

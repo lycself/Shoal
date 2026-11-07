@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the E2E Studio computational kernel:
+# Build the Shoal computational kernel:
 #   * gotm      — GOTM 1D water column with FABM and the institutes below
 #   * pyfabm    — FABM Python interface (0D runs, labs, offline MIZER) with the same institutes
 #
@@ -34,20 +34,29 @@ PY="$ENV_PREFIX/bin/python"
 FC="$ENV_PREFIX/bin/gfortran"
 [[ -x "$FC" ]] || { echo "gfortran not found in $ENV_PREFIX (create the env first, see README)"; exit 1; }
 
-fetch() { # name url [branch]
-  local name=$1 url=$2
+# Third-party sources are pinned to the commits Shoal was developed and tested against, so a fresh
+# build reproduces the same model. To upgrade one, change its hash here and rebuild with --clean.
+fetch() { # name url commit
+  local name=$1 url=$2 rev=$3
   if [[ ! -d "$SRC/$name" ]]; then
-    echo ">> cloning $name"
-    git clone --depth 1 --recurse-submodules "$url" "$SRC/$name"
+    echo ">> fetching $name @ ${rev:0:7}"
+    git init -q "$SRC/$name"
+    git -C "$SRC/$name" remote add origin "$url"
+    git -C "$SRC/$name" fetch -q --depth 1 origin "$rev"
+    git -C "$SRC/$name" checkout -q FETCH_HEAD
+    git -C "$SRC/$name" submodule update -q --init --recursive --depth 1
+  else
+    local have; have=$(git -C "$SRC/$name" rev-parse HEAD 2>/dev/null || echo "?")
+    [[ "$have" == "$rev" ]] || echo "!! $name is at ${have:0:7}, Shoal is tested with ${rev:0:7} (delete $SRC/$name to refetch)"
   fi
 }
 mkdir -p "$SRC" "$BUILD" "$PREFIX/bin"
-fetch gotm https://github.com/gotm-model/code.git
-fetch fabm https://github.com/fabm-model/fabm.git
-fetch ersem https://github.com/pmlmodelling/ersem.git
-fetch fabm-mizer https://github.com/pmlmodelling/fabm-mizer.git
-fetch gotm-cases https://github.com/gotm-model/cases.git
-fetch ersem-setups https://github.com/pmlmodelling/ersem-setups.git
+fetch gotm         https://github.com/gotm-model/code.git            771b3b5a36c10cbcf4fc3a5d5225d0f64a9c8159  # 2026-08-27
+fetch fabm         https://github.com/fabm-model/fabm.git            4585bcf510ef862308147fa873beb4cf42f43341  # 2026-10-30
+fetch ersem        https://github.com/pmlmodelling/ersem.git         ca71e5aae98477232c3510f3a4ffee496e83d62f  # 2026-10-29
+fetch fabm-mizer   https://github.com/pmlmodelling/fabm-mizer.git    ed8b78a4ba6f4d6ca07a4028cee392bc8335fa93  # 2025-11-03
+fetch gotm-cases   https://github.com/gotm-model/cases.git           caa8a1d67da4d0bfa7ad7e50b5a1b409c935b0aa  # 2026-03-18
+fetch ersem-setups https://github.com/pmlmodelling/ersem-setups.git  545b4dadb6bdd2387374adcf995c8e0289948faa  # 2026-08-25
 
 # E2E: prefer the official ECOSMO E2E v2.0 source if the user unpacked it into src/ecosmo-e2e
 # (Zenodo 10.5281/zenodo.20413770); otherwise use the paper-equation implementation in kernel/e2e.

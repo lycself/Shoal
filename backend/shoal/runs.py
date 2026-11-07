@@ -49,7 +49,7 @@ def describe_fabm(fabm_yaml: Path) -> dict:
     import json
     import subprocess
 
-    proc = subprocess.run([sys.executable, "-m", "e2estudio.describe", str(fabm_yaml)],
+    proc = subprocess.run([sys.executable, "-m", "shoal.describe", str(fabm_yaml)],
                           capture_output=True, text=True, cwd=str(Path(__file__).resolve().parents[1]), timeout=120)
     marker = "@@JSON@@"
     if proc.returncode != 0 or marker not in proc.stdout:
