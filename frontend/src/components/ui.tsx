@@ -6,12 +6,20 @@ export function Icon({ name, className = "", spin, style }: { name: string; clas
   return <i className={`codicon codicon-${name} ${spin ? "spin" : ""} ${className}`} style={style} aria-hidden />;
 }
 
-export function Logo() {
+/** Shoal mark: a small school of fish over shallow water (shoal = both "shallow sea" and "school of fish").
+ *  Keep in sync with the favicon in index.html. */
+export function Logo({ size = 18 }: { size?: number }) {
+  const clip = React.useId();
   return (
-    <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M2 15.5c2.2-2 4.4 2 6.6 0s4.4 2 6.6 0 4.4 2 6.8 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      <path d="M2 19.5c2.2-2 4.4 2 6.6 0s4.4 2 6.6 0 4.4 2 6.8 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" opacity=".55" />
-      <path d="M6 8.6c2.6-3.1 6.6-3.6 9.6-.9l3.4-2.2v6.6l-3.4-2.2c-3 2.7-7 2.2-9.6-1.3z" fill="currentColor" />
+    <svg viewBox="0 0 24 24" width={size} height={size} aria-hidden style={{ display: "block", flex: "none" }}>
+      <clipPath id={clip}><rect width="24" height="24" rx="5.5" /></clipPath>
+      <g clipPath={`url(#${clip})`}>
+        <rect width="24" height="24" style={{ fill: "var(--accent)" }} />
+        <path d="M0 18.2c3-1.7 6 1.7 9 0s6 1.7 9 0 6 1.7 9 0V24H0z" fill="#fff" opacity=".28" />
+        <path d="M20.5 10.4C18.74 6.99 14.34 6.77 11.7 9.74L8.84 7.54L9.83 10.4L8.84 13.26L11.7 11.06C14.34 14.03 18.74 13.81 20.5 10.4Z" fill="#fff" />
+        <path d="M8.3 5.6C7.31 3.68 4.83 3.55 3.34 5.23L1.73 3.99L2.29 5.6L1.73 7.21L3.34 5.97C4.83 7.65 7.31 7.52 8.3 5.6Z" fill="#fff" opacity=".85" />
+        <path d="M8.4 14.4C7.5 12.66 5.26 12.55 3.92 14.06L2.46 12.94L2.97 14.4L2.46 15.86L3.92 14.74C5.26 16.25 7.5 16.14 8.4 14.4Z" fill="#fff" opacity=".85" />
+      </g>
     </svg>
   );
 }

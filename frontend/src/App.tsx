@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api, connectEvents, on, onConnection } from "./api";
-import { Icon, IconBtn, MenuEntry, MenuList, Modal, Progress, StatusBadge, Toasts, TooltipLayer } from "./components/ui";
+import { Icon, IconBtn, Logo, MenuEntry, MenuList, Modal, Progress, StatusBadge, Toasts, TooltipLayer } from "./components/ui";
 import { Page, useApp } from "./store";
 import HomePage from "./pages/HomePage";
 import SitePage from "./pages/SitePage";
@@ -212,7 +212,7 @@ function MenuBar({ menus, title, children }: { menus: { label: string; items: ()
   }, []);
   return (
     <header className="menubar" ref={ref}>
-      <div className="menubar-logo"><Icon name="pulse" /></div>
+      <div className="menubar-logo" data-tip="Shoal：浅海生态模拟工作台"><Logo size={18} /></div>
       {menus.map((m, i) => (
         <button key={m.label} className={`menubar-item ${open === i ? "open" : ""}`} onMouseDown={(e) => { e.preventDefault(); setTitleMenu(false); setOpen(open === i ? null : i); }} onMouseEnter={() => open !== null && setOpen(i)}>
           {m.label}
