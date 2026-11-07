@@ -1,0 +1,269 @@
+diff --color -ruN -x *_bkp a/ecosmofish.F90 b/ecosmofish.F90
+--- a/ecosmofish.F90	2026-11-08 00:15:13
++++ b/ecosmofish.F90	2026-11-08 00:16:20
+@@ -48,6 +48,7 @@
+       type (type_state_variable_id),allocatable         :: id_prey(:)!
+       type (type_dependency_id)             :: id_temp ! 
+       type (type_state_variable_id)         :: id_fish1 !
++      type (type_state_variable_id)         :: id_dic ! [Shoal] optional, respired carbon
+       type (type_bottom_state_variable_id)  :: id_mb1 ! 
+ ! Variables for stoichiometry compensation
+       type (type_state_variable_id)         :: id_detn,id_detp,id_dets
+@@ -77,6 +78,9 @@
+       real(rk) :: scalenh4,scalepho,scaleo2,scaledet,scaledom ! To convert components from the host LTL model's unit to ecosmo e2e unit
+       character(len=10) :: compositiondet, compositiondom
+       character(len=10), allocatable :: compositionprey(:)
++      ! [Shoal] optional corrections, all .false. by default (= original ECOSMO E2E v2.0 behaviour)
++      logical  :: fix_dom, fix_oxygen, fix_silica, fix_dic
++      real(rk) :: scaledic
+       contains
+ 
+ !     Model procedures
+@@ -148,6 +152,12 @@
+    call self%get_parameter(self%scaledet, 'scaledet', '-', 'scaling for unit conversion of det', default=1.0_rk)
+    call self%get_parameter(self%scaledom, 'scaledom', '-', 'scaling for unit conversion of dom', default=1.0_rk)
+    call self%get_parameter(self%nprey, 'nprey', '', 'number of prey', default=2)
++   ! [Shoal] corrections (see kernel/patches/README.md)
++   call self%get_parameter(self%fix_dom,    'fix_dom',    '', 'send the dissolved fraction frr of egestion and mortality to DOM (original: lost)', default=.false.)
++   call self%get_parameter(self%fix_oxygen, 'fix_oxygen', '', 'excretion consumes 1 mol O2 per mol C (original: produces 1 mol O2 per mol N)', default=.false.)
++   call self%get_parameter(self%fix_silica, 'fix_silica', '', 'silicate passes through fish unchanged (original: Redfield Si created/removed)', default=.false.)
++   call self%get_parameter(self%fix_dic,    'fix_dic',    '', 'return respired carbon to DIC when coupled (original: lost)', default=.false.)
++   call self%get_parameter(self%scaledic,   'scaledic',   '-', 'scaling for unit conversion of dic', default=1.0_rk)
+ 
+    !composition
+    call self%get_parameter(self%compositiondet, 'compositiondet', '', 'elemental composition of det', default='c')
+@@ -189,6 +199,7 @@
+    call self%register_state_dependency(self%id_det,      'det',     'mgC/m3',    'detritus')!
+    call self%register_state_dependency(self%id_dom,      'dom',     'mgC/m3',    'labile dissolved om')!
+    call self%register_state_dependency(self%id_mb1,     'mb',    'mgC/m2',    'macrobenthos')!      
++   if (self%fix_dic) call self%register_state_dependency(self%id_dic, 'dic', 'mgC/m3', 'dissolved inorganic carbon', required=.false.)
+    if (index(self%compositiondet,'n')/=0) call self%register_state_dependency( self%id_detn,      'detn',     'mmol N/m3',   'detritus N')!                 minimum=0.0_rk,        vertical_movement=-self%BioC23 , &
+    if (index(self%compositiondet,'p')/=0) call self%register_state_dependency( self%id_detp,      'detp',     'mmol P/m3',   'detritus P')!                 minimum=0.0_rk,        vertical_movement=-self%BioC23 , &
+    if (index(self%compositiondet,'s')/=0) call self%register_state_dependency( self%id_dets,      'dets',     'mmol Si/m3',  'detritus Si')!                 minimum=0.0_rk,        vertical_movement=-self%BioC23 , &
+@@ -249,6 +260,7 @@
+    real(rk) :: fish1 
+    integer :: iprey
+    real(rk) :: expterm
++   real(rk) :: si_eaten, ssi, rhsegest ! [Shoal]
+ 
+ ! Prey composition checks:
+ logical, dimension(:), allocatable :: hasNprey, hasPprey, hasSprey
+@@ -299,12 +311,24 @@
+         expterm=exp((self%tempcF1/(8.6173324*10.**(-5.)))*ttemp)
+ 
+ ! prey
++     si_eaten = 0.0_rk
+      do iprey=1,self%nprey
+       rhs=-1.0_rk*(F1onprey(iprey)*prey(iprey)/preyi(iprey)*fishi)  !fish1 predation!fishi is integrated fish1 
+       _ADD_SOURCE_(self%id_prey(iprey), rhs/self%scaleprey(iprey)) ! 
+       if (hasNprey(iprey)) _ADD_SOURCE_(self%id_preyn(iprey),rhs*redf(4)/(redf(2)*redf(6)*self%scaleprey(iprey)))     ! 
+       if (hasPprey(iprey)) _ADD_SOURCE_(self%id_preyp(iprey),rhs/(redf(2)*redf(6)*self%scaleprey(iprey)))     ! 
+-      if (hasSprey(iprey)) _ADD_SOURCE_(self%id_preys(iprey),rhs*redf(4)/(redf(2)*redf(6)*self%scaleprey(iprey)))     ! 
++      if (hasSprey(iprey)) then
++       if (self%fix_silica) then
++        ! [Shoal] remove the prey's actual Si with the eaten carbon; it is egested to detritus below
++        if (hasSdet .and. prey(iprey) > 0.0_rk) then
++         _GET_(self%id_preys(iprey),ssi)
++         _ADD_SOURCE_(self%id_preys(iprey),rhs*ssi/prey(iprey))
++         si_eaten = si_eaten - rhs*ssi/prey(iprey)
++        end if
++       else
++        _ADD_SOURCE_(self%id_preys(iprey),rhs*redf(4)/(redf(2)*redf(6)*self%scaleprey(iprey)))     ! 
++       end if
++      end if
+      enddo
+    
+    Fish_prod=0.
+@@ -321,29 +345,50 @@
+    !   rhs=rhs+(F1onprey(iprey)*prey(iprey)/preyi(iprey))
+    !enddo
+      rhs=rhs1
++     rhsegest = (1.-self%asefF1)*(rhs+F1onDet*det/deti)*fishi + self%mF1*fish1 ! [Shoal] all egestion + mortality
+      rhs = (1.0_rk-self%frr)*((1.-self%asefF1)*(rhs+F1onDet*det/deti)*fishi  &      !
+               + self%mF1*fish1) ! 
+    _ADD_SOURCE_(self%id_det, rhs/self%scaledet) ! 
+    if (hasNdet) _ADD_SOURCE_(self%id_detn,rhs*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
+    if (hasPdet) _ADD_SOURCE_(self%id_detp,rhs/(redf(2)*redf(6)*self%scaledet))     !  
+-   if (hasSdet) _ADD_SOURCE_(self%id_dets,rhs*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
++   if (hasSdet .and. .not. self%fix_silica) _ADD_SOURCE_(self%id_dets,rhs*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
++   if (self%fix_silica .and. hasSdet) _ADD_SOURCE_(self%id_dets,si_eaten) ! [Shoal] eaten Si egested as is
++   if (self%fix_dom) then
++     ! [Shoal] the dissolved fraction frr goes to DOM, as in do_bottom and in the macrobenthos module
++     rhs = self%frr*rhsegest
++     _ADD_SOURCE_(self%id_dom, rhs/self%scaledom)
++     if (index(self%compositiondom,'n')/=0) _ADD_SOURCE_(self%id_domn,rhs*redf(4)/(redf(2)*redf(6)*self%scaledom))
++     if (index(self%compositiondom,'p')/=0) _ADD_SOURCE_(self%id_domp,rhs/(redf(2)*redf(6)*self%scaledom))
++     if (index(self%compositiondom,'s')/=0 .and. .not. self%fix_silica) _ADD_SOURCE_(self%id_doms,rhs*redf(4)/(redf(2)*redf(6)*self%scaledom))
++   end if
+      rhs = - F1onDet*det/deti*fishi !
+ 
+    _ADD_SOURCE_(self%id_det, rhs/self%scaledet) ! 
+    if (hasNdet) _ADD_SOURCE_(self%id_detn,rhs*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
+    if (hasPdet) _ADD_SOURCE_(self%id_detp,rhs/(redf(2)*redf(6)*self%scaledet))     !  
+-   if (hasSdet) _ADD_SOURCE_(self%id_dets,rhs*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
+-    rhs = self%excF1*expterm*fish1 !&
++   ! [Shoal] with fix_silica the detritus Si eaten is egested straight back: net zero
++   if (hasSdet .and. .not. self%fix_silica) _ADD_SOURCE_(self%id_dets,rhs*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
++    rhs = self%excF1*expterm*fish1 !&
++   if (self%fix_dic) then
++     if (_AVAILABLE_(self%id_dic)) _ADD_SOURCE_(self%id_dic, rhs/self%scaledic) ! [Shoal] respired carbon
++   end if
+  
+    _ADD_SOURCE_(self%id_nh4, rhs/self%scalenh4) ! 
+ 
+ 
+-    !rhs = self%excF1*expterm*fish1 !&
++    !rhs = self%excF1*expterm*fish1 !&
+    _ADD_SOURCE_(self%id_pho, rhs/self%scalepho) ! 
+ 
+ 
+      !rhs = (self%excF1*expterm*fish1)*redf(11)*redf(16) !! 
++     if (self%fix_oxygen) then
++       ! [Shoal] respiration consumes 1 mol O2 per mol C (mg C / 12.01), only while oxygen is present,
++       ! as the macrobenthos module does
++       rhs = 0.0_rk
++       if (oxy > 0.0_rk) rhs = -self%excF1*expterm*fish1*redf(16)
++     else
+      rhs = rhs*redf(11)*redf(16) !! 
++     end if
+    _ADD_SOURCE_(self%id_oxy, rhs/self%scaleo2) ! 
+ 
+    _LOOP_END_
+@@ -440,13 +485,13 @@
+           _ADD_BOTTOM_FLUX_(self%id_det,MBflux/self%scaledet) ! 
+         if (hasNdet) _ADD_BOTTOM_FLUX_(self%id_detn,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
+         if (hasPdet) _ADD_BOTTOM_FLUX_(self%id_detp,MBflux/(redf(2)*redf(6)*self%scaledet))     !  
+-        if (hasSdet) _ADD_BOTTOM_FLUX_(self%id_dets,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
++        if (hasSdet .and. .not. self%fix_silica) _ADD_BOTTOM_FLUX_(self%id_dets,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
+ 
+          MBflux=(self%frr)*((1.-self%asefF1)*F1onMB1*fishi)!  &  !    
+          _ADD_BOTTOM_FLUX_(self%id_dom,MBflux/self%scaledom)     ! 
+         if (hasNdom) _ADD_BOTTOM_FLUX_(self%id_domn,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledom))     ! 
+         if (hasPdom) _ADD_BOTTOM_FLUX_(self%id_domp,MBflux/(redf(2)*redf(6)*self%scaledom))     ! 
+-        if (hasSdom) _ADD_BOTTOM_FLUX_(self%id_doms,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledom))     ! 
++        if (hasSdom .and. .not. self%fix_silica) _ADD_BOTTOM_FLUX_(self%id_doms,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledom))     ! 
+         fishi1=fishi    ! 
+  ! Diagnostics for fish
+     do iprey=1,self%nprey
+diff --color -ruN -x *_bkp a/ecosmomb.F90 b/ecosmomb.F90
+--- a/ecosmomb.F90	2026-11-08 00:15:13
++++ b/ecosmomb.F90	2026-11-08 00:16:46
+@@ -53,6 +53,7 @@
+       type (type_bottom_state_variable_id)  :: id_sedn,id_sedp,id_seds ! 
+ !htl variable
+       type (type_bottom_state_variable_id)  :: id_mb1 ! 
++      type (type_state_variable_id)         :: id_dic ! [Shoal] optional, respired carbon
+ !Diagnostic variables 
+       type (type_bottom_diagnostic_variable_id)    :: id_dMBonDet, id_dMBonDom, id_dMBonSed !
+       type (type_bottom_diagnostic_variable_id),allocatable    :: id_dMBonprey(:) !
+@@ -75,6 +76,9 @@
+       real(rk) :: scalenh4,scalepho,scaleo2,scaledet,scaledom,scalesed ! To convert components from the host LTL model's unit to ecosmo e2e unit
+       character(len=10) :: compositiondet, compositiondom, compositionsed
+       character(len=10), allocatable :: compositionprey(:)
++      ! [Shoal] optional corrections, all .false. by default (= original ECOSMO E2E v2.0 behaviour)
++      logical  :: fix_silica, fix_dic, fix_boltzmann
++      real(rk) :: scaledic
+       contains
+ 
+ !     Model procedures
+@@ -153,6 +157,12 @@
+    call self%get_parameter(self%compositionsed, 'compositionsed', '', 'elemental composition of sed', default='c')
+ 
+    call self%get_parameter(self%nprey, 'nprey', '', 'number of prey', default=2)
++   ! [Shoal] corrections (see kernel/patches/README.md)
++   call self%get_parameter(self%fix_silica,    'fix_silica',    '', 'silicate passes through macrobenthos unchanged (original: Redfield Si created/removed)', default=.false.)
++   call self%get_parameter(self%fix_dic,       'fix_dic',       '', 'return respired carbon to DIC when coupled (original: lost)', default=.false.)
++   call self%get_parameter(self%fix_boltzmann, 'fix_boltzmann', '', 'Boltzmann constant 8.617e-5 eV/K in the excretion temperature term (original: 8.617e-4)', default=.false.)
++   call self%get_parameter(self%scaledic,      'scaledic',      '-', 'scaling for unit conversion of dic', default=1.0_rk)
++   if (self%fix_dic) call self%register_state_dependency(self%id_dic, 'dic', 'mgC/m3', 'dissolved inorganic carbon', required=.false.)
+    allocate(self%pref(self%nprey))
+    allocate(self%Gr(self%nprey))
+    allocate(self%scaleprey(self%nprey))
+@@ -243,6 +253,7 @@
+    real(rk) :: ttemp 
+    real(rk) :: rcMB,rrcMB,MBflux ! 
+    real(rk) :: expterm
++   real(rk) :: si_eaten, ssi ! [Shoal]
+    real(rk),allocatable :: prey(:)!
+    real(rk),allocatable :: MBonprey(:)!
+    integer :: iprey
+@@ -305,7 +316,11 @@
+    end if
+ !-----------------t dependy for fish & MB  -------------------------
+         ttemp=temp/((temp+273.15)*273.15)
++        if (self%fix_boltzmann) then
++          expterm = exp((self%tempcMB1/(8.6173324*10.**(-5.)))*ttemp) ! [Shoal] as in the fish module
++        else
+         expterm = exp((self%tempcMB1/(8.6173324*10.**(-4.)))*ttemp) 
++        end if
+ !---------------------------------------------------------------
+ ! Macrobenthos feeding preferences
+      FM=0.0_rk
+@@ -346,26 +361,63 @@
+         _ADD_BOTTOM_SOURCE_(self%id_sed1,MBflux/self%scalesed)      
+         if (hasNsed) _ADD_BOTTOM_SOURCE_(self%id_sedn,MBflux*redf(4)/(redf(2)*redf(6)*self%scalesed))     !  
+         if (hasPsed) _ADD_BOTTOM_SOURCE_(self%id_sedp,MBflux/(redf(2)*redf(6)*self%scalesed))     !  
+-        if (hasSsed) _ADD_BOTTOM_SOURCE_(self%id_seds,MBflux*redf(4)/(redf(2)*redf(6)*self%scalesed))     ! 
++        if (hasSsed .and. .not. self%fix_silica) _ADD_BOTTOM_SOURCE_(self%id_seds,MBflux*redf(4)/(redf(2)*redf(6)*self%scalesed))     ! 
++        ! [Shoal] with fix_silica the Si of eaten sediment detritus is egested straight back (net zero);
++        ! the Si of other food is collected in si_eaten and egested to the sediment below
++        si_eaten = 0.0_rk
+        do iprey=1,self%nprey
+          _ADD_BOTTOM_FLUX_(self%id_prey(iprey),-MBonprey(iprey)*mb1/self%scaleprey(iprey))     ! 
+          if (hasNprey(iprey)) _ADD_BOTTOM_FLUX_(self%id_preyn(iprey),-MBonprey(iprey)*mb1*redf(4)/(redf(2)*redf(6)*self%scaleprey(iprey)))     !  
+          if (hasPprey(iprey)) _ADD_BOTTOM_FLUX_(self%id_preyp(iprey),-MBonprey(iprey)*mb1/(redf(2)*redf(6)*self%scaleprey(iprey)))     !  
+-         if (hasSprey(iprey)) _ADD_BOTTOM_FLUX_(self%id_preys(iprey),-MBonprey(iprey)*mb1*redf(4)/(redf(2)*redf(6)*self%scaleprey(iprey)))     !  
++         if (hasSprey(iprey)) then
++          if (self%fix_silica) then
++           if (hasSsed .and. prey(iprey) > 0.0_rk) then
++            _GET_(self%id_preys(iprey),ssi)
++            _ADD_BOTTOM_FLUX_(self%id_preys(iprey),-MBonprey(iprey)*mb1*ssi/prey(iprey))
++            si_eaten = si_eaten + MBonprey(iprey)*mb1*ssi/prey(iprey)
++           end if
++          else
++         _ADD_BOTTOM_FLUX_(self%id_preys(iprey),-MBonprey(iprey)*mb1*redf(4)/(redf(2)*redf(6)*self%scaleprey(iprey)))     !  
++          end if
++         end if
+        enddo
+          MBflux=-MBonDet*mb1  ! 
+           _ADD_BOTTOM_FLUX_(self%id_det,MBflux/self%scaledet) !  
+          if (hasNdet) _ADD_BOTTOM_FLUX_(self%id_detn,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
+          if (hasPdet) _ADD_BOTTOM_FLUX_(self%id_detp,MBflux/(redf(2)*redf(6)*self%scaledet))     !  
+-         if (hasSdet) _ADD_BOTTOM_FLUX_(self%id_dets,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
++         if (hasSdet) then
++          if (self%fix_silica) then
++           if (hasSsed .and. det > 0.0_rk) then
++            _GET_(self%id_dets,ssi)
++            _ADD_BOTTOM_FLUX_(self%id_dets,MBflux*ssi/det)
++            si_eaten = si_eaten - MBflux*ssi/det
++           end if
++          else
++         _ADD_BOTTOM_FLUX_(self%id_dets,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledet))     !  
++          end if
++         end if
+ 
+ 
+          MBflux=-MBonDom*mb1+(self%frr)*(((1.-self%BioC21)*rrcMB+self%mMB1)*mb1)  ! 
+          _ADD_BOTTOM_FLUX_(self%id_dom,MBflux/self%scaledom)     !  
+          if (hasNdom) _ADD_BOTTOM_FLUX_(self%id_domn,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledom))     !  
+         if (hasPdom) _ADD_BOTTOM_FLUX_(self%id_domp,MBflux/(redf(2)*redf(6)*self%scaledom))     ! 
+-        if (hasSdom) _ADD_BOTTOM_FLUX_(self%id_doms,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledom))     !  
++        if (hasSdom) then
++          if (self%fix_silica) then
++           if (hasSsed .and. dom > 0.0_rk) then
++            _GET_(self%id_doms,ssi)
++            _ADD_BOTTOM_FLUX_(self%id_doms,-MBonDom*mb1*ssi/dom)
++            si_eaten = si_eaten + MBonDom*mb1*ssi/dom
++           end if
++          else
++        _ADD_BOTTOM_FLUX_(self%id_doms,MBflux*redf(4)/(redf(2)*redf(6)*self%scaledom))     !  
++          end if
++        end if
++        if (self%fix_silica .and. hasSsed) _ADD_BOTTOM_SOURCE_(self%id_seds,si_eaten)
+         MBflux=+self%excMB1*expterm*mb1 ! 
++        if (self%fix_dic) then
++          if (_AVAILABLE_(self%id_dic)) _ADD_BOTTOM_FLUX_(self%id_dic,MBflux/self%scaledic) ! [Shoal] respired carbon
++        end if
+          _ADD_BOTTOM_FLUX_(self%id_nh4,MBflux/self%scalenh4)     !  
+          _ADD_BOTTOM_FLUX_(self%id_pho,MBflux/self%scalepho) ! 
+         MBflux =-(BioOM6*6.625_rk*self%excMB1* & ! 

@@ -8,6 +8,7 @@ A spec is plain JSON edited by the UI:
         "kind": "none" | "e2e" | "mizer",
         "e2e":   {"macrobenthos": true, "fish1": true, "fish2": true,
                   "engine": "official" | "reimplementation",   # default: official when compiled in
+                  "corrected": true,                           # official engine: Shoal's mass/sign fixes
                   "params": {"MB": {...}, "F1": {...}, "F2": {...}}},
         "mizer": {"feedback": true, "params": {...}}
       },
@@ -24,6 +25,13 @@ E2E has two engines. "official" is the ECOSMO E2E v2.0 Fortran code (models ecos
 ecosmoe2e_mb) with the parameters of its published test cases; "reimplementation" is Shoal's own
 module written from the paper's equations (e2e/fish, e2e/macrobenthos), kept for comparison and for
 kernels built without the official code.
+
+With "corrected": true (the default for new configurations) the official engine switches on the fixes of
+kernel/patches/ecosmo-e2e-corrections.patch (all off = the published code path, verified bit-identical):
+fish send the dissolved fraction frr of egestion and mortality to DOM instead of losing it, fish
+respiration consumes oxygen instead of producing it, silicate passes through fish and macrobenthos
+unchanged instead of being created or destroyed at Redfield ratios, respired carbon returns to DIC, and
+the macrobenthos temperature term uses the Boltzmann constant 8.617e-5 eV/K.
 """
 from __future__ import annotations
 
@@ -92,7 +100,7 @@ def default_spec(host: str = "ersem", htl: str = "none") -> dict:
         "host": host,
         "htl": {
             "kind": htl,
-            "e2e": {"macrobenthos": True, "fish1": True, "fish2": True, "engine": default_e2e_engine(), "params": {}},
+            "e2e": {"macrobenthos": True, "fish1": True, "fish2": True, "engine": default_e2e_engine(), "corrected": True, "params": {}},
             "mizer": {"feedback": True, "params": {}},
         },
         "ltl": {"zoo_mortality_factor": 1.0, "z4_cannibalism": True, "z4_basal_mortality": True},
@@ -112,6 +120,11 @@ def normalize_spec(spec: dict) -> dict:
                     out[k][k2] = v2
         else:
             out[k] = v
+    # configurations saved before the "corrected" switch existed (they always carry "engine") keep
+    # running the original code, so their results do not change behind the user's back
+    e = (spec.get("htl") or {}).get("e2e")
+    if isinstance(e, dict) and "engine" in e and "corrected" not in e:
+        out["htl"]["e2e"]["corrected"] = False
     return out
 
 
@@ -355,6 +368,26 @@ def official_e2e_available() -> bool:
     return "ecosmoe2e" in (kernel_info().get("institutes_extra") or [])
 
 
+def official_corrections_available() -> bool:
+    from ..config import kernel_info
+    return bool(((kernel_info().get("e2e") or {}).get("corrections")))
+
+
+# FABM parameters added by kernel/patches/ecosmo-e2e-corrections.patch
+CORRECTIONS_FISH = ("fix_dom", "fix_oxygen", "fix_silica", "fix_dic")
+CORRECTIONS_MB = ("fix_silica", "fix_dic", "fix_boltzmann")
+
+
+def _official_corrections(host: Host, params: dict, coupling: dict, flags: tuple[str, ...]) -> None:
+    for f in flags:
+        params[f] = True
+    if host.dic:
+        coupling["dic"] = host.dic[0]
+        params["scaledic"] = round(1.0 / host.dic[1], 6)   # host DIC unit -> mg C
+    else:
+        params.pop("fix_dic", None)                        # no DIC pool in this host (ERGOM)
+
+
 def default_e2e_engine() -> str:
     try:
         return "official" if official_e2e_available() else "reimplementation"
@@ -429,11 +462,15 @@ def _add_e2e_official(inst, host: Host, e2e: dict) -> None:
     user = e2e.get("params", {}) or {}
     benthic: dict[str, str] = {}
     have_mb = e2e.get("macrobenthos", True)
+    # kernels built before the corrections patch run the original code; the food-web page says so
+    corrected = bool(e2e.get("corrected", False)) and official_corrections_available()
     if have_mb:
         params = {k: _pick(v, host.id) for k, v in OFFICIAL_MB["params"].items()}
         coupling: dict = {}
         _official_prey(host, OFFICIAL_MB, {}, params, coupling)
         _official_waste(host, params, coupling, benthic=True)
+        if corrected:
+            _official_corrections(host, params, coupling, CORRECTIONS_MB)
         _official_user(params, user.get("MB"), OFFICIAL_KEYS["MB"])
         inst["MB"] = yamlio.cmap({"long_name": "macrobenthos", "model": "ecosmoe2e_mb",
                                   "parameters": yamlio.cmap(params), "coupling": yamlio.cmap(coupling),
@@ -455,6 +492,8 @@ def _add_e2e_official(inst, host: Host, e2e: dict) -> None:
             # and switch that diet item off
             coupling["mb"] = _var(host.sed[0], "c")
             params["GrF1MB1"] = 0.0
+        if corrected:
+            _official_corrections(host, params, coupling, CORRECTIONS_FISH)
         _official_user(params, user.get(name), OFFICIAL_KEYS["F"])
         inst[name] = yamlio.cmap({"long_name": long_name, "model": "ecosmoe2e_fish",
                                   "parameters": yamlio.cmap(params), "coupling": yamlio.cmap(coupling),
@@ -500,8 +539,11 @@ def htl_parameter_table(host_id: str, engine: str | None = None) -> dict:
     out = {}
     if engine == "official":
         tables = (("MB", OFFICIAL_MB, OFFICIAL_KEYS["MB"]), ("F1", OFFICIAL_F1, OFFICIAL_KEYS["F"]), ("F2", OFFICIAL_F2, OFFICIAL_KEYS["F"]))
-        units = {"r": "mmol N m⁻³", "r_ben": "mmol N m⁻³"}
+        # The fish compare r with depth-integrated food (mg C m-2), so their r is per square metre; the
+        # paper's table and the code's metadata say "m-3", which is a labelling error, not a different
+        # formula. Macrobenthos compare r with bottom-layer concentrations (plus sediment per m2).
         for name, table, keys in tables:
+            units = ({"r": "mmol N m⁻³"} if name == "MB" else {"r": "mmol N m⁻²", "r_ben": "mmol N m⁻²"})
             rows = []
             for k, official_name in keys.items():
                 label, unit = PARAM_DOCS[k]
