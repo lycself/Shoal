@@ -64,7 +64,7 @@ export default function SettingsPage() {
         {k && (
           <div className="panel panel-pad">
             <div className="kv">
-              {[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E 模块", k.e2e?.source === "official" ? "官方 ECOSMO E2E v2.0（另含按论文方程重写的对照版本）" : "按论文方程重写（未编入官方代码）"], ["可执行文件", k.gotm_path], ["pyfabm", k.pyfabm_available ? "可用" : "不可用"], ["编译时间", k.built ? new Date(k.built).toLocaleString() : "–"]].map(([a1, b]) => (
+              {[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E 模块", k.e2e?.source === "official" ? (k.e2e?.corrections ? "官方 ECOSMO E2E v2.0 + 可选修正补丁" : "官方 ECOSMO E2E v2.0（编译于修正补丁之前）") + "；另含按论文方程重写的对照版本" : "按论文方程重写（未编入官方代码）"], ["可执行文件", k.gotm_path], ["pyfabm", k.pyfabm_available ? "可用" : "不可用"], ["编译时间", k.built ? new Date(k.built).toLocaleString() : "–"]].map(([a1, b]) => (
                 <Fragment key={String(a1)}><span className="k">{a1}</span><span className="v mono">{b ?? "–"}</span></Fragment>
               ))}
             </div>

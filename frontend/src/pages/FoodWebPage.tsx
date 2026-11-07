@@ -164,12 +164,12 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                         <span className="control">
                           {hosts?.e2e_engines?.corrections_available
                             ? <Seg value={spec.htl.e2e.corrected ? "fixed" : "orig"} onChange={(v: string) => upd((s) => { s.htl.e2e.corrected = v === "fixed"; })}
-                                options={[["orig", "原样（重现论文）"], ["fixed", "修正版（收支闭合）", "check"]] as any} />
+                                options={[["orig", "原样（论文所用代码）"], ["fixed", "修正版（收支闭合）", "check"]] as any} />
                             : <span className="soft">内核编译于修正补丁之前，重新运行 kernel/build.sh 后可选修正版</span>}
                         </span>
                         <span /><span className="hint">{spec.htl.e2e.corrected
-                          ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程第 7 章），其余公式和参数不变。碳、氮、磷、硅收支闭合，鱼呼吸消耗氧气；结果与论文图会有差别。"
-                          : "逐行运行作者发布的代码，能重现论文结果。但代码里鱼的一部分粪便和尸体凭空消失，呼吸放出的碳也不回到水里，鱼呼吸反而产生氧气。研究物质循环时请选修正版。"}</span>
+                          ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程第 7 章），其余公式和参数不变。鱼和底栖动物不再让宿主里的元素凭空增减，鱼呼吸消耗氧气。第一年结果与论文几乎相同，多年后硅酸盐和硅藻明显更多。"
+                          : "逐行运行作者发布的代码，ERSEM 宿主下能重现论文的参考结果。但代码里鱼的一部分粪便和尸体凭空消失，呼吸放出的碳不回到水里，鱼呼吸反而产生氧气，硅被不断扣掉（多年后硅酸盐减半）。研究物质循环或浮游植物时请选修正版。"}</span>
                       </>
                     )}
                   </>
