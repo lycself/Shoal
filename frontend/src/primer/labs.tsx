@@ -112,7 +112,7 @@ function NpzdBox({ compareOnly }: { compareOnly?: boolean }) {
   const y = p.years;
   const zoo = lastYearMean(res.t, res.Z, y), zooRef = lastYearMean(ref.t, ref.Z, y);
   return (
-    <LabShell title="NPZD 盒子模型 + 鱼类：单向与双向耦合" note="营养盐 N、浮游植物 P、浮游动物 Z、碎屑 D 以 mmol N m⁻³ 计；鱼类按 E2E 方程（式 6–14）以浮游动物为食，以 mg C m⁻² 计。单向耦合：鱼类照常生长，但不从浮游动物中扣除被吃掉的量，也不返还排泄物。">
+    <LabShell title="NPZD 盒子模型 + 鱼类：单向与双向耦合" note="营养盐 N、浮游植物 P、浮游动物 Z、碎屑 D 以 mmol N m⁻³ 计；鱼类以 mg C m⁻² 计，按官方 ECOSMO E2E 代码的写法以浮游动物为食（食物取整个盒子的总量，半饱和常数 0.7 mmol N m⁻²，排泄随温度变化 θ = 0.5 eV），粪便、尸体和排泄全部返回（相当于修正版）。单向耦合：鱼类照常生长，但不从浮游动物中扣除被吃掉的量，也不返还排泄物；鱼吃多少都不会让食物变少，所以会无限制地指数增长（右轴改为对数）。">
       <div className="row" style={{ marginBottom: 10 }}>
         <Seg value={p.fish} options={[["none", "无鱼类"], ["one_way", "单向耦合"], ["two_way", "双向耦合"]]} onChange={(v) => set("fish", v)} />
       </div>
@@ -129,7 +129,7 @@ function NpzdBox({ compareOnly }: { compareOnly?: boolean }) {
         { x: ref.t, y: ref.Z, name: "Z（无鱼类参照）", line: { color: cssVar("--eco-zoo"), dash: "dot", width: 1 } },
         { x: res.t, y: res.N, name: "营养盐 N", line: { color: cssVar("--eco-nut"), width: 1 } },
         ...(p.fish !== "none" ? [{ x: res.t, y: res.F, name: "鱼类 F（右轴）", yaxis: "y2", line: { color: cssVar("--eco-fish") } }] : []),
-      ].map((s) => ({ ...s, type: "scatter", mode: "lines" }))} layout={{ xaxis: { title: "天" }, yaxis: { title: "mmol N m⁻³" }, yaxis2: { overlaying: "y", side: "right", title: "mg C m⁻²", showgrid: false } }} />
+      ].map((s) => ({ ...s, type: "scatter", mode: "lines" }))} layout={{ xaxis: { title: "天" }, yaxis: { title: "mmol N m⁻³" }, yaxis2: { overlaying: "y", side: "right", title: "mg C m⁻²", showgrid: false, type: p.fish === "one_way" ? "log" : "linear" } }} />
       <div className="lab-readout">
         <span>最后一年平均浮游动物：<b>{fmt(zoo)}</b>（无鱼 {fmt(zooRef)}，{zooRef ? `${fmt(((zoo - zooRef) / zooRef) * 100, 2)}%` : ""}）</span>
         <span>夏季峰值：<b>{fmt(lastYearMax(res.t, res.Z, y))}</b></span>
@@ -147,13 +147,13 @@ function FunctionalResponse() {
   const [a2, setA2] = useState(0.15);
   const [c2, setC2] = useState(20);
   const xs = Array.from({ length: 101 }, (_, i) => i * 2);
-  const rMg = r * 12.011;
+  const rMg = r * 6.625 * 12.01;
   const g1 = xs.map((c) => (sigma * a1 * c) / (rMg + a1 * c + a2 * c2));
   const g2 = xs.map((c) => (sigma * a2 * c2) / (rMg + a1 * c + a2 * c2));
   return (
-    <LabShell title="Michaelis–Menten 摄食与饵料偏好（E2E 式 1–3）" note="G_X = σ a_X C_X / (r + Σ a C)。饵料 1 增多时，摄食者把更多“注意力”转向它，饵料 2 被摄食的量下降（开关效应）；总摄食在食物充足时趋于 σ。">
+    <LabShell title="Michaelis–Menten 摄食与饵料偏好（E2E 式 1–3）" note="大型底栖动物的写法：G_X = σ a_X C_X / (r + Σ a C)，C 为最底层的浓度，r 以 mmol N m⁻³ 计、乘 79.6 换成碳。饵料 1 增多时，摄食者把更多“注意力”转向它，饵料 2 被摄食的量下降（开关效应）；总摄食在食物充足时趋于 σ。">
       <Slider label="最大摄食率 σ" value={sigma} min={0.01} max={0.3} onChange={setSigma} unit="d⁻¹" />
-      <Slider label="半饱和常数 r" value={r} min={0.01} max={2} onChange={setR} unit="mmol C m⁻³" log />
+      <Slider label="半饱和常数 r" value={r} min={0.01} max={2} onChange={setR} unit="mmol N m⁻³" log />
       <Slider label="对饵料 1 的偏好 a₁" value={a1} min={0} max={1} onChange={setA1} />
       <Slider label="对饵料 2 的偏好 a₂" value={a2} min={0} max={1} onChange={setA2} />
       <Slider label="饵料 2 浓度" value={c2} min={0} max={200} onChange={setC2} unit="mg C m⁻³" />
@@ -210,12 +210,12 @@ function SpectrumSlope() {
 // 6 ---------------------------------------------------------------- arrhenius
 function Arrhenius() {
   const [ea, setEa] = useState(0.63);
-  const [theta, setTheta] = useState(0.0);
+  const [theta, setTheta] = useState(0.5);
   const Ts = Array.from({ length: 31 }, (_, i) => i);
   const mizer = Ts.map((T) => Math.exp((ea / BOLTZMANN) * (1 / 286.15 - 1 / (T + 273.15))));
   const e2e = Ts.map((T) => Math.exp((theta / BOLTZMANN) * ((T + 273.15 - 273.15) / ((T + 273.15) * 273.15))));
   return (
-    <LabShell title="温度依赖：Arrhenius 因子" note="MIZER（式 S21）以 13 °C 为参考温度，因子在 13 °C 时为 1；E2E 排泄（式 4、11）以 0 °C 为参考，θ 越大升温越快。Vijayakumaran 等 (2026)未给出 θ，本软件默认 θ=0（排泄率取表中数值、与温度无关）。">
+    <LabShell title="温度依赖：Arrhenius 因子" note="MIZER（式 S21）以 13 °C 为参考温度，因子在 13 °C 时为 1；E2E 排泄（式 4、11）以 0 °C 为参考，θ 越大升温越快。Vijayakumaran 等 (2026) 未给出 θ；官方算例里鱼取 θ = 0.5 eV（10 °C 时约为 0 °C 的 2.1 倍），大型底栖取 0（不随温度变）。">
       <Slider label="MIZER 活化能 E_a" value={ea} min={0} max={1.2} onChange={setEa} unit="eV" />
       <Slider label="E2E 排泄参数 θ" value={theta} min={0} max={1.2} onChange={setTheta} unit="eV" />
       <Plot height={260} data={[

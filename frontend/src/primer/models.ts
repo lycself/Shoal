@@ -8,18 +8,20 @@ export interface BoxParams {
   fish0: number; // mg C m-2
   sigma: number; // fish grazing rate on zooplankton (d-1)
   a: number; // preference
-  r: number; // half saturation (mmol C m-3)
+  r: number; // half saturation (mmol N m-2, as in the official ECOSMO E2E code)
   gamma: number; // assimilation efficiency
   m: number; // fish mortality (d-1)
-  mu: number; // fish excretion (d-1)
+  mu: number; // fish excretion at 0 °C (d-1)
+  theta: number; // excretion temperature sensitivity (eV)
   zmort: number; // zooplankton linear mortality (d-1)
   gmax: number; // zooplankton max grazing (d-1)
 }
 
-export const BOX_DEFAULTS: BoxParams = { years: 4, H: 30, nut0: 8, fish: "two_way", fish0: 1000, sigma: 0.033, a: 0.4, r: 0.7, gamma: 0.7, m: 0.001, mu: 0.001, zmort: 0.05, gmax: 0.5 };
+export const BOX_DEFAULTS: BoxParams = { years: 4, H: 30, nut0: 8, fish: "two_way", fish0: 1000, sigma: 0.033, a: 0.4, r: 0.7, gamma: 0.7, m: 0.001, mu: 0.001, theta: 0.5, zmort: 0.05, gmax: 0.5 };
 const C_PER_N = 6.625 * 12.01; // mg C per mmol N
 
-/** NPZD (nitrogen) in a mixed box + one E2E fish group (carbon, depth-integrated) feeding on Z. */
+/** NPZD (nitrogen) in a mixed box + one E2E fish group (carbon per m2) feeding on Z, written like the
+ *  official ECOSMO E2E code: food is the depth-integrated prey, r is per m2, excretion follows exp(θ/k ·…). */
 export function runBox(p: BoxParams) {
   const days = Math.round(p.years * 365);
   let N = p.nut0, P = 0.3, Z = 0.2, D = 0.5, F = p.fish === "none" ? 0 : p.fish0;
@@ -44,15 +46,15 @@ export function runBox(p: BoxParams) {
     const zmort = p.zmort * Z + 0.02 * Z * Z;
     const remin = 0.05 * fT * D;
     const pmort = 0.03 * P;
-    // fish (E2E Eq. 6-14, depth-averaged food)
-    const Zc = Z * C_PER_N; // mg C m-3
-    const food = p.a * Zc;
-    const rMg = p.r * 12.011;
-    const G = (p.sigma * p.a * Zc) / (rMg + food); // d-1 per fish carbon (per m3 equivalent)
-    const consC = F * G; // mg C m-2 d-1 (fish biomass integrated, prey depth-averaged)
+    // fish (official ECOSMO E2E: depth-integrated food, r in mmol N m-2 converted to mg C m-2)
+    const Zint = Z * C_PER_N * p.H; // mg C m-2
+    const food = p.a * Zint;
+    const rMg = p.r * C_PER_N;
+    const G = (p.sigma * p.a * Zint) / (rMg + food); // d-1 per unit fish carbon
+    const consC = F * G; // mg C m-2 d-1
     const consN_vol = p.fish === "two_way" ? consC / C_PER_N / p.H : 0; // mmol N m-3 d-1 removed from Z
     const growth = p.gamma * consC;
-    const exc = p.mu * F;
+    const exc = p.mu * Math.exp((p.theta / BOLTZMANN) * (T / ((T + 273.15) * 273.15))) * F;
     const fm = p.m * F;
     const wasteN = p.fish === "two_way" ? ((1 - p.gamma) * consC + fm) / C_PER_N / p.H : 0;
     const excN = p.fish === "two_way" ? exc / C_PER_N / p.H : 0;

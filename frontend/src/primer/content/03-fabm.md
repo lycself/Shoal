@@ -46,8 +46,8 @@ GOTM 里源汇项用什么方法做时间积分，可以在 `gotm.yaml` 的 `fab
 | 身份 | 含义 | 例子 |
 |---|---|---|
 | 状态变量（state variable） | 有自己的方程、需要积分的量 | ERSEM 的 `P1/c`（硅藻碳）；E2E 的 `F1/c`（鱼 1 碳） |
-| 水体内 vs 水平（底部/表面） | 水体内变量每层一个值，单位 m⁻³；水平变量每根水柱一个值，单位 m⁻² | 浮游生物是水体内变量；E2E 鱼类和大型底栖、ERSEM 沉积物 `Q6` 是水平变量 |
-| 诊断量（diagnostic） | 算出来供输出，不积分 | E2E 鱼的 `consumption`（总摄食）、`wet_mass`（湿重） |
+| 水体内 vs 水平（底部/表面） | 水体内变量每层一个值，单位 m⁻³；水平变量每根水柱一个值，单位 m⁻² | 浮游生物和 E2E 的鱼是水体内变量；E2E 大型底栖、ERSEM 沉积物 `Q6` 是水平变量 |
+| 诊断量（diagnostic） | 算出来供输出，不积分 | E2E 鱼的 `Fishint`（深度积分生物量）、`F1prey1`（对第 1 种饵料的摄食） |
 | 依赖（dependency） | 模块要读、但不归它算的量 | 水温、光照、水深等“标准变量” |
 | 状态依赖（state dependency） | 别的模块的状态变量；本模块可以读，**也可以给它加源汇项** | 鱼的 `prey1_c` 连到浮游动物 `Z4/c` |
 | 聚合量（aggregate） | 把各模块的贡献加起来 | 总碳、总氮、总磷 |
@@ -72,48 +72,54 @@ FABM 的配置写在一个人能看懂的 YAML 文件里。每个实例（instan
 instances:
   F1:
     long_name: planktivorous fish
-    model: e2e/fish              # 用哪个模块（研究所/模块名）
+    model: ecosmoe2e_fish        # 用哪个模块（官方 ECOSMO E2E 的鱼）
     parameters:
-      m: 0.001                   # 死亡率 (d-1)，论文 2 表 2
-      gamma: 0.7                 # 同化效率
-      nprey: 4                   # 4 种猎物
-      prey1_sigma: 0.0001        # 对碎屑的摄食率 (d-1)
-      prey1_a: 0.1               # 对碎屑的偏好
-      prey1_composition: cnps    # 碎屑有碳、氮、磷、硅
-      prey2_sigma: 0.005         # 对大型底栖的摄食率
-      prey2_benthic: true        # 大型底栖在海底
-      prey3_sigma: 0.033         # 对小型浮游动物的摄食率
-      prey3_a: 0.4
-      prey3_composition: cnp
-      prey4_sigma: 0.033         # 对中型浮游动物的摄食率
-      prey4_a: 0.4
-      prey4_composition: c       # Z4 只有碳一个状态变量……
-      prey4_qn: 0.0126           # ……氮、磷按固定比例换算 (mmol/mg C)
-      prey4_qp: 0.000786
-      excretion_targets: apco    # 排泄到铵(a)、磷酸盐(p)、DIC(c)、氧(o)
-      dic_scale: 0.08326         # mg C -> mmol C（ERSEM 的 O3/c 以 mmol 计）
+      mF1: 0.001                 # 死亡率 (d-1)
+      excF1: 0.001               # 排泄率，0 °C 时 (d-1)
+      tempcF1: 0.5               # 排泄的温度敏感性 θ (eV)
+      asefF1: 0.7                # 同化效率
+      rF1: 0.7                   # 半饱和常数 (mmol N m-2，代码内乘 79.6 换成 mg C)
+      frr: 0.4                   # 未同化与死亡物质中进入 DOM 的比例
+      GrF1Det: 0.0001            # 对碎屑的摄食率 (d-1)，碎屑和大型底栖是固定的两项
+      GrF1MB1: 0.005             # 对大型底栖的摄食率 (d-1)
+      nprey: 2                   # 另外 2 种浮游猎物
+      Gr1: 0.033                 # 对猎物 1 的摄食率 (d-1)
+      pref1: 0.4                 # 对猎物 1 的偏好
+      compositionprey1: cnp      # 猎物 1（Z5）有碳、氮、磷三个变量
+      Gr2: 0.033
+      pref2: 0.4                 # 猎物 2（Z4）只有碳：氮、磷按 Redfield 比例隐含其中
+      compositiondet: cnps       # 碎屑有碳、氮、磷、硅
+      compositiondom: cnp
+      scalenh4: 79.57            # 宿主 1 mmol N = 79.57 mg C
+      scalepho: 1273.0           # 宿主 1 mmol P = 1273 mg C
+      fix_dom: true              # 修正版的开关（见第 7 章）
     coupling:
-      prey1_c: R6/c              # 中等粒级颗粒有机物
-      prey2_c: MB/c              # 另一个实例：大型底栖
-      prey3_c: Z5/c              # 小型浮游动物
-      prey4_c: Z4/c              # 中型浮游动物
-      det_c: R6/c                # 未同化和死亡物质 -> 碎屑
-      dom_c: R1/c                # -> 活性溶解有机物
+      prey1: Z5/c                # 小型浮游动物
+      preyn1: Z5/n
+      preyp1: Z5/p
+      prey2: Z4/c                # 中型浮游动物
+      det: R6/c                  # 未同化和死亡物质 -> 中等粒级颗粒有机物
+      detn: R6/n
+      detp: R6/p
+      dom: R1/c                  # -> 活性溶解有机物
+      mb: MB/c                   # 另一个实例：大型底栖
       nh4: N4/n                  # 排泄 -> 铵盐
-      po4: N1/p                  # 排泄 -> 磷酸盐
-      dic: O3/c                  # 呼吸 -> 溶解无机碳
-      o2: O2/o                   # 呼吸消耗氧
+      pho: N1/p                  # 排泄 -> 磷酸盐
+      oxy: O2/o                  # 氧
+      dic: O3/c                  # 修正版：呼吸 -> 溶解无机碳
     initialization:
-      c: 1000.0                  # 初始生物量 (mg C m-2)
+      c: 5.0                     # 初始浓度 (mg C m-3，鱼在每层都有值)
 ```
+
+（这是软件为 ERSEM 宿主生成的鱼 1，略去了几行同类项。）
 
 读这份文件时注意三点：
 
-1. **`coupling` 下面写的全是名字。** `prey4_c: Z4/c` 的意思是：把我登记的状态依赖 `prey4_c`，接到实例 `Z4` 的变量 `c` 上。FABM 初始化时按名字查找，把线接好。
-2. 鱼的“菜单”长度可变。`nprey` 和 `preyN_*` 组成一个数组，猎物可以随意加减，鱼 2 还可以把 `F1/c` 当猎物。
-3. 组分字符串决定哪些元素要守恒。论文 2 说明，模块靠检查这个字符串来决定是否追踪氮、磷、硅：组分里有 `n`，被吃掉的氮就要从猎物里扣掉，并回到宿主的氮库。
+1. **`coupling` 下面写的全是名字。** `prey2: Z4/c` 的意思是：把我登记的状态依赖 `prey2`，接到实例 `Z4` 的变量 `c` 上。FABM 初始化时按名字查找，把线接好。
+2. 鱼的“菜单”长度可变。`nprey` 和 `GrN`、`prefN`、`preyN` 组成一个数组，猎物可以随意加减，鱼 2 还可以把 `F1/c` 当猎物。
+3. 组分字符串决定哪些元素要守恒。论文 2 说明，模块靠检查这个字符串来决定是否追踪氮、磷、硅：组分里有 `n`，被吃掉的氮就要从猎物里扣掉，并回到宿主的氮库。官方代码扣氮、扣磷都按 Redfield 比例（鱼体只记碳，氮磷按固定比例隐含），不按猎物实际的氮碳比。
 
-换成 ECOSMO 宿主，同一条鱼 1 只要把 `coupling` 改成 `prey3_c: ECO/microzoo`、`prey4_c: ECO/mesozoo`、`det_c: ECO/det` 等，模块代码一个字都不用动。
+换成 ECOSMO 宿主，同一条鱼 1 只要把 `coupling` 改成 `prey1: ECO/microzoo`、`prey2: ECO/mesozoo`、`det: ECO/det` 等，模块代码一个字都不用动。
 
 ## 为什么不用重新编译
 
@@ -128,14 +134,14 @@ instances:
 
 双向耦合有一条硬规矩：**每一笔通量都要在两个账户上同时记账**，一边减多少，另一边就加多少。论文 2 写道，所有通量都通过共享的数据结构处理，所以质量守恒。
 
-以鱼 1 吃掉 1 mg C 浮游动物为例（$\gamma_{F1}=0.7$；没被同化的部分里进入溶解有机物的比例 $\alpha_{\mathrm{DOM}}$ 取软件默认值 0.3）：
+以鱼 1 吃掉 1 mg C 浮游动物为例（同化效率 $\gamma_{F1}=0.7$；没被同化的部分里进入溶解有机物的比例 $f_{rr}$ 取官方算例的 0.4）：
 
 | 账户 | 变化 |
 |---|---|
 | 浮游动物 | $-1$ |
 | 鱼 1 | $+\gamma = +0.7$ |
-| 碎屑 | $+(1-\alpha_{\mathrm{DOM}})(1-\gamma) = +0.21$ |
-| 溶解有机物 | $+\alpha_{\mathrm{DOM}}(1-\gamma) = +0.09$ |
+| 碎屑 | $+(1-f_{rr})(1-\gamma) = +0.18$ |
+| 溶解有机物 | $+f_{rr}(1-\gamma) = +0.12$ |
 | 合计 | $0$ |
 
 （鱼的排泄和死亡另有去处，同样两边记账：排泄的碳以 CO₂ 形式进入溶解无机碳 DIC，氮和磷进入铵盐和磷酸盐，同时消耗氧。）写成一般形式，对任何守恒元素：
@@ -144,7 +150,9 @@ $$
 \frac{d}{dt}\left(\sum_{\text{所有库}} c_j\right) = \text{边界通量（海–气、沉积埋藏、松弛等）}
 $$
 
-为了能检查这一点，模块会把自己的变量登记进“总碳”“总氮”“总磷”等聚合量。E2E 鱼模块就是把鱼的碳按 $1/12.011$ 换成 mmol C，氮、磷按固定的化学计量比（元素之间的固定比例）计入总量。
+为了能检查这一点，模块可以把自己的变量登记进“总碳”“总氮”“总磷”等聚合量。ERSEM 和 FABM-MIZER 都这样做；官方 E2E 代码没有登记，鱼和大型底栖动物的碳、氮、磷要自己按 1/12.01、Redfield 比例换算后加进去。
+
+要注意，“共享数据结构所以守恒”只是说框架允许两边同时记账，每一笔是否真的记对，还要看模块代码本身。官方 E2E 代码就有几处没记对：上表里溶解有机物那 0.12，在原样代码里并没有加到任何变量上；呼吸的碳不进入 DIC，鱼呼吸反而增加氧气。本软件的修正版改正了这些（[第 7 章](chapter:07-functional-groups)）。
 
 ## 单位与换算因子
 
@@ -156,11 +164,12 @@ $$
 | ECOSMO | mg C m⁻³ | 也以碳当量 mg C m⁻³ 表示（按 Redfield 比换算） |
 | ERGOM | mmol N m⁻³ | mmol N m⁻³ 与 mmol P m⁻³ |
 
-E2E 内部用 mg C 计。YAML 里可以给每个连接设一个乘子（论文 2 第 2.2 节），软件会自动算好：
+E2E 内部用 mg C 计。官方代码给每个连接设一个换算系数 `scale…`（论文 2 第 2.2 节），含义是“宿主的 1 个单位等于多少 mg C”：读入时乘它，写回宿主时除以它。软件会自动算好：
 
-- **ERSEM 的 DIC**：$1\ \mathrm{mg\,C} = 1/12.011\ \mathrm{mmol\,C}$，所以 `dic_scale` $= 0.0833$。
-- **ECOSMO 的铵盐**：Redfield 比（海洋浮游生物典型的元素比例）C:N $=106:16=6.625$（摩尔比），所以 $1\ \mathrm{mmol\,N}$ 相当于 $6.625\times12.01\approx79.6\ \mathrm{mg\,C}$；磷酸盐 $1\ \mathrm{mmol\,P}\leftrightarrow106\times12.01\approx1273\ \mathrm{mg\,C}$。
-- **ERGOM 的猎物**：浮游动物以 mmol N 计，乘以 79.6 换成 mg C；反过来写回碎屑时乘以 $1/79.6\approx0.0126$。
+- **ERSEM 的铵盐和磷酸盐**：Redfield 比（海洋浮游生物典型的元素比例）C:N $=106:16=6.625$（摩尔比），所以 $1\ \mathrm{mmol\,N}$ 相当于 $6.625\times12.01\approx79.6\ \mathrm{mg\,C}$，`scalenh4` $=79.57$；磷酸盐 $1\ \mathrm{mmol\,P}\leftrightarrow106\times12.01\approx1273\ \mathrm{mg\,C}$，`scalepho` $=1273$。
+- **ERSEM 的 DIC**（修正版用到）：$1\ \mathrm{mmol\,C} = 12.01\ \mathrm{mg\,C}$，`scaledic` $=12.01$。
+- **ECOSMO**：营养盐本来就以碳当量 mg C 计，不需要换算。
+- **ERGOM**：浮游生物、碎屑都以 mmol N 计，`scaleprey`、`scaledet` 等取 79.6；营养盐以 mmol N、mmol P 计，`scalenh4` $=79.57$、`scalepho` $=1273$。
 
 论文 2 还举了一个例子：如果宿主的碎屑以 mol C kg⁻¹ 计，而 E2E 要的是 mg C m⁻³，乘子约为
 
