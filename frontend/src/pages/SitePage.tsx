@@ -4,7 +4,7 @@ import { MapCanvas } from "../components/MapCanvas";
 import { Plot, colorscaleFor, seriesColor } from "../components/Plot";
 import { SitePicker, siteNotes } from "../components/SitePicker";
 import { Term } from "../components/Term";
-import { Btn, Empty, Icon, Loading, Modal, Notice, Progress, Select, Seg, Split, StatusBadge, Tabs, fmtLatLon, useAsync, HelpLink } from "../components/ui";
+import { Btn, Empty, Icon, Loading, Modal, Notice, Progress, Select, Seg, Split, StatusBadge, Tabs, fmtLatLon, useAsync, HelpLink, PanelToggle } from "../components/ui";
 import { useApp } from "../store";
 
 const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
@@ -25,7 +25,7 @@ export default function SitePage() {
     <div className="page fill">
       <div className="page-header">
         <div>
-          <div className="row"><div className="page-title">站点与物理</div><HelpLink chapter="02-water-column" title="一维水柱物理（教程）" /></div>
+          <div className="row"><PanelToggle id="site" label="站点信息与模拟设置" /><div className="page-title">站点与物理</div><HelpLink chapter="02-water-column" title="一维水柱物理（教程）" /></div>
         </div>
         <div className="page-actions">
           <StatusBadge status={siteJob ? "building" : p.site_status} />

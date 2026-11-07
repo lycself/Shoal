@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { create } from "zustand";
 import { useApp } from "../store";
 
 /** Codicon glyph (VS Code icon font). */
@@ -80,9 +81,10 @@ export function Seg<T extends string>({ value, options, onChange, size }: { valu
   );
 }
 
-export function Tabs<T extends string>({ value, tabs, onChange, right }: { value: T; tabs: { id: T; label: string; icon?: string; hidden?: boolean; tip?: string }[]; onChange: (v: T) => void; right?: React.ReactNode }) {
+export function Tabs<T extends string>({ value, tabs, onChange, right, left }: { value: T; tabs: { id: T; label: string; icon?: string; hidden?: boolean; tip?: string }[]; onChange: (v: T) => void; right?: React.ReactNode; left?: React.ReactNode }) {
   return (
     <div className="tabs">
+      {left && <div className="tabs-left">{left}</div>}
       {tabs.filter((t) => !t.hidden).map((t) => (
         <div key={t.id} className={`tab ${value === t.id ? "active" : ""}`} data-tip={t.tip} onClick={() => onChange(t.id)}>
           {t.icon && <Icon name={t.icon} />}{t.label}
@@ -237,51 +239,77 @@ export function TooltipLayer() {
   return <div ref={ref} className="tooltip" role="tooltip" style={{ left: tip.x + dx, top: tip.y, transform: `translate(-50%, ${tip.below ? "0" : "-100%"})` }}>{tip.text}</div>;
 }
 
+/* Side panels of the workbench pages (AVAS style). Width and open/closed state live in a small store so
+ * the panel and its toggle button (in the page header) stay in step, and both are remembered. */
+interface SplitState { w: number; collapsed: boolean }
+const splitKey = (id: string) => `e2e.split.${id}`;
+const useSplits = create<{ s: Record<string, SplitState>; set: (id: string, v: Partial<SplitState>) => void }>((set, get) => ({
+  s: {},
+  set: (id, v) => {
+    const next = { ...(get().s[id] ?? { w: 280, collapsed: false }), ...v };
+    try {
+      localStorage.setItem(splitKey(id), String(Math.round(next.w)));
+      localStorage.setItem(`${splitKey(id)}.collapsed`, next.collapsed ? "1" : "0");
+    } catch { /* ignore */ }
+    set({ s: { ...get().s, [id]: next } });
+  },
+}));
+function useSplit(id: string, initial = 280, min = 200, max = 520) {
+  const st = useSplits((x) => x.s[id]);
+  const setSt = useSplits((x) => x.set);
+  const cur: SplitState = st ?? (() => {
+    try {
+      const w = Number(localStorage.getItem(splitKey(id)) ?? initial) || initial;
+      return { w: Math.max(min, Math.min(max, w)), collapsed: localStorage.getItem(`${splitKey(id)}.collapsed`) === "1" };
+    } catch { return { w: initial, collapsed: false }; }
+  })();
+  return { ...cur, update: (v: Partial<SplitState>) => setSt(id, { ...cur, ...v }) };
+}
+
+/** The button that opens and closes a page's side panel; put it at the left of the page header. */
+export function PanelToggle({ id, label }: { id: string; label: string }) {
+  const sp = useSplit(id);
+  return <IconBtn icon={sp.collapsed ? "layout-sidebar-left-off" : "layout-sidebar-left"} title={sp.collapsed ? `显示${label}` : `收起${label}（也可以拖动或双击它的右边缘）`} active={!sp.collapsed} onClick={() => sp.update({ collapsed: !sp.collapsed })} />;
+}
+
 /**
- * Side panel + main area. The side panel can be resized by dragging the divider, collapsed with the
- * small button on the divider (or by dragging it narrow, or double-clicking it), and reopened from
- * the slim rail that remains — the rail names the panel so nothing disappears silently.
+ * Side panel + main area. The panel slides open and closed (its content keeps its width while it moves);
+ * the divider drags to resize, dragging it narrow folds the panel away, double-clicking toggles it. When
+ * folded, the divider stays at the edge (drag or double-click it to reopen) and <PanelToggle> in the page
+ * header shows the panel again.
  */
 export function Split({ id, initial = 280, min = 200, max = 520, side, children, label = "侧栏" }: { id: string; initial?: number; min?: number; max?: number; side: React.ReactNode; children: React.ReactNode; label?: string }) {
-  const key = `e2e.split.${id}`;
-  const [w, setW] = useState<number>(() => {
-    try { return Math.max(min, Math.min(max, +(localStorage.getItem(key) ?? initial))); } catch { return initial; }
-  });
-  const [collapsed, setCollapsed] = useState<boolean>(() => { try { return localStorage.getItem(`${key}.collapsed`) === "1"; } catch { return false; } });
-  const setC = (v: boolean) => { setCollapsed(v); try { localStorage.setItem(`${key}.collapsed`, v ? "1" : "0"); } catch { /* ignore */ } };
+  const sp = useSplit(id, initial, min, max);
+  const [live, setLive] = useState<number | null>(null);
+  // register this panel's own starting width, so <PanelToggle> in the header reopens it at that width
+  useEffect(() => { if (!useSplits.getState().s[id]) sp.update({}); }, [id]);
   const drag = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest(".sash-btn")) return;
+    if (e.button !== 0) return;
     e.preventDefault();
-    const x0 = e.clientX, w0 = w;
+    const x0 = e.clientX, w0 = sp.collapsed ? 0 : sp.w;
     let last = w0;
-    const move = (ev: MouseEvent) => { last = w0 + ev.clientX - x0; setW(Math.max(min, Math.min(max, last))); };
+    document.body.classList.add("dragging");
+    const move = (ev: MouseEvent) => { last = w0 + ev.clientX - x0; setLive(Math.max(0, Math.min(max, last))); };
     const up = () => {
+      document.body.classList.remove("dragging");
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
-      document.body.style.cursor = "";
-      if (last < min - 60) setC(true); // dragged well past the minimum: fold the panel away
-      setW((v) => { try { localStorage.setItem(key, String(v)); } catch { /* ignore */ } return v; });
+      setLive(null);
+      if (last < min / 2) sp.update({ collapsed: true });  // dragged narrow: fold the panel away
+      else sp.update({ collapsed: false, w: Math.max(min, Math.min(max, last)) });
     };
-    document.body.style.cursor = "col-resize";
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
-  if (collapsed) {
-    return (
-      <div className="split">
-        <button className="split-rail" data-tip={`展开${label}`} aria-label={`展开${label}`} onClick={() => setC(false)}>
-          <Icon name="chevron-right" /><span className="rail-label">{label}</span>
-        </button>
-        <div className="split-main">{children}</div>
-      </div>
-    );
-  }
+  const w = Math.max(min, Math.min(max, sp.w));
+  const width = live ?? (sp.collapsed ? 0 : w);
   return (
     <div className="split">
-      <div className="split-side" style={{ width: w }}>{side}</div>
-      <div className="sash" onMouseDown={drag} onDoubleClick={() => setC(true)} data-tip="拖动调整宽度；双击或点 ‹ 收起">
-        <button className="sash-btn" data-tip={`收起${label}`} aria-label={`收起${label}`} onClick={() => setC(true)}><Icon name="chevron-left" /></button>
+      <div className={`split-side ${live == null ? "animate" : ""} ${sp.collapsed && live == null ? "closed" : ""}`} style={{ width }} aria-hidden={sp.collapsed} aria-label={label}>
+        <div className="split-side-inner" style={{ width: Math.max(live ?? 0, w) }}>{side}</div>
       </div>
+      <div className={`sash ${sp.collapsed && live == null ? "sash-closed" : ""}`} onMouseDown={drag} onDoubleClick={() => sp.update({ collapsed: !sp.collapsed })}
+        data-tip={sp.collapsed ? `${label}已收起：向右拖动或双击这里展开` : `拖动调整${label}宽度，拖到很窄或双击收起`} />
       <div className="split-main">{children}</div>
     </div>
   );

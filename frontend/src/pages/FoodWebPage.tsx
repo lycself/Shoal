@@ -2,7 +2,7 @@ import { Term } from "../components/Term";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { FoodWebGraph } from "../components/FoodWebGraph";
-import { Btn, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Switch, Tabs, useAsync, HelpLink } from "../components/ui";
+import { Btn, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Switch, Tabs, useAsync, HelpLink, PanelToggle } from "../components/ui";
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
 
 const HTL_NAMES: Record<string, string> = { MB: "大型底栖动物 MB", F1: "鱼 1 · 浮游食性", F2: "鱼 2 · 底栖 / 鱼食性" };
@@ -30,7 +30,7 @@ export default function FoodWebPage() {
     <div className="page fill">
       <div className="page-header">
         <div>
-          <div className="row"><div className="page-title">食物网配置</div><HelpLink chapter="05-hosts" title="三个宿主与高营养级模块（教程）" /></div>
+          <div className="row"><PanelToggle id="foodweb" label="配置列表" /><div className="page-title">食物网配置</div><HelpLink chapter="05-hosts" title="三个宿主与高营养级模块（教程）" /></div>
         </div>
       </div>
       <Split id="foodweb" label="配置列表" initial={270} side={

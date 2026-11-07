@@ -99,13 +99,15 @@ export function useReadingOpen(): [boolean, () => void] {
 export function ReadingToggle({ open, toggle }: { open: boolean; toggle: () => void }) {
   return <IconBtn icon="book" size="sm" title={open ? "收起读图说明" : "显示读图说明"} active={open} onClick={toggle} />;
 }
-export function FigAside({ open, figure, reading, toggle }: { open: boolean; figure: ReactNode; reading: ReactNode; toggle?: () => void }) {
+/** Figure with the reading panel on its right. The panel slides open and closed; the book button
+ *  (<ReadingToggle>) in the tab's option bar is its switch, as AVAS puts panel toggles in the bar above. */
+export function FigAside({ open, figure, reading }: { open: boolean; figure: ReactNode; reading: ReactNode; toggle?: () => void }) {
   return (
     <div className="fig-aside">
       <div className="fig-main">{figure}</div>
-      {open
-        ? <aside className="reading-aside">{toggle && <button className="aside-collapse" data-tip="收起读图说明" aria-label="收起读图说明" onClick={toggle}><Icon name="chevron-right" /></button>}{reading}</aside>
-        : toggle && <button className="split-rail right" data-tip="展开读图说明：这张图说明了什么" aria-label="展开读图说明" onClick={toggle}><Icon name="chevron-left" /><span className="rail-label">读图说明</span></button>}
+      <aside className={`reading-aside ${open ? "open" : ""}`} aria-hidden={!open} aria-label="读图说明">
+        <div className="reading-aside-inner">{reading}</div>
+      </aside>
     </div>
   );
 }

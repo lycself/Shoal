@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, on } from "../api";
 import { MapCanvas } from "../components/MapCanvas";
-import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Seg, Split, Stat, StatusBadge, Tabs, fmt, robustAbs, useAsync, HelpLink } from "../components/ui";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Seg, Split, Stat, StatusBadge, Tabs, fmt, robustAbs, useAsync, HelpLink, PanelToggle } from "../components/ui";
 import { Shelf3DView, ShelfPlates, ShelfRegions } from "../components/ShelfViews";
 import { FigureReading, changeOfMeans, configKind, pairKeyOf, referenceIndex } from "../components/ShelfExplain";
 import { CellPanel } from "../components/CellPanel";
-import { useReadingOpen } from "../components/ResultReading";
+import { ReadingToggle, useReadingOpen } from "../components/ResultReading";
 import { HOST_LABEL, useApp } from "../store";
 
 const AMM7: [number, number, number, number] = [48, 62, -12, 10];
@@ -33,7 +33,7 @@ export default function ShelfPage() {
     <div className="page fill">
       <div className="page-header">
         <div>
-          <div className="row"><div className="page-title">三维陆架</div><span className="badge">水柱集合</span><HelpLink chapter="11-shelf-3d" title="从水柱到陆架（教程）" /></div>
+          <div className="row"><PanelToggle id="shelf" label="研究列表" /><div className="page-title">三维陆架</div><span className="badge">水柱集合</span><HelpLink chapter="11-shelf-3d" title="从水柱到陆架（教程）" /></div>
         </div>
         <div className="page-actions"><Btn icon="add" onClick={() => setPlanning(true)}>新建研究</Btn></div>
       </div>
@@ -270,6 +270,8 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
               <span className="opt">比较<Select size="sm" value={cj} onChange={(v) => setCj(+v)}>{results.map((r, i) => <option key={i} value={i}>{r.config_name}</option>)}</Select></span>
             </>}
             {metric.startsWith("monthly:") && <span className="opt" style={{ flex: 1, minWidth: 220 }}>月份<input type="range" min={0} max={12} value={month} onChange={(e) => setMonth(+e.target.value)} style={{ flex: 1, accentColor: "var(--accent)" }} /><b style={{ width: 40, color: "var(--fg-strong)" }}>{month === 0 ? "年均" : `${month}月`}</b></span>}
+            <span className="grow" />
+            <ReadingToggle open={readOpen} toggle={toggleRead} />
           </div>
           <div className="split-scroll" style={{ padding: "16px 20px 24px" }}>
             {!metric.startsWith("monthly:") && metric && !has(metric, ci) && <div className="reading-warn small" style={{ marginBottom: 8 }}>“{(label ?? metric).trim()}”在 {results[ci]?.config_name} 中不存在（这个配置没有该类群）。请切换“{cmp === "value" ? "配置" : "基准"}”，或换一个指标。</div>}
@@ -277,8 +279,7 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
               <MapCanvas box={study.box} cell={study.res} points={points} varName={varName} diverging={cmp !== "value"} range={range} units={unit} height={520}
                 onPointClick={(p, at) => setCellSel({ point: { lat: p.lat, lon: p.lon }, at })} selected={cellSel?.point}
                 title={`${(label ?? "").trim()}${cmp === "value" ? ` · ${results[ci]?.config_name}` : cmp === "diff" ? `：${results[cj]?.config_name} − ${results[ci]?.config_name}` : `：${results[cj]?.config_name} 相对 ${results[ci]?.config_name} 的变化`}`} />
-              {!readOpen ? <button className="split-rail right" style={{ alignSelf: "stretch", borderRadius: 4 }} data-tip="展开读图说明：这张图说明了什么" aria-label="展开读图说明" onClick={toggleRead}><Icon name="chevron-left" /><span className="rail-label">读图说明</span></button> : <div style={{ position: "relative" }}>
-              <button className="aside-collapse" style={{ top: -4, right: -6 }} data-tip="收起读图说明" aria-label="收起读图说明" onClick={toggleRead}><Icon name="chevron-right" /></button>
+              {readOpen && <div>
               <FigureReading metric={metric} label={label ?? metric} unit={metric.startsWith("monthly:") ? "" : meta[metric]?.units ?? ""} mode={cmp}
                 pairs={pairs} nameA={results[ci]?.config_name} nameB={results[cj]?.config_name}
                 descA={cfgOf(results[ci])?.description} descB={cfgOf(results[cj])?.description}

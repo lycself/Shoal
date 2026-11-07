@@ -3,7 +3,7 @@ import { api } from "../api";
 import { FoodWebGraph } from "../components/FoodWebGraph";
 import { sampleScale } from "../components/MapCanvas";
 import { Plot, colorscaleFor, seriesColor } from "../components/Plot";
-import { Btn, Check, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Stat, Tabs, cssVar, extent, fmt, useAsync } from "../components/ui";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Stat, Tabs, cssVar, extent, fmt, useAsync, PanelToggle } from "../components/ui";
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
 import { PlatesTab } from "../components/Plates";
 import { ValidateTab } from "../components/Validate";
@@ -57,7 +57,7 @@ export default function ResultsPage() {
       <Split id="results" label="运行与变量列表" initial={300} min={240} max={460} side={
         <SidePanel runs={done} exps={exps.data ?? []} sel={sel} setSel={setSelectedRuns} vars={vars.data} v={v} setV={setV} win={win} setWin={setWin} dark={dark} />
       }>
-        <Tabs value={tab} onChange={setTab} tabs={[
+        <Tabs value={tab} onChange={setTab} left={<PanelToggle id="results" label="运行与变量列表" />} tabs={[
           { id: "compare", label: "指标对比", icon: "table", tip: "各运行的年平均指标，以及相对第一个勾选运行的变化" },
           { id: "plates", label: "图版", icon: "files", tip: "排好版、可直接放进报告的多面板图" },
           { id: "hov", label: "时间–深度", icon: "symbol-color", tip: "横轴时间、纵轴深度、颜色表示浓度的图，一眼看出季节和分层" },
