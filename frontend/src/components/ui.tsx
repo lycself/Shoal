@@ -350,7 +350,9 @@ export type MenuEntry =
 export function MenuList({ items, onDone }: { items: MenuEntry[]; onDone: () => void }) {
   const [sub, setSub] = useState<number | null>(null);
   return (
-    <div className="menu" onMouseLeave={() => setSub(null)}>
+    // The list is rendered inside the menubar button that opened it: stop mousedown from reaching that
+    // button, which would toggle the menu shut before the item's click fires.
+    <div className="menu" onMouseLeave={() => setSub(null)} onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); }}>
       {items.map((it, i) => "type" in it ? <div key={i} className="menu-sep" /> : (
         <div key={i} className={`menu-row ${it.disabled ? "disabled" : ""} ${it.danger ? "danger" : ""}`}
           onMouseEnter={() => setSub(it.submenu ? i : null)}
