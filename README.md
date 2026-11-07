@@ -57,24 +57,21 @@ backend/shoal/        FastAPI 后端
 frontend/src/             React 前端（pages/、components/、primer/ 教程内容与交互实验）
 kernel/                   计算内核
   build.sh                获取源码并编译 GOTM 与 pyfabm
-  e2e/                    按论文方程实现的 E2E 鱼类与大型底栖 FABM 模块（Fortran）
+  e2e/                    按论文方程重写的 E2E 鱼类与大型底栖 FABM 模块（对照用；官方代码放在 src/ecosmo-e2e）
   src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.sh 按锁定的版本下载，不进仓库）
   install/                编译结果（bin/gotm、kernel.json）
 workspace/                项目、数据缓存、设置（运行时生成）
 ```
 
-## 关于 ECOSMO E2E 官方代码（Zenodo）
+## ECOSMO E2E 官方代码
 
-论文二的官方代码与测试算例在 Zenodo（doi:10.5281/zenodo.20413770），开发环境无法访问 Zenodo，所以 `kernel/e2e/` 是**按论文方程（式 1–19、表 1–3）重写的版本**。实现说明（单位解释、θ 默认值、质量守恒、数值保护）见入门教程第 7、12 章。
+鱼类与大型底栖功能群默认用 ECOSMO E2E v2.0 的官方 Fortran 代码（Vijayakumaran et al. 2026，Zenodo doi:10.5281/zenodo.20413770，GPL）。它不进本仓库，放在 `kernel/src/ecosmo-e2e/`：
 
-手动替换为官方代码：
+1. 从 Zenodo 下载 `ecosmoe2e_gmd.tar.gz`，把解压出的 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`（`model_output/` 有 5.9 GB 参考结果，不必复制）。
+2. 重新编译：`bash kernel/build.sh`。脚本检测到 `kernel/src/ecosmo-e2e/src/CMakeLists.txt` 后，把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核。
+3. 在“食物网配置”的“计算代码”里选择用哪一份；默认是官方代码，参数取自官方的 ERSEM / ECOSMO / ERGOM 算例。
 
-1. 在能访问 Zenodo 的网络下打开 <https://doi.org/10.5281/zenodo.20413770>，下载源码压缩包（以及测试算例压缩包）。
-2. 把 E2E 源码解压到 `kernel/src/ecosmo-e2e/`，确保该目录下有 `CMakeLists.txt`（FABM 外部模块的根目录）。
-3. 重新编译：`bash kernel/build.sh`。脚本检测到 `kernel/src/ecosmo-e2e` 后会编译官方代码，首页“计算内核”卡片会显示“官方 ECOSMO E2E”。
-4. 测试算例（GOTM 设置目录，含 `gotm.yaml`）可在“站点与物理 → 更换站点 → 导入目录”中直接导入。
-
-注意：官方模块的参数名可能与本软件生成的 fabm.yaml 不同，替换后需要在“食物网配置 → fabm.yaml / 高级参数覆盖”中核对。
+验证（ERSEM 宿主，北海中部 56°N 3°E，2020–2039 年，官方驱动与配置）：第一年与官方参考结果相差 1–4%；官方算例里鱼 2 的两个摄食率写作 0.004，而参考结果用的是 0.0045，改成 0.0045 后高营养级第一年在 1% 以内。20 年后的剩余偏差来自 ERSEM 版本（官方未记录），验证时用的是 ERSEM 8510fbf（2024-11-12）。本软件自动生成的鱼类配置与官方配置在同一内核上相差不到 1%。官方算例里的 ECOSMO、ERGOM 是 NECCTON 项目版本（未公开），本软件用 FABM 自带的 nersc/ecosmo 与 msi/ergom1。详见入门教程第 7、12 章。
 
 ## 全球使用
 

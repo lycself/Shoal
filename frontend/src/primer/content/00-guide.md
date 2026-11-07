@@ -25,7 +25,7 @@ summary: 一个项目从建立到出图要走哪几步（项目、站点、食�
 
 第一次使用时按下面三步来：
 
-1. 准备 conda 环境（`pnpm setup:env`），然后编译内核：`pnpm kernel`（等于 `bash kernel/build.sh`）。脚本会下载 GOTM、FABM、ERSEM、FABM-MIZER 的源码，把 `ersem`、`mizer`、`e2e` 三个模块库编进同一个 `gotm` 可执行文件，最后写出 `kernel.json`，记下编译结果。如果你把官方的 ECOSMO E2E v2.0 源码（Zenodo 10.5281/zenodo.20413770）解压到 `kernel/src/ecosmo-e2e`，脚本会优先用它；没有的话，就用按论文公式实现的 `kernel/e2e`。
+1. 准备 conda 环境（`pnpm setup:env`），然后编译内核：`pnpm kernel`（等于 `bash kernel/build.sh`）。脚本会下载 GOTM、FABM、ERSEM、FABM-MIZER 的源码，把 `ersem`、`mizer`、`e2e` 三个模块库编进同一个 `gotm` 可执行文件（如果 `kernel/src/ecosmo-e2e` 里放了官方 ECOSMO E2E 代码，也一起编进去，鱼类模块默认就用它），最后写出 `kernel.json`，记下编译结果。如果你把官方的 ECOSMO E2E v2.0 源码（Zenodo 10.5281/zenodo.20413770）解压到 `kernel/src/ecosmo-e2e`，脚本会优先用它；没有的话，就用按论文公式实现的 `kernel/e2e`。
 2. 在仓库根目录运行 `pnpm install`，再运行 `pnpm dev`。这一步会同时启动后端（默认 `http://127.0.0.1:8765`）和前端。
 3. 用浏览器打开 `http://localhost:5173`。
 
@@ -51,7 +51,7 @@ workspace/projects/<项目id>/
 2. **[站点](app:site)**：设定经纬度、水深和强迫年份，点“构建”，软件会下载并缓存数据。站点有三种：
    - *generated*（生成）：海上任意格点，用 ERA5 + WOA23 + ETOPO 自动生成（设置方法参考 Vijayakumaran et al. 2026 §3.1）；
    - *gotm_case*（官方算例）：GOTM 自带的测试算例，比如北海北部的 `nns_annual`，不用联网；
-   - *imported*（导入）：一个现成的 GOTM 设置目录（必须含 `gotm.yaml`），比如 ECOSMO E2E 在 Zenodo 上发布的测试算例。
+   - *imported*（导入）：一个现成的 GOTM 设置目录（必须含 `gotm.yaml`），比如 ECOSMO E2E 官方压缩包里的 `testcases/`（需先用 GOTM 自带的 `update_setup.py` 升级到当前配置格式）。
 3. **[食物网](app:foodweb)**：每个“配置”由一个低营养级宿主（ERSEM / ECOSMO / ERGOM）加一种高营养级（无 / E2E 功能群 / MIZER 粒径谱）组成。你可以开关大型底栖、鱼 1、鱼 2；修改功能群参数（默认值来自 Vijayakumaran et al. 2026 表 1–3）；调整浮游动物死亡率倍数；调整 ERSEM 中型浮游动物的种内捕食和基础死亡；还可以按路径直接改 `fabm.yaml` 里的任何参数。页面上的食物网图是从实际生成的 `fabm.yaml` 读出来的，每条 `preyN` 耦合画成一条边。
 4. **[实验](app:experiments)**：一个实验就是一组按顺序排好的运行。点运行后，后端给每个配置写出 `gotm.yaml` 和 `fabm.yaml`，调用内核计算，日志实时显示。
 5. **[图版](app:results)**：深度–时间剖面图（Hovmöller 图，横轴时间、纵轴深度、颜色表示数值）、时间序列、年平均、垂直剖面、多次运行的对比图和差值图、鱼类粒径谱、食物网通量。

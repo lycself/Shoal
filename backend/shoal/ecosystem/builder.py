@@ -7,6 +7,7 @@ A spec is plain JSON edited by the UI:
       "htl": {
         "kind": "none" | "e2e" | "mizer",
         "e2e":   {"macrobenthos": true, "fish1": true, "fish2": true,
+                  "engine": "official" | "reimplementation",   # default: official when compiled in
                   "params": {"MB": {...}, "F1": {...}, "F2": {...}}},
         "mizer": {"feedback": true, "params": {...}}
       },
@@ -18,6 +19,11 @@ A spec is plain JSON edited by the UI:
 
 Default HTL parameters reproduce Vijayakumaran et al. (2026) Tables 1-3 (E2E)
 and Powley et al. (2026) Table S1 (FABM-MIZER).
+
+E2E has two engines. "official" is the ECOSMO E2E v2.0 Fortran code (models ecosmoe2e_fish /
+ecosmoe2e_mb) with the parameters of its published test cases; "reimplementation" is Shoal's own
+module written from the paper's equations (e2e/fish, e2e/macrobenthos), kept for comparison and for
+kernels built without the official code.
 """
 from __future__ import annotations
 
@@ -86,7 +92,7 @@ def default_spec(host: str = "ersem", htl: str = "none") -> dict:
         "host": host,
         "htl": {
             "kind": htl,
-            "e2e": {"macrobenthos": True, "fish1": True, "fish2": True, "params": {}},
+            "e2e": {"macrobenthos": True, "fish1": True, "fish2": True, "engine": default_e2e_engine(), "params": {}},
             "mizer": {"feedback": True, "params": {}},
         },
         "ltl": {"zoo_mortality_factor": 1.0, "z4_cannibalism": True, "z4_basal_mortality": True},
@@ -121,7 +127,13 @@ def build_fabm_yaml(spec: dict) -> Any:
     _apply_ltl(inst, host, spec)
     kind = spec["htl"]["kind"]
     if kind == "e2e":
-        _add_e2e(inst, host, spec["htl"]["e2e"])
+        e2e = spec["htl"]["e2e"]
+        if e2e.get("engine", default_e2e_engine()) == "official":
+            if not official_e2e_available():
+                raise ValueError("内核里没有编译官方 ECOSMO E2E 代码：把官方压缩包里的文件夹放到 kernel/src/ecosmo-e2e 后重新运行 kernel/build.sh，或把 E2E 引擎改为“按论文方程重写”。")
+            _add_e2e_official(inst, host, e2e)
+        else:
+            _add_e2e(inst, host, e2e)
     elif kind == "mizer":
         if host.id != "ersem":
             raise ValueError("FABM-MIZER 多元素版本需要 ERSEM 这样区分碳氮磷的宿主")
@@ -298,6 +310,159 @@ def _add_e2e(inst, host: Host, e2e: dict) -> None:
             benthic_prey["F1"] = "F1/c"
 
 
+# ----------------------------------------------------------------------------
+# Official ECOSMO E2E v2.0 (Vijayakumaran et al. 2026), parameters of its test cases
+# (testcases/fabm.yaml_{ersem,ecosmo,ergom}). Rates d-1, half saturations mmol N m-3 (the code
+# converts to mg C), temperature control in eV. Per-host values as in _pick().
+# ----------------------------------------------------------------------------
+OFFICIAL_MB = {
+    "params": {"mMB1": 0.001, "excMB1": 0.025, "rMB1": {"default": 0.1, "ergom": 0.2}, "gammaZd": 0.75,
+               "GrMB1Det": 0.1, "GrMB1Sed": 0.1, "tempcMB1": 0.0,
+               "prefMB1Det": 0.1, "prefMB1Sed": 0.1, "prefMB1Dom": {"default": 0.1, "ergom": 0.0}, "frr": 0.4},
+    "prey": [("Pf", 0.1, 0.15), ("Pd", 0.1, 0.2), ("Zs", 0.1, 0.15), ("Zl", 0.1, 0.2)],
+    "c": {"default": 0.01, "ergom": 1.0},   # mg C m-2
+}
+OFFICIAL_F1 = {
+    "params": {"mF1": {"default": 0.001, "ergom": 0.00113}, "excF1": {"default": 0.001, "ergom": 0.00113},
+               "rF1": 0.7, "rF1MB": 0.9, "tempcF1": 0.5, "asefF1": 0.7,
+               "GrF1Det": 0.0001, "GrF1MB1": 0.005, "prefF1Det": 0.1, "prefF1MB1": 0.1, "frr": 0.4},
+    "prey": [("Zs", 0.033, 0.4), ("Zl", 0.033, 0.4)],
+    "c": 5.0,                                # mg C m-3
+}
+OFFICIAL_F2 = {
+    "params": {"mF1": {"default": 0.0005, "ergom": 0.00055}, "excF1": {"default": 0.001, "ergom": 0.00105},
+               "rF1": 0.7, "rF1MB": 0.9, "tempcF1": 0.5, "asefF1": 0.65,
+               "GrF1Det": 0.0001, "GrF1MB1": {"default": 0.0045, "ersem": 0.004}, "prefF1Det": 0.1, "prefF1MB1": 0.4,
+               "frr": 0.4},
+    "prey": [("Zl", 0.001, 0.1), ("F1", {"default": 0.0045, "ersem": 0.004}, 0.4)],
+    "c": 1.0,
+}
+# UI parameter keys (shared with the re-implementation) -> official parameter names
+OFFICIAL_KEYS = {
+    "MB": {"m": "mMB1", "mu": "excMB1", "r": "rMB1", "gamma": "gammaZd", "theta": "tempcMB1", "alpha_dom": "frr"},
+    "F": {"m": "mF1", "mu": "excF1", "r": "rF1", "r_ben": "rF1MB", "gamma": "asefF1", "theta": "tempcF1", "alpha_dom": "frr"},
+}
+# host unit -> mg C (the official code's currency) for nutrients, detritus, DOM and sediment
+OFFICIAL_SCALES = {
+    "ersem":  {"scalenh4": 79.57, "scalepho": 1273.0},
+    "ecosmo": {},
+    "ergom":  {"scalenh4": 79.57, "scalepho": 1273.0, "scaledet": 79.57, "scaledom": 79.57, "scalesed": 79.57},
+}
+
+
+def official_e2e_available() -> bool:
+    from ..config import kernel_info
+    return "ecosmoe2e" in (kernel_info().get("institutes_extra") or [])
+
+
+def default_e2e_engine() -> str:
+    try:
+        return "official" if official_e2e_available() else "reimplementation"
+    except Exception:
+        return "reimplementation"
+
+
+def _official_waste(host: Host, params: dict, coupling: dict, benthic: bool) -> None:
+    """nh4/pho/oxy/det/dom (and sed for macrobenthos) couplings with their compositions and scales."""
+    coupling.update({"nh4": host.nh4[0], "pho": host.po4[0], "oxy": host.o2[0]})
+    det, dcomp, _ = host.det
+    params["compositiondet"] = "".join(c for c in dcomp if c in "cnps")
+    coupling["det"] = _var(det, "c")
+    if host.dom:
+        dom, mcomp, _ = host.dom
+        params["compositiondom"] = "".join(c for c in mcomp if c in "cnps")
+        coupling["dom"] = _var(dom, "c")
+    else:
+        # no DOM pool (ERGOM): the dissolved share of waste goes to detritus (prefMB1Dom is 0 there)
+        params["compositiondom"] = "c"
+        coupling["dom"] = _var(det, "c")
+    for c in params["compositiondet"].replace("c", ""):
+        coupling[f"det{c}"] = f"{det}/{c}"
+    if host.dom:
+        for c in params["compositiondom"].replace("c", ""):
+            coupling[f"dom{c}"] = f"{host.dom[0]}/{c}"
+    if benthic:
+        sed, scomp, _ = host.sed
+        params["compositionsed"] = "".join(c for c in scomp if c in "cnps")
+        coupling["sed1"] = _var(sed, "c")
+        for c in params["compositionsed"].replace("c", ""):
+            coupling[f"sed{c}"] = f"{sed}/{c}"
+    for k, v in OFFICIAL_SCALES[host.id].items():
+        if k != "scalesed" or benthic:
+            params[k] = v
+
+
+def _official_prey(host: Host, table: dict, extra: dict[str, str], params: dict, coupling: dict) -> None:
+    n = 0
+    for key, gr, pref in table["prey"]:
+        if key in host.prey:
+            p = host.prey[key]
+            n += 1
+            coupling[f"prey{n}"] = p.var
+            comp = "".join(c for c in p.composition if c in "cnps") if p.instance else "c"
+            if comp != "c":
+                params[f"compositionprey{n}"] = comp
+                for c in comp.replace("c", ""):
+                    coupling[f"prey{c}{n}"] = f"{p.instance}/{c}"
+            if p.c_scale != 1.0:
+                params[f"scaleprey{n}"] = p.c_scale
+        elif key in extra:
+            n += 1
+            coupling[f"prey{n}"] = extra[key]
+        else:
+            continue
+        params[f"Gr{n}"] = _pick(gr, host.id)
+        params[f"pref{n}"] = pref
+    params["nprey"] = n
+
+
+def _official_user(params: dict, user: dict, keys: dict) -> None:
+    """Apply UI edits (shared keys like m, mu, gamma) and raw official names."""
+    for k, v in (user or {}).items():
+        if k in keys:
+            params[keys[k]] = v
+        elif k in params:          # official name, e.g. GrF1MB1 or pref2
+            params[k] = v
+
+
+def _add_e2e_official(inst, host: Host, e2e: dict) -> None:
+    user = e2e.get("params", {}) or {}
+    benthic: dict[str, str] = {}
+    have_mb = e2e.get("macrobenthos", True)
+    if have_mb:
+        params = {k: _pick(v, host.id) for k, v in OFFICIAL_MB["params"].items()}
+        coupling: dict = {}
+        _official_prey(host, OFFICIAL_MB, {}, params, coupling)
+        _official_waste(host, params, coupling, benthic=True)
+        _official_user(params, user.get("MB"), OFFICIAL_KEYS["MB"])
+        inst["MB"] = yamlio.cmap({"long_name": "macrobenthos", "model": "ecosmoe2e_mb",
+                                  "parameters": yamlio.cmap(params), "coupling": yamlio.cmap(coupling),
+                                  "initialization": yamlio.cmap({"c": float(_pick(OFFICIAL_MB["c"], host.id))})})
+    for name, table, enabled, long_name in (
+        ("F1", OFFICIAL_F1, e2e.get("fish1", True), "planktivorous fish"),
+        ("F2", OFFICIAL_F2, e2e.get("fish2", True), "bentho-piscivorous fish"),
+    ):
+        if not enabled:
+            continue
+        params = {k: _pick(v, host.id) for k, v in table["params"].items()}
+        coupling = {}
+        _official_prey(host, table, benthic, params, coupling)
+        _official_waste(host, params, coupling, benthic=False)
+        if have_mb:
+            coupling["mb"] = "MB/c"
+        else:
+            # the official fish always link a macrobenthos pool; without one, point it at the sediment
+            # and switch that diet item off
+            coupling["mb"] = _var(host.sed[0], "c")
+            params["GrF1MB1"] = 0.0
+        _official_user(params, user.get(name), OFFICIAL_KEYS["F"])
+        inst[name] = yamlio.cmap({"long_name": long_name, "model": "ecosmoe2e_fish",
+                                  "parameters": yamlio.cmap(params), "coupling": yamlio.cmap(coupling),
+                                  "initialization": yamlio.cmap({"c": float(_pick(table["c"], host.id))})})
+        if name == "F1":
+            benthic["F1"] = "F1/c"
+
+
 def _add_mizer(inst, host: Host, mz: dict) -> None:
     params = dict(MIZER_DEFAULTS)
     params.update(mz.get("params", {}) or {})
@@ -329,20 +494,43 @@ def _add_mizer(inst, host: Host, mz: dict) -> None:
 
 
 # ----------------------------------------------------------------------------
-def htl_parameter_table(host_id: str) -> dict:
-    """Default HTL parameter values for the UI (with descriptions)."""
+def htl_parameter_table(host_id: str, engine: str | None = None) -> dict:
+    """Default HTL parameter values for the UI (with descriptions), for the given E2E engine."""
+    engine = engine or default_e2e_engine()
     out = {}
-    for name, table in (("MB", E2E_MB), ("F1", E2E_F1), ("F2", E2E_F2)):
-        rows = []
-        for k in ("m", "mu", "r", "r_ben", "gamma", "alpha_dom"):
-            if k in table:
+    if engine == "official":
+        tables = (("MB", OFFICIAL_MB, OFFICIAL_KEYS["MB"]), ("F1", OFFICIAL_F1, OFFICIAL_KEYS["F"]), ("F2", OFFICIAL_F2, OFFICIAL_KEYS["F"]))
+        units = {"r": "mmol N m⁻³", "r_ben": "mmol N m⁻³"}
+        for name, table, keys in tables:
+            rows = []
+            for k, official_name in keys.items():
                 label, unit = PARAM_DOCS[k]
-                rows.append({"key": k, "label": label, "unit": unit, "value": _pick(table[k], host_id)})
-        rows.append({"key": "theta", "label": PARAM_DOCS["theta"][0], "unit": "eV", "value": 0.0})
-        rows.append({"key": "fishing", "label": PARAM_DOCS["fishing"][0], "unit": "d⁻¹", "value": 0.0})
-        prey = []
-        for key, (sigma, a) in table["prey"].items():
-            prey.append({"key": key, "sigma": _pick(sigma, host_id), "a": a})
-        out[name] = {"params": rows, "prey": prey}
+                rows.append({"key": k, "label": label, "unit": units.get(k, unit), "official": official_name,
+                             "value": _pick(table["params"][official_name], host_id)})
+            prey = [{"key": key, "sigma": _pick(gr, host_id), "a": a} for key, gr, a in table["prey"]
+                    if key in HOSTS[host_id].prey or key == "F1"]
+            if name == "MB":
+                prey += [{"key": "det", "sigma": table["params"]["GrMB1Det"], "a": table["params"]["prefMB1Det"]},
+                         {"key": "sed", "sigma": table["params"]["GrMB1Sed"], "a": table["params"]["prefMB1Sed"]},
+                         # the official code grazes DOM with the detritus rate GrMB1Det
+                         {"key": "dom", "sigma": table["params"]["GrMB1Det"], "a": _pick(table["params"]["prefMB1Dom"], host_id)}]
+            else:
+                prey += [{"key": "det", "sigma": table["params"]["GrF1Det"], "a": table["params"]["prefF1Det"]},
+                         {"key": "MB", "sigma": _pick(table["params"]["GrF1MB1"], host_id), "a": table["params"]["prefF1MB1"]}]
+            out[name] = {"params": rows, "prey": prey}
+    else:
+        for name, table in (("MB", E2E_MB), ("F1", E2E_F1), ("F2", E2E_F2)):
+            rows = []
+            for k in ("m", "mu", "r", "r_ben", "gamma", "alpha_dom"):
+                if k in table:
+                    label, unit = PARAM_DOCS[k]
+                    rows.append({"key": k, "label": label, "unit": unit, "value": _pick(table[k], host_id)})
+            rows.append({"key": "theta", "label": PARAM_DOCS["theta"][0], "unit": "eV", "value": 0.0})
+            rows.append({"key": "fishing", "label": PARAM_DOCS["fishing"][0], "unit": "d⁻¹", "value": 0.0})
+            prey = []
+            for key, (sigma, a) in table["prey"].items():
+                prey.append({"key": key, "sigma": _pick(sigma, host_id), "a": a})
+            out[name] = {"params": rows, "prey": prey}
+    out["engine"] = engine
     out["mizer"] = {"params": [{"key": k, "value": v} for k, v in MIZER_DEFAULTS.items()]}
     return out

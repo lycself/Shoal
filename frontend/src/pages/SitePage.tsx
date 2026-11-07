@@ -237,7 +237,7 @@ function SiteEditor({ onClose, at }: { onClose: () => void; at?: { lat: number; 
         {mode === "case" && <Notice kind="plain">使用 GOTM 官方北海北部算例（PROVESS 1998，59.33°N 1.28°E，110 m）自带的气象与剖面，不需要联网。</Notice>}
         {mode === "import" && (
           <div className="col">
-            <div className="field"><label>GOTM 设置目录（需包含 gotm.yaml，例如 ECOSMO E2E 的 Zenodo 测试算例）</label><input className="input mono" value={path} onChange={(e) => setPath(e.target.value)} placeholder="/Users/…/ecosmo-e2e/testcases/central_north_sea" /></div>
+            <div className="field"><label>GOTM 设置目录（需包含 gotm.yaml）</label><input className="input mono" value={path} onChange={(e) => setPath(e.target.value)} placeholder="/Users/…/ecosmo-e2e/testcases/central_north_sea" /></div>
           </div>
         )}
       </div>

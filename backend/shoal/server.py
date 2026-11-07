@@ -123,8 +123,12 @@ def put_settings(data: dict = Body(...)) -> dict:
 
 @app.get("/api/hosts")
 def hosts() -> dict:
+    official = builder.official_e2e_available()
     return {"hosts": [host_summary(h) for h in HOSTS.values()],
             "htl_defaults": {h: builder.htl_parameter_table(h) for h in HOSTS},
+            "htl_defaults_by_engine": {e: {h: builder.htl_parameter_table(h, e) for h in HOSTS}
+                                       for e in (("official", "reimplementation") if official else ("reimplementation",))},
+            "e2e_engines": {"default": builder.default_e2e_engine(), "official_available": official},
             "param_docs": builder.PARAM_DOCS}
 
 
