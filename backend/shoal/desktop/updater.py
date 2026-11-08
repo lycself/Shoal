@@ -69,6 +69,7 @@ _manifest: dict | None = None
 _check_running = threading.Lock()
 _started = False
 _stop = threading.Event()  # ends the background loop (tests)
+completed_checks = 0  # finished checks, successful or not (diagnostics and tests)
 
 
 # ----------------------------------------------------------------------------- helpers
@@ -235,6 +236,8 @@ def check() -> dict:
         _set(phase="error", error=_friendly(e))
         return state()
     finally:
+        global completed_checks
+        completed_checks += 1
         _check_running.release()
 
 
