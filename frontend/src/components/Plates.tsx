@@ -216,7 +216,7 @@ function HtlPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: stri
       const live = p.res.series.filter((x: any) => !x.missing);
       const yr = headroom(live.flatMap((x: any) => x.mean), 0.35);
       const ev = eventLayer(annualEvents(p.v, s0.doy, s0.mean, lat).slice(0, 1).map((e) => ({ ...e, detail: `${e.sub} · ${fmt(e.y, 3)}` })),
-        { xaxis: xa, yaxis: ya, series: live.map((x: any) => ({ x: x.doy, y: x.mean })), xRange: [1, 365], yRange: yr, wFrac: 0.45, hFrac: 0.16 });
+        { xaxis: xa, yaxis: ya, series: live.map((x: any) => ({ x: x.doy, y: x.mean })), xRange: [1, 365], yRange: yr, px: [Math.max(160, (window.innerWidth - 760) / n - 40), 300] });
       layout.annotations.push(...ev.annotations);
       if (ev.marker) traces.push(ev.marker);
       layout[i ? `yaxis${i + 1}` : "yaxis"].range = yr;
@@ -271,10 +271,11 @@ function BarsPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: str
   };
   const traces: any[] = [];
   const shown = new Set<string>();
-  const layout: any = { barmode: "group", margin: { l: 64, r: 10, t: 64, b: 96 }, annotations: [], legend: { orientation: "h", x: 0, y: 1.16, yanchor: "bottom" } };
+  // legend under the plot (above it, it ran into the host titles); category names stay horizontal where they fit
+  const layout: any = { barmode: "group", bargap: 0.25, margin: { l: 64, r: 10, t: 30, b: 70 }, annotations: [], legend: { orientation: "h", x: 0, y: -0.28, yanchor: "top", font: { size: 11.5 } } };
   hosts.forEach((h, i) => {
     const xa = i ? `x${i + 1}` : "x", ya = i ? `y${i + 1}` : "y";
-    layout[i ? `xaxis${i + 1}` : "xaxis"] = { domain: [i * (w + gap), i * (w + gap) + w], anchor: ya, tickangle: -40 };
+    layout[i ? `xaxis${i + 1}` : "xaxis"] = { domain: [i * (w + gap), i * (w + gap) + w], anchor: ya, tickangle: n > 2 ? -30 : 0, automargin: true };
     layout[i ? `yaxis${i + 1}` : "yaxis"] = { anchor: xa, title: i === 0 ? { text: "与基准之差 (mg C m⁻²)" } : undefined, zeroline: true, zerolinewidth: 1.2 };
     layout.annotations.push({ text: `<b>${h.toUpperCase()}</b>`, xref: "paper", yref: "paper", x: i * (w + gap) + w / 2, y: 1.0, yanchor: "bottom", showarrow: false });
     const b = base(h);
@@ -289,7 +290,7 @@ function BarsPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: str
   });
   return (
     <div className="col" style={{ gap: 8 }}>
-      <Plot height={420} data={traces} layout={layout} />
+      <Plot height={460} data={traces} layout={layout} />
       <PlateNote read="每个面板是一个宿主模型；柱子是相对该宿主第一个勾选运行（建议“仅低营养级”）的差值，颜色区分处理：完整（鱼 + 底栖）、仅底栖、仅鱼类、只提高浮游动物死亡率。"
         show={["加入鱼后浮游动物通常减少：这是“下行控制”，捕食者压低了猎物。", "加入大型底栖动物后碎屑通常减少：底栖动物吃掉了沉到海底的有机物。", "“浮游动物死亡率 +20%”是只调低营养级闭合项的对照：如果它的效果和加入鱼相似，说明鱼的作用在这里主要相当于额外的浮游动物死亡。"]}
         look={["同一处理在三个宿主中方向是否一致：三个宿主方向一致，结论就比较可靠；不一致，说明结论取决于用了哪个宿主模型。这是判断结论是否稳健的关键。"]}

@@ -71,7 +71,7 @@ export function CellPanel({ at, point, results, ci, cj, metric, boxes, onClose }
           if (evs.length === 2 && evs[0].x === evs[1].x && Math.abs(evs[0].y - evs[1].y) <= 1e-3 * Math.max(1, Math.abs(evs[0].y))) evs.splice(0, 2, { ...evs[0], title: `两个配置都在 ${evs[0].x} 月最高 ${fmt(evs[0].y, 3)}` });
           const all = ps.flatMap((p) => (p.monthly?.[mv] ?? []) as (number | null)[]);
           const yr = headroom(all, 0.9, 0.1);
-          const ev = eventLayer(evs, { series: ps.map((p) => ({ x: M, y: p.monthly?.[mv] ?? [] })), xRange: [1, 12], yRange: yr, wFrac: 0.28, hFrac: 0.26 });
+          const ev = eventLayer(evs, { series: ps.map((p) => ({ x: M, y: p.monthly?.[mv] ?? [] })), xRange: [1, 12], yRange: yr, px: [330, 140] });
           ev.annotations.forEach((an: any, j: number) => { an.arrowcolor = seriesColor(evs[j].i, dark); an.font = { ...an.font, size: 10.5 }; });
           return <Plot height={180} data={[...ps.map((p: any, i: number) => ({ x: M, y: p.monthly?.[mv], type: "scatter", mode: "lines+markers", name: short(results[i ? cj! : ci].config_name), line: { color: seriesColor(i, dark), width: 2 }, marker: { size: 4 } })), ...(ev.marker ? [ev.marker] : [])]}
             layout={{ margin: { l: 44, r: 8, t: 6, b: 26 }, xaxis: { tickvals: [1, 4, 7, 10], ticktext: ["1月", "4月", "7月", "10月"] }, yaxis: { range: yr }, showlegend: !!B, legend: { orientation: "h", y: 1.15, font: { size: 10 } }, annotations: ev.annotations }} />;

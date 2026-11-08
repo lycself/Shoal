@@ -30,12 +30,13 @@ export default function FoodWebPage() {
   };
   return (
     <div className="page fill">
+      <Split header={
       <div className="page-header">
         <div>
           <div className="row"><PanelToggle id="foodweb" label="配置列表" /><div className="page-title">食物网配置</div><HelpLink chapter="05-hosts" title="三个宿主与高营养级模块（教程）" /></div>
         </div>
       </div>
-      <Split id="foodweb" label="配置列表" initial={270} side={
+      } id="foodweb" label="配置列表" initial={270} side={
         <>
           <div className="tree-head">配置<span className="actions"><IconBtn icon="add" title="新配置" size="sm" onClick={add} /><IconBtn icon="refresh" title="刷新" size="sm" onClick={configs.reload} /></span></div>
           <div className="split-scroll">

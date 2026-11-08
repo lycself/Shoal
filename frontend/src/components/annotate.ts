@@ -74,7 +74,13 @@ const toNum = (x: number | string) => (typeof x === "number" ? x : Date.parse(x)
  * count the plotted points (and interpolated segments) a label box there would cover, plus other labels, and take
  * the cheapest. Coordinates are data units, so the result goes to Plotly with axref/ayref set to the axes.
  */
-export function placeCallouts(events: SeasonEvent[], series: PlaceSeries[], opts: { xRange?: [number, number]; yRange?: [number, number]; wFrac?: number; hFrac?: number } = {}) {
+/** Pixel size of a callout: CJK glyphs one em wide, Latin and digits about 0.6 em, plus padding. */
+function labelPx(e: SeasonEvent, second: string): [number, number] {
+  const w = (t: string, size: number) => [...t.replace(/<[^>]+>/g, "")].reduce((a, ch) => a + (ch.charCodeAt(0) > 0x2e80 ? size : size * 0.6), 0);
+  return [Math.max(w(e.title, 11.5), w(second, 10.5)) + 14, (second ? 30 : 17) + 8];
+}
+
+export function placeCallouts(events: SeasonEvent[], series: PlaceSeries[], opts: { xRange?: [number, number]; yRange?: [number, number]; wFrac?: number; hFrac?: number; px?: [number, number]; seconds?: string[] } = {}) {
   const pts: [number, number][] = [];
   for (const s of series) {
     const xs = s.x.map(toNum);
@@ -92,10 +98,14 @@ export function placeCallouts(events: SeasonEvent[], series: PlaceSeries[], opts
   const xr = opts.xRange ?? [Math.min(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[0]))];
   const yr = opts.yRange ?? (() => { const lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1])); return [lo, hi + 0.24 * (hi - lo || 1)] as [number, number]; })();
   const xs = xr[1] - xr[0] || 1, ys = yr[1] - yr[0] || 1;
-  // a little larger than the text itself, so a curve passing just outside the estimate still clears the label
-  const W = (opts.wFrac ?? 0.2) * xs * 1.15, H = (opts.hFrac ?? 0.13) * ys * 1.2;
+  // plot area in pixels (estimated from the window when the caller does not know it): label boxes are sized from
+  // their text, so a long label gets the room it really needs
+  const plotPx = opts.px ?? [Math.max(300, window.innerWidth - 780), Math.max(200, window.innerHeight - 300)];
   const placed: [number, number, number, number][] = [];
-  return events.map((e) => {
+  return events.map((e, ei) => {
+    const [lw, lh] = labelPx(e, opts.seconds?.[ei] ?? "");
+    // a little larger than the text itself, so a curve passing just outside the box still clears the label
+    const W = Math.max((opts.wFrac ?? 0) * xs, (lw / plotPx[0]) * xs) * 1.12, H = Math.max((opts.hFrac ?? 0) * ys * 0.6, (lh / plotPx[1]) * ys) * 1.15;
     const px = toNum(e.x), py = e.y;
     let best: { cx: number; cy: number; cost: number } | null = null;
     for (const fy of [1.4, 2.2, -1.4, -2.2, 3, -3, 4, -4, 0]) for (const fx of [0, 0.8, -0.8, 1.5, -1.5, 2.2, -2.2]) {
@@ -119,11 +129,12 @@ export function placeCallouts(events: SeasonEvent[], series: PlaceSeries[], opts
 
 /** Plotly annotations + a marker trace for a list of events. Labels sit on the page colour; with `series` given they
  *  are placed where they cover no data (see placeCallouts), otherwise they use fixed pixel offsets. */
-export function eventLayer(events: SeasonEvent[], opts: { units?: string; xaxis?: string; yaxis?: string; digits?: number; color?: string; series?: PlaceSeries[]; xRange?: [number, number]; yRange?: [number, number]; wFrac?: number; hFrac?: number } = {}) {
+export function eventLayer(events: SeasonEvent[], opts: { units?: string; xaxis?: string; yaxis?: string; digits?: number; color?: string; series?: PlaceSeries[]; xRange?: [number, number]; yRange?: [number, number]; wFrac?: number; hFrac?: number; px?: [number, number] } = {}) {
   const glow = opts.color ?? cssVar("--glow");
   const u = prettyUnit(opts.units);
   const xref = opts.xaxis ?? "x", yref = opts.yaxis ?? "y";
-  const spots = opts.series ? placeCallouts(events, opts.series, opts) : events.map(() => null);
+  const seconds = events.map((e) => e.detail ?? `${e.sub ? `${e.sub} · ` : ""}${fmt(e.y, opts.digits ?? 3)}${u ? ` ${u}` : ""}`);
+  const spots = opts.series ? placeCallouts(events, opts.series, { ...opts, seconds }) : events.map(() => null);
   // fallback: stagger callouts whose points are close together so their labels never sit on top of each other
   const num = (x: number | string) => (typeof x === "number" ? x : Date.parse(x));
   const xs = events.map((e) => num(e.x)), span = (Math.max(...xs) - Math.min(...xs)) || 1;
@@ -136,7 +147,7 @@ export function eventLayer(events: SeasonEvent[], opts: { units?: string; xaxis?
   const annotations = events.map((e, i) => ({
     x: e.x, y: e.y, xref, yref, showarrow: true, arrowhead: 0, arrowwidth: 1, arrowcolor: glow, standoff: 4, borderpad: 3,
     ...(spots[i] ? { axref: xref, ayref: yref, ax: spots[i]!.ax, ay: spots[i]!.ay, xanchor: "center", yanchor: "middle" } : { ax: place[i].ax, ay: place[i].ay }),
-    text: (() => { const second = e.detail ?? `${e.sub ? `${e.sub} · ` : ""}${fmt(e.y, opts.digits ?? 3)}${u ? ` ${u}` : ""}`; return `<b>${e.title}</b>${second ? `<br><span style="font-size:10.5px;color:${cssVar("--fg-soft")}">${second}</span>` : ""}`; })(),
+    text: (() => { const second = seconds[i]; return `<b>${e.title}</b>${second ? `<br><span style="font-size:10.5px;color:${cssVar("--fg-soft")}">${second}</span>` : ""}`; })(),
     align: "center", font: { size: 11.5, color: cssVar("--fg-strong") }, bgcolor: cssVar("--bg"),
   }));
   const marker = events.length ? {

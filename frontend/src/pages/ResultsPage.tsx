@@ -3,7 +3,7 @@ import { api } from "../api";
 import { FoodWebGraph } from "../components/FoodWebGraph";
 import { sampleScale } from "../components/MapCanvas";
 import { Plot, colorscaleFor, seriesColor } from "../components/Plot";
-import { Btn, Check, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Stat, Tabs, cssVar, extent, fmt, useAsync, PanelToggle } from "../components/ui";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Stat, Tabs, cssVar, extent, fmt, useAsync, PanelToggle, SearchInput } from "../components/ui";
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
 import { PlatesTab } from "../components/Plates";
 import { varName } from "../varnames";
@@ -129,7 +129,7 @@ function SidePanel({ runs, exps, sel, provisional, setSel, vars, v, setV, win, s
                 const i = sel.indexOf(r.id);
                 return (
                   <div key={r.id} className={`tree-item ${i >= 0 ? "active" : ""}`} style={{ paddingLeft: 16 }} onClick={() => toggle(r.id)} title={`${r.id}\n${HOST_LABEL[r.spec?.host]} · ${HTL_LABEL[r.spec?.htl?.kind]}`}>
-                    <Check checked={i >= 0} onChange={() => toggle(r.id)} />
+                    <span onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggle(r.id); }}><Check checked={i >= 0} onChange={() => {}} /></span>
                     {i >= 0 ? <span className="swatch round" style={{ background: seriesColor(i, dark) }} /> : <span className="swatch round" style={{ background: "var(--border)" }} />}
                     <div className="grow"><div className="ellipsis">{r.label}</div><div className="meta">{(r.created || "").slice(5, 16).replace("T", " ")}{i === 0 && sel.length > 1 ? " · 基准" : ""}</div></div>
                   </div>
@@ -141,7 +141,7 @@ function SidePanel({ runs, exps, sel, provisional, setSel, vars, v, setV, win, s
       </div>
       <div style={{ flex: "1 1 50%", minHeight: 120, display: "flex", flexDirection: "column" }}>
         <div className="tree-head">变量</div>
-        <div style={{ padding: "0 10px 6px" }}><div className="search"><Icon name="search" /><input placeholder="搜索变量（名称或含义）" value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
+        <div style={{ padding: "0 10px 6px" }}><SearchInput placeholder="搜索变量（名称或含义）" value={q} onChange={setQ} /></div>
         <div className="split-scroll">
           {!vars ? <Loading /> : vars.groups.map((g: any) => {
             const vs = g.vars.filter((x: any) => !q || (x.name + x.long_name).toLowerCase().includes(q.toLowerCase()));
@@ -204,11 +204,21 @@ function CompareTab({ pid, runs }: { pid: string; runs: any[] }) {
       {runs.length > 1 && pctRows.length > 0 && (
         <div className="section">
           <div className="section-header"><Icon name="graph" /><h3>相对基准的百分比变化</h3></div>
-          <Plot height={Math.max(240, pctRows.length * 30 + 70)} data={t.labels.slice(1).map((l: string, k: number) => ({
-            type: "bar", orientation: "h", name: l, y: pctRows.map((r: any) => r.label.trim()), x: pctRows.map((r: any) => r.pct[k + 1]),
-            marker: { color: seriesColor(k + 1, dark) }, hovertemplate: "%{y}: %{x:+.1f}%<extra>" + l + "</extra>",
-            texttemplate: "%{x:+.1f}%", textposition: "outside", cliponaxis: false, textfont: { size: 11, color: cssVar("--fg-muted") },
-          }))} layout={{ barmode: "group", xaxis: { title: { text: `相对“${t.labels[0]}”的变化 (%)` }, zeroline: true, zerolinewidth: 1.5 }, yaxis: { autorange: "reversed" }, margin: { l: 200, t: 34 }, legend: { orientation: "h", y: 1.02, yanchor: "bottom", x: 0 } }} />
+          {(() => {
+            // short labels on two lines at most, value printed at the bar end; the axis leaves room for those numbers on
+            // both sides so they never run into the category names, and no hover box covers the bars
+            const short = (l: string) => l.trim().replace(/（[^）]*(深度积分|以碳计)[^）]*）/g, "");
+            const wrapL = (l: string) => (l.length > 9 ? l.slice(0, 9) + "<br>" + l.slice(9) : l);
+            const vals = pctRows.flatMap((r: any) => r.pct.slice(1)).filter((x: any) => x !== null) as number[];
+            const lo = Math.min(0, ...vals), hi = Math.max(0, ...vals), pad = 0.32 * Math.max(hi - lo, 1);
+            const many = t.labels.length > 2;
+            return <Plot height={Math.max(220, pctRows.length * (many ? 22 * (t.labels.length - 1) + 14 : 40) + 80)} data={t.labels.slice(1).map((l: string, k: number) => ({
+              type: "bar", orientation: "h", name: l, y: pctRows.map((r: any) => wrapL(short(r.label))), x: pctRows.map((r: any) => r.pct[k + 1]),
+              marker: { color: seriesColor(k + 1, dark) }, hoverinfo: "skip",
+              texttemplate: "%{x:+.1f}%", textposition: "outside", cliponaxis: false, constraintext: "none", textfont: { size: 11, color: cssVar("--fg-muted") },
+            }))} layout={{ barmode: "group", bargap: 0.35, xaxis: { title: { text: `相对“${t.labels[0]}”的变化 (%)` }, zeroline: true, zerolinewidth: 1.5, range: [lo - pad, hi + pad], nticks: 6, ticksuffix: "%" },
+              yaxis: { autorange: "reversed", automargin: true, tickfont: { size: 11.5 } }, margin: { l: 10, r: 16, t: many ? 30 : 10, b: 46 }, showlegend: many, legend: { orientation: "h", y: 1.0, yanchor: "bottom", x: 0 } }} />;
+          })()}
         </div>
       )}
       <div className="section"><CompareReading t={t} runs={runs} /></div>
@@ -621,7 +631,7 @@ function ProfilePlot({ profiles, units, runs, months, dashes, dark }: { profiles
   const allD = profiles.flatMap((p: any) => p.depth) as number[];
   const xr: [number, number] = allX.length ? [Math.min(0, ...allX), Math.max(...allX) * 1.3] : [0, 1];
   const dr: [number, number] = allD.length ? [Math.min(...allD) - 1, Math.max(...allD) + 1] : [0, 1];
-  const ev = eventLayer(events, { series: profiles.map((p: any) => ({ x: p.values, y: p.depth })), xRange: xr, yRange: dr, wFrac: 0.2, hFrac: 0.07 });
+  const ev = eventLayer(events, { series: profiles.map((p: any) => ({ x: p.values, y: p.depth })), xRange: xr, yRange: dr });
   ev.annotations.forEach((a: any, i: number) => { a.arrowcolor = events[i].c; });
   events.forEach((e) => traces.push({ x: [e.x], y: [e.y], type: "scatter", mode: "markers", marker: { size: 7, color: e.c, line: { width: 1.5, color: cssVar("--bg") } }, showlegend: false, hoverinfo: "skip" }));
   return <Plot fill data={traces} layout={{ yaxis: { range: [dr[1], dr[0]], title: { text: "深度 (m)" } }, xaxis: { title: { text: units }, range: xr }, legend: { orientation: "h", x: 0, y: -0.1, yanchor: "top" }, margin: { r: 30, t: 14, b: 70 }, annotations: ev.annotations }} />;

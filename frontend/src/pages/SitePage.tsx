@@ -25,6 +25,7 @@ export default function SitePage() {
 
   return (
     <div className="page fill">
+      <Split header={<>
       <div className="page-header">
         <div>
           <div className="row"><PanelToggle id="site" label="站点信息与模拟设置" /><div className="page-title">站点与物理</div><HelpLink chapter="02-water-column" title="一维水柱物理（教程）" /></div>
@@ -43,8 +44,7 @@ export default function SitePage() {
         </div>
       )}
       {p.site_status === "error" && <Notice kind="danger">站点构建失败：{p.site_error}。请检查网络后重试，或改用离线演示站点。</Notice>}
-
-      <Split id="site" label="站点信息与模拟设置" initial={360} min={300} max={480} side={
+      </>} id="site" label="站点信息与模拟设置" initial={360} min={300} max={480} side={
         <div className="split-scroll">
           <div className="tree-head">站点</div>
           <div style={{ padding: "4px 16px 14px" }}>
@@ -101,7 +101,7 @@ function SimSettings() {
   const set = (k: string, v: any) => { setS({ ...s, [k]: v }); setDirty(true); };
   const save = async () => { await api.patch(`/projects/${p.id}`, { simulation: s }); setDirty(false); toast("模拟设置已保存（下次运行生效）", "ok"); refreshProject(); };
   const num = (k: string, label: string, unit?: string, opt?: any) => (
-    <><span className="label"><Term k={label.replace(/^(温盐|营养盐) ?/, "")}>{label}</Term></span><span className="control"><input className="input num" type="number" value={s[k] ?? ""} onChange={(e) => set(k, e.target.value === "" ? null : +e.target.value)} {...opt} />{unit && <span className="unit">{unit}</span>}</span></>
+    <><span className="label"><Term k={label.replace(/^(温盐|营养盐) ?/, "")}>{label}</Term></span><span className="control"><input className="input num" type="number" value={s[k] ?? ""} onChange={(e) => set(k, e.target.value === "" ? null : +e.target.value)} {...opt} /><span className="unit">{unit ?? ""}</span></span></>
   );
   return (
     <div style={{ borderTop: "1px solid var(--border)" }}>
@@ -109,14 +109,14 @@ function SimSettings() {
         {dirty && <><span className="warn-text" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>未保存</span><Btn variant="primary" size="sm" icon="save" onClick={save}>保存</Btn></>}</span></div>
       <div style={{ padding: "4px 16px 16px" }}>
         <Seg value={s.mode} options={[["repeat", "重复同一年的气象"], ["period", "真实年份序列"]]} onChange={(v) => set("mode", v)} />
-        <div className="form" style={{ gridTemplateColumns: "100px minmax(0,1fr)", marginTop: 12 }}>
-          {s.mode === "repeat" ? <>{num("repeat_year", "强迫年")}{num("years", "分析年数", "年", { min: 1 })}</> : (
+        <div className="form tight" style={{ gridTemplateColumns: "98px minmax(0,1fr)", marginTop: 12 }}>
+          {s.mode === "repeat" ? <>{num("repeat_year", "强迫年", "年")}{num("years", "分析年数", "年", { min: 1 })}</> : (
             <>
               <span className="label">时段</span>
-              <span className="control">
+              <span className="control"><span className="pair">
                 <input className="input num" type="number" value={s.period?.[0] ?? fy[0]} onChange={(e) => set("period", [+e.target.value, s.period?.[1] ?? fy[1]])} />–
                 <input className="input num" type="number" value={s.period?.[1] ?? fy[1]} onChange={(e) => set("period", [s.period?.[0] ?? fy[0], +e.target.value])} />
-              </span>
+              </span><span className="unit">年</span></span>
               {num("analysis_from", "分析起始", "年")}
             </>
           )}
@@ -125,12 +125,12 @@ function SimSettings() {
           {num("dt", "时间步长", "s")}
           {num("relax_ts_days", "温盐松弛", "天")}
           {num("relax_nut_days", "营养盐松弛", "天")}
-          <span className="label">营养盐松弛</span>
-          <span className="control"><Select value={s.relax_nutrients === false ? "0" : "1"} onChange={(v) => set("relax_nutrients", v === "1")}><option value="1">开（WOA23）</option><option value="0">关</option></Select></span>
+          <span className="label">松弛营养盐</span>
+          <span className="control"><Select value={s.relax_nutrients === false ? "0" : "1"} onChange={(v) => set("relax_nutrients", v === "1")}><option value="1">开（WOA23）</option><option value="0">关</option></Select><span /></span>
           <span className="label"><Term k="潮流混合" /></span>
           <span className="control"><Select value={String(s.tide_scale ?? 1)} onChange={(v) => set("tide_scale", +v)}>
             <option value="0">无潮（如地中海、波罗的海）</option><option value="0.5">弱</option><option value="1">中等（北海中部，默认）</option><option value="2">强（如东海、乔治浅滩）</option><option value="3">很强（大潮差海湾）</option>
-          </Select></span>
+          </Select><span /></span>
         </div>
         <div className="hint" style={{ marginTop: 6 }}>一维模型没有真实潮汐，用周期性的水平压强梯度模拟 M2 潮流带来的底层湍流混合。潮流越强，浅水越容易全年混合、不形成层化。</div>
         <div className="hint" style={{ marginTop: 10, lineHeight: 1.6 }}>
@@ -163,7 +163,7 @@ function MeteoChart({ m }: { m: any }) {
     const vals = (m[k] as (number | null)[]).filter((v) => v !== null && isFinite(v as number)) as number[];
     const lo = Math.min(...vals), hi = Math.max(...vals), r = hi - lo || 1;
     const yr: [number, number] = [lo - 0.45 * r, hi + 0.55 * r];
-    const ev = eventLayer(evs.map((e) => ({ ...e, low: false })), { units: unit, yaxis: ya, digits: 3, series: [{ x: m.date, y: m[k] }], yRange: yr, wFrac: 0.16, hFrac: 0.3 });
+    const ev = eventLayer(evs.map((e) => ({ ...e, low: false })), { units: unit, yaxis: ya, digits: 3, series: [{ x: m.date, y: m[k] }], yRange: yr, px: [Math.max(400, window.innerWidth - 640), Math.max(80, (fillH(620, 200) - 50) / 4 - 10)] });
     annotations.push(...ev.annotations);
     if (ev.marker) data.push(ev.marker);
     yRanges[i] = yr;

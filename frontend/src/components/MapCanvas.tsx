@@ -104,9 +104,14 @@ export function MapCanvas({ box, points = [], cell, scale, range, onPick, marker
     return () => { alive = false; };
   }, [lat0, lat1, lon0, lon1, res]);
   useEffect(() => {
-    const ro = new ResizeObserver(() => wrap.current && setW(wrap.current.clientWidth));
+    // redraw once the size has settled, not on every frame of a panel sliding open (that made the map flicker)
+    let t = 0, first = true;
+    const ro = new ResizeObserver(() => {
+      if (first) { first = false; if (wrap.current) setW(wrap.current.clientWidth); return; }
+      window.clearTimeout(t); t = window.setTimeout(() => wrap.current && setW(wrap.current.clientWidth), 120);
+    });
     if (wrap.current) ro.observe(wrap.current);
-    return () => ro.disconnect();
+    return () => { window.clearTimeout(t); ro.disconnect(); };
   }, []);
 
   const [vmin, vmax] = useMemo(() => {

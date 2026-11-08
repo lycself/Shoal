@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { create } from "zustand";
 import { useApp } from "../store";
 import { useDialog } from "../dialog";
@@ -44,12 +45,96 @@ export function IconBtn({ icon, title, active, danger, size, ...rest }: React.Bu
   );
 }
 
+interface SelOpt { value: string; label: React.ReactNode; text: string; disabled?: boolean; group?: string }
+const nodeText = (n: React.ReactNode): string => typeof n === "string" || typeof n === "number" ? String(n) : Array.isArray(n) ? n.map(nodeText).join("") : React.isValidElement(n) ? nodeText((n.props as any).children) : "";
+function selOptions(children: React.ReactNode, group?: string): SelOpt[] {
+  const out: SelOpt[] = [];
+  React.Children.forEach(children, (c) => {
+    if (!React.isValidElement(c)) return;
+    const pr: any = c.props;
+    if (c.type === "optgroup") out.push(...selOptions(pr.children, pr.label));
+    else if (c.type === "option") out.push({ value: String(pr.value ?? nodeText(pr.children)), label: pr.children, text: nodeText(pr.children).trim(), disabled: pr.disabled, group });
+    else if (c.type === React.Fragment) out.push(...selOptions(pr.children, group));
+  });
+  return out;
+}
+
+/** Drop-down picker drawn by Shoal (not the system menu): selected item highlighted, keyboard navigation,
+ *  and a filter box when there are more than 8 choices. Takes the same <option>/<optgroup> children as <select>. */
 export function Select({ value, onChange, children, size, style, disabled, title }: { value: string | number; onChange: (v: string) => void; children: React.ReactNode; size?: "sm"; style?: React.CSSProperties; disabled?: boolean; title?: string }) {
+  const opts = selOptions(children);
+  const cur = opts.find((o) => o.value === String(value));
+  const btn = useRef<HTMLButtonElement>(null);
+  const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
+  const [hi, setHi] = useState(-1);
+  const [pos, setPos] = useState<{ left: number; top?: number; bottom?: number; width: number; maxH: number } | null>(null);
+  const searchable = opts.length > 8;
+  const shown = q ? opts.filter((o) => o.text.toLowerCase().includes(q.toLowerCase()) || (o.group ?? "").toLowerCase().includes(q.toLowerCase())) : opts;
+  const place = () => {
+    const r = btn.current!.getBoundingClientRect();
+    const below = window.innerHeight - r.bottom - 8, above = r.top - 8;
+    const down = below >= 220 || below >= above;
+    setPos({ left: Math.min(r.left, window.innerWidth - Math.max(r.width, 180) - 8), width: r.width, maxH: Math.min(360, (down ? below : above) - 4), ...(down ? { top: r.bottom + 4 } : { bottom: window.innerHeight - r.top + 4 }) });
+  };
+  const show = () => { if (disabled) return; place(); setQ(""); setHi(Math.max(0, opts.findIndex((o) => o.value === String(value)))); setOpen(true); };
+  const pick = (o?: SelOpt) => { if (!o || o.disabled) return; setOpen(false); btn.current?.focus(); if (o.value !== String(value)) onChange(o.value); };
+  useEffect(() => {
+    if (!open) return;
+    const away = (e: MouseEvent) => { const t = e.target as Element; if (!t.closest?.(".sel-pop") && !btn.current?.contains(t)) setOpen(false); };
+    const scroll = (e: Event) => { if (!(e.target as Element)?.closest?.(".sel-pop")) setOpen(false); };
+    window.addEventListener("mousedown", away, true);
+    window.addEventListener("scroll", scroll, true);
+    window.addEventListener("resize", () => setOpen(false), { once: true });
+    return () => { window.removeEventListener("mousedown", away, true); window.removeEventListener("scroll", scroll, true); };
+  }, [open]);
+  useEffect(() => { if (open) document.querySelector(".sel-pop .sel-item.hi")?.scrollIntoView({ block: "nearest" }); }, [hi, open]);
+  const key = (e: React.KeyboardEvent) => {
+    if (!open) { if (["ArrowDown", "ArrowUp", "Enter", " "].includes(e.key)) { e.preventDefault(); show(); } return; }
+    if (e.key === "Escape") { e.preventDefault(); setOpen(false); btn.current?.focus(); }
+    else if (e.key === "ArrowDown") { e.preventDefault(); setHi((h) => Math.min(shown.length - 1, h + 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); setHi((h) => Math.max(0, h - 1)); }
+    else if (e.key === "Enter") { e.preventDefault(); pick(shown[hi]); }
+  };
+  let lastGroup: string | undefined;
   return (
-    <span className={`select ${size === "sm" ? "sm" : ""}`} style={style} title={title}>
-      <select value={value} disabled={disabled} onChange={(e) => onChange(e.target.value)}>{children}</select>
-      <Icon name="chevron-down" />
+    <span className={`select ${size === "sm" ? "sm" : ""} ${open ? "open" : ""}`} style={style} title={title}>
+      <button ref={btn} type="button" className="sel-btn" disabled={disabled} onClick={() => (open ? setOpen(false) : show())} onKeyDown={key} aria-haspopup="listbox" aria-expanded={open}>
+        <span className="sel-val">{cur ? cur.label : <span className="soft">请选择</span>}</span>
+        <Icon name="chevron-down" />
+      </button>
+      {open && pos && createPortal(
+        <div className="sel-pop" role="listbox" style={{ left: pos.left, top: pos.top, bottom: pos.bottom, minWidth: Math.max(pos.width, 160), maxHeight: pos.maxH }} onKeyDown={key}>
+          {searchable && <div className="sel-search"><Icon name="search" /><input autoFocus value={q} placeholder="输入筛选" onChange={(e) => { setQ(e.target.value); setHi(0); }} />{q && <button type="button" className="sel-clear" onClick={() => setQ("")} title="清空"><Icon name="close" /></button>}</div>}
+          <div className="sel-list">
+            {!shown.length && <div className="sel-empty">没有匹配的选项</div>}
+            {shown.map((o, i) => {
+              const head = o.group && o.group !== lastGroup ? <div key={`g-${o.group}`} className="sel-group">{o.group}</div> : null;
+              lastGroup = o.group;
+              return (
+                <React.Fragment key={o.value}>
+                  {head}
+                  <div className={`sel-item ${o.value === String(value) ? "on" : ""} ${i === hi ? "hi" : ""} ${o.disabled ? "disabled" : ""}`} role="option" aria-selected={o.value === String(value)}
+                    onMouseEnter={() => setHi(i)} onMouseDown={(e) => e.preventDefault()} onClick={() => pick(o)}>
+                    <span className="sel-text">{o.label}</span>{o.value === String(value) && <Icon name="check" />}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>, document.body)}
     </span>
+  );
+}
+
+/** Search field: magnifier in front, a clear button once something is typed, Esc clears. */
+export function SearchInput({ value, onChange, placeholder, style, autoFocus }: { value: string; onChange: (v: string) => void; placeholder: string; style?: React.CSSProperties; autoFocus?: boolean }) {
+  return (
+    <div className={`search ${value ? "has-value" : ""}`} style={style}>
+      <Icon name="search" />
+      <input value={value} placeholder={placeholder} aria-label={placeholder} autoFocus={autoFocus} onChange={(e) => onChange(e.target.value)} onKeyDown={(e) => { if (e.key === "Escape" && value) { e.stopPropagation(); onChange(""); } }} />
+      {value && <button type="button" className="search-clear" title="清空" onClick={() => onChange("")}><Icon name="close" /></button>}
+    </div>
   );
 }
 
@@ -150,7 +235,7 @@ export function Empty({ icon = "inbox", title, children, action }: { icon?: stri
 }
 
 export function Loading({ text = "加载中…" }: { text?: string }) {
-  return <div className="loading"><Icon name="loading" spin />{text}</div>;
+  return <div className="loading" role="status"><Icon name="loading" spin />{text}</div>;
 }
 
 export function Notice({ kind = "info", icon, children, style }: { kind?: "info" | "warn" | "danger" | "plain"; icon?: string; children: React.ReactNode; style?: React.CSSProperties }) {
@@ -339,7 +424,7 @@ export function PanelToggle({ id, label }: { id: string; label: string }) {
  * folded, the divider stays at the edge (drag or double-click it to reopen) and <PanelToggle> in the page
  * header shows the panel again.
  */
-export function Split({ id, initial = 280, min = 200, max = 520, side, children, label = "侧栏" }: { id: string; initial?: number; min?: number; max?: number; side: React.ReactNode; children: React.ReactNode; label?: string }) {
+export function Split({ id, initial = 280, min = 200, max = 520, side, children, label = "侧栏", header }: { id: string; initial?: number; min?: number; max?: number; side: React.ReactNode; children: React.ReactNode; label?: string; header?: React.ReactNode }) {
   const sp = useSplit(id, initial, min, max);
   const [live, setLive] = useState<number | null>(null);
   // register this panel's own starting width, so <PanelToggle> in the header reopens it at that width
@@ -371,7 +456,8 @@ export function Split({ id, initial = 280, min = 200, max = 520, side, children,
       </div>
       <div className={`sash ${sp.collapsed && live == null ? "sash-closed" : ""}`} onMouseDown={drag} onDoubleClick={() => sp.update({ collapsed: !sp.collapsed })}
         data-tip={sp.collapsed ? `${label}已收起：向右拖动或双击这里展开` : `拖动调整${label}宽度，拖到很窄或双击收起`} />
-      <div className="split-main">{children}</div>
+      {/* the page title row belongs to the main column, so the panel toggle sits right next to the panel it folds */}
+      <div className="split-main">{header}{children}</div>
     </div>
   );
 }
@@ -424,14 +510,24 @@ export function Stat({ k, v, unit, delta }: { k: string; v: React.ReactNode; uni
   );
 }
 
+// Results of useAsync calls, keyed by call site and arguments: coming back to a page or reopening a tab shows the
+// last result at once (and refreshes it quietly) instead of a spinner and a jump.
+const asyncCache = new Map<string, unknown>();
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]): { data: T | null; error: string | null; loading: boolean; reload: () => void } {
-  const [state, setState] = useState<{ data: T | null; error: string | null; loading: boolean }>({ data: null, error: null, loading: true });
+  const key = (() => { try { return fn.toString() + "|" + JSON.stringify(deps); } catch { return ""; } })();
+  const cached = key && asyncCache.has(key) ? (asyncCache.get(key) as T) : undefined;
+  const [state, setState] = useState<{ data: T | null; error: string | null; loading: boolean }>({ data: cached ?? null, error: null, loading: cached === undefined });
   const [tick, setTick] = useState(0);
   useEffect(() => {
     let alive = true;
-    setState((s) => ({ ...s, loading: true, error: null }));
+    const hit = key && asyncCache.has(key);
+    // known result: show it now and refresh in the background; unknown: keep what is on screen and mark loading
+    setState((s) => (hit ? { data: asyncCache.get(key) as T, error: null, loading: false } : { ...s, loading: true, error: null }));
     fn().then(
-      (d) => alive && setState({ data: d, error: null, loading: false }),
+      (d) => {
+        if (key) { asyncCache.delete(key); asyncCache.set(key, d); if (asyncCache.size > 200) asyncCache.delete(asyncCache.keys().next().value as string); }
+        if (alive) setState({ data: d, error: null, loading: false });
+      },
       (e) => alive && setState({ data: null, error: String(e?.message ?? e), loading: false }),
     );
     return () => { alive = false; };

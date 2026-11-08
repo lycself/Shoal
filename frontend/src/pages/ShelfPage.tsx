@@ -33,13 +33,14 @@ export default function ShelfPage() {
   const job = Object.values(jobs).find((j) => j.kind === "shelf" && j.study_id === sel && (j.status === "running" || j.status === "queued"));
   return (
     <div className="page fill">
+      <Split header={
       <div className="page-header">
         <div>
           <div className="row"><PanelToggle id="shelf" label="研究列表" /><div className="page-title">三维陆架</div><span className="badge">水柱集合</span><HelpLink chapter="11-shelf-3d" title="从水柱到陆架（教程）" /></div>
         </div>
         <div className="page-actions"><Btn icon="add" onClick={() => setPlanning(true)}>新建研究</Btn></div>
       </div>
-      <Split id="shelf" label="研究列表" initial={260} side={
+      } id="shelf" label="研究列表" initial={260} side={
         <>
           <div className="tree-head">研究<span className="actions"><IconBtn icon="add" title="新建" size="sm" onClick={() => setPlanning(true)} /></span></div>
           <div className="split-scroll">

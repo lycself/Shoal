@@ -32,6 +32,7 @@ export default function ExperimentsPage() {
 
   return (
     <div className="page fill">
+      <Split header={
       <div className="page-header">
         <div>
           <div className="row"><PanelToggle id="exps" label="实验列表" /><div className="page-title">实验与运行</div><HelpLink chapter="00-guide" title="使用说明" /></div>
@@ -42,7 +43,7 @@ export default function ExperimentsPage() {
           <Btn icon="add" onClick={() => setEdit({ name: "新实验", description: "", items: [] })}>新实验</Btn>
         </div>
       </div>
-      <Split id="exps" label="实验列表" initial={300} side={
+      } id="exps" label="实验列表" initial={300} side={
         <>
           <div className="tree-head">实验<span className="actions"><IconBtn icon="refresh" title="刷新" size="sm" onClick={() => { exps.reload(); runs.reload(); }} /></span></div>
           <div className="split-scroll">

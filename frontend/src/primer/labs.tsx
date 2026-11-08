@@ -92,7 +92,7 @@ function Stratification() {
   const bloom = d.days.find((t) => t > 30 && d.mld[t] < d.crit[t]);
   // the crossing where the mixed layer becomes shallower than the critical depth: the bloom starts there
   const bloomEv = eventLayer(bloom !== undefined ? [{ x: bloom, y: d.mld[bloom], title: "水华开始", detail: `第 ${bloom} 天：混合层浅于临界深度` }] : [],
-    { series: [{ x: d.days, y: d.mld }, { x: d.days, y: d.crit }], xRange: [0, 365], yRange: [0, 150], wFrac: 0.34, hFrac: 0.2 });
+    { series: [{ x: d.days, y: d.mld }, { x: d.days, y: d.crit }], xRange: [0, 365], yRange: [0, 150], px: [520, 200] });
   return (
     <LabShell title="混合层与临界深度：春季水华何时开始？" note="简化模型：海面受热时，风搅出的湍流要把轻的暖水往下压，浮力又把它往上托，两者打平的深度就是混合层底（这个深度叫 Monin–Obukhov 长度，风越大越深、加热越强越浅）；海面冷却时，表层水变重下沉，对流把混合层加深。临界深度按 Sverdrup 的思路随光照变化：混合层加深到这个深度时，整层浮游植物的光合作用刚好抵消呼吸和被吃掉的损失。混合层浅于临界深度时浮游植物净生长，水华开始。">
       <Slider label="10 m 风速" value={wind} min={2} max={16} onChange={setWind} unit="m/s" />
@@ -121,7 +121,7 @@ function NpzdBox({ compareOnly }: { compareOnly?: boolean }) {
   const kz = res.Z.reduce((b: number, v: number, i: number) => (res.t[i] >= t0 && v > (res.Z[b] ?? -1) ? i : b), res.t.findIndex((t: number) => t >= t0));
   const yTop = Math.max(...res.P, ...res.Z, ...res.N, ...ref.Z) * 1.3;
   const zEv = eventLayer(kz >= 0 ? [{ x: res.t[kz], y: res.Z[kz], title: "末年浮游动物高峰", detail: `第 ${Math.round(res.t[kz] % 365)} 天 · ${fmt(res.Z[kz])} mmol N m⁻³` }] : [],
-    { series: [{ x: res.t, y: res.P }, { x: res.t, y: res.Z }, { x: res.t, y: res.N }, { x: ref.t, y: ref.Z }], yRange: [0, yTop], wFrac: 0.24, hFrac: 0.14 });
+    { series: [{ x: res.t, y: res.P }, { x: res.t, y: res.Z }, { x: res.t, y: res.N }, { x: ref.t, y: ref.Z }], yRange: [0, yTop], px: [520, 220] });
   return (
     <LabShell title="NPZD 盒子模型 + 鱼类：单向与双向耦合" note="营养盐 N、浮游植物 P、浮游动物 Z、碎屑 D 以 mmol N m⁻³ 计；鱼类以 mg C m⁻² 计，按官方 ECOSMO E2E 代码的写法以浮游动物为食（食物取整个盒子的总量，半饱和常数 0.7 mmol N m⁻²，排泄随温度变化 θ = 0.5 eV），粪便、尸体和排泄全部返回（相当于修正版）。单向耦合：鱼类照常生长，但不从浮游动物中扣除被吃掉的量，也不返还排泄物；鱼吃多少都不会让食物变少，所以会无限制地指数增长（右轴改为对数）。">
       <div className="row" style={{ marginBottom: 10 }}>
@@ -165,7 +165,7 @@ function FunctionalResponse() {
   const tot = g1.map((v, i) => v + g2[i]);
   const kh = tot.findIndex((v) => v >= sigma / 2);
   const frEv = eventLayer(kh > 0 ? [{ x: xs[kh], y: tot[kh], title: "吃到一半", detail: `饵料 1 ≈ ${xs[kh]} mg C m⁻³` }] : [],
-    { series: [{ x: xs, y: g1 }, { x: xs, y: g2 }, { x: xs, y: tot }], xRange: [0, 200], yRange: [0, sigma * 1.25], wFrac: 0.26, hFrac: 0.14 });
+    { series: [{ x: xs, y: g1 }, { x: xs, y: g2 }, { x: xs, y: tot }], xRange: [0, 200], yRange: [0, sigma * 1.25], px: [520, 200] });
   return (
     <LabShell title="Michaelis–Menten 摄食与饵料偏好（E2E 式 1–3）" note="大型底栖动物的写法：G_X = σ a_X C_X / (r + Σ a C)，C 为最底层的浓度，r 以 mmol N m⁻³ 计、乘 79.6 换成碳。饵料 1 增多时，摄食者把更多“注意力”转向它，饵料 2 被摄食的量下降（开关效应）；总摄食在食物充足时趋于 σ。">
       <Slider label="最大摄食率 σ" value={sigma} min={0.01} max={0.3} onChange={setSigma} unit="d⁻¹" />
@@ -307,9 +307,9 @@ function CouplingCompare() {
           { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.zoo), name: "浮游动物", marker: { color: cssVar("--eco-zoo") }, texttemplate: "%{y:.2f}", textposition: "outside", cliponaxis: false },
           { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.phy), name: "浮游植物", marker: { color: cssVar("--eco-phyto") }, texttemplate: "%{y:.2f}", textposition: "outside", cliponaxis: false },
           { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.det), name: "碎屑", marker: { color: cssVar("--eco-organic") }, texttemplate: "%{y:.2f}", textposition: "outside", cliponaxis: false },
-        ]} layout={{ barmode: "group", yaxis: { title: "年均 mmol N m⁻³" } }} />
+        ]} layout={{ barmode: "group", yaxis: { title: "年均 mmol N m⁻³", range: [0, Math.max(...runs.flatMap((r) => [r.zoo, r.phy, r.det])) * 1.25] }, legend: { orientation: "h", x: 0, y: -0.18, yanchor: "top" }, margin: { t: 12, b: 70 } }} />
         <Plot height={260} data={[{ type: "bar", x: runs.filter((r) => r.m !== "none").map((r) => lab[r.m]), y: runs.filter((r) => r.m !== "none").map((r) => r.fish), marker: { color: cssVar("--eco-fish") }, name: "鱼类", texttemplate: "%{y:.3s}", textposition: "outside", cliponaxis: false }]}
-          layout={{ yaxis: { title: "末年鱼类 mg C m⁻²" } }} />
+          layout={{ yaxis: { title: "末年鱼类 mg C m⁻²", range: [0, Math.max(...runs.map((r) => r.fish)) * 1.25] }, showlegend: false, margin: { t: 12, b: 70 } }} />
       </div>
     </LabShell>
   );

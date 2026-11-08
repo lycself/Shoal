@@ -13,7 +13,7 @@ summary: 一个项目从建立到出图要走哪几步（项目、站点、食�
 
 ## 启动软件
 
-**用桌面版（推荐）**：在 macOS、Windows 或 Linux 上安装 Shoal 桌面版，双击打开即可。计算内核已经编译好，打包在安装程序里，不需要装 Python 或编译工具。所有项目存在系统的应用数据目录里（macOS：~/Library/Application Support/Shoal；Windows：%LOCALAPPDATA%\\Shoal；Linux：~/.local/share/shoal）。
+**用桌面版（推荐）**：在 macOS、Windows 或 Linux 上安装 Shoal 桌面版，双击打开即可。计算内核已经编译好，打包在安装程序里，不需要装 Python 或编译工具。所有项目存在系统的应用数据目录里：macOS 是 `~/Library/Application Support/Shoal`，Windows 是 `%LOCALAPPDATA%\Shoal`，Linux 是 `~/.local/share/shoal`。
 
 打开后先到[设置页](app:settings)看一眼：上面会显示计算内核是否就绪，也可以在这里配置 AI 助手的接口（不配置也能用其他所有功能）。
 

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Markdown, parseFrontMatter } from "../components/Markdown";
-import { Btn, Icon } from "../components/ui";
+import { Btn, Icon, SearchInput } from "../components/ui";
 import { useApp } from "../store";
 import { askTutor } from "../tutor";
 
@@ -94,7 +94,7 @@ export default function PrimerPage() {
       <aside className={`learn-nav ${navOpen ? "open" : ""} ${floating.nav ? "drawer" : ""} ${navW.live !== null ? "dragging" : ""}`} aria-label="章节目录" aria-hidden={!navOpen}
         style={navOpen ? { width: navW.width } : undefined}>
         <div className="learn-panel-inner" style={{ width: navW.inner }}>
-          <div style={{ padding: "12px 10px 8px" }}><div className="search"><Icon name="search" /><input placeholder="搜索教程" value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
+          <div style={{ padding: "12px 10px 8px" }}><SearchInput placeholder="搜索教程" value={q} onChange={setQ} /></div>
           <div className="split-scroll" style={{ padding: "0 6px 14px" }}>
             {PARTS.map(([name, f]) => (
               <div key={name} style={{ marginBottom: 10 }}>
