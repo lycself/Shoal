@@ -7,14 +7,14 @@
  * sentences are only emitted when the data support them (thresholds below), so the text follows
  * the figure instead of a textbook expectation.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../store";
-import { fmt, Icon, IconBtn } from "./ui";
+import { fmt, Icon, IconBtn, RightPane } from "./ui";
 import { METRIC_INFO, PAIR_INTRO, cascadeText, configKind, infoKey, mechanism, pairKeyOf } from "./ShelfExplain";
 
 // ------------------------------------------------------------------ variable catalogue
 type Cat = "temp" | "salt" | "nitrate" | "ammonium" | "phosphate" | "silicate" | "oxygen" | "dic" | "diatoms" | "flagellates" | "pico" | "largephyto"
-  | "cyano" | "chl" | "mesozoo" | "microzoo" | "hnf" | "zoo" | "bacteria" | "dom" | "detritus" | "fish" | "benthos" | "mld" | "mixing" | "forcing" | "other";
+  | "cyano" | "chl" | "mesozoo" | "microzoo" | "hnf" | "zoo" | "bacteria" | "dom" | "detritus" | "fish" | "benthos" | "meiobenthos" | "mld" | "mixing" | "buoyancy" | "forcing" | "other";
 
 const RULES: [RegExp, Cat][] = [
   [/^temp$|^sst$|^tprof/, "temp"], [/^salt$|^sprof/, "salt"],
@@ -22,8 +22,8 @@ const RULES: [RegExp, Cat][] = [
   [/^O2_o$|ECO_oxy|ergom_o2/, "oxygen"], [/^O3_c$|dic/i, "dic"],
   [/^P1_c$|ECO_dia|ergom_pp/, "diatoms"], [/^P2_c$|ECO_fla|ergom_ff/, "flagellates"], [/^P3_c$/, "pico"], [/^P4_c$/, "largephyto"], [/ECO_bg|ergom_bb/, "cyano"],
   [/chl/i, "chl"], [/^Z4_c$|ECO_mesozoo/, "mesozoo"], [/^Z5_c$|ECO_microzoo/, "microzoo"], [/^Z6_c$/, "hnf"], [/ergom_zz/, "zoo"],
-  [/^B1_c$/, "bacteria"], [/^R1_c$|ECO_dom/, "dom"], [/^R[2-8]_c$|ECO_det|ergom_dd|^Q[1-7]_c$/, "detritus"],
-  [/^F[12]_c$|fish/, "fish"], [/^MB_c$|^Y[2-4]_c$/, "benthos"], [/^mld/, "mld"], [/^nu[hms]$|^tke$|^eps$|^NN$/, "mixing"],
+  [/^B1_c$/, "bacteria"], [/^R[1-3]_c$|^Q1_c$|ECO_dom/, "dom"], [/^R[4-8]_c$|^Q[67]_c$|ECO_det|ergom_dd/, "detritus"],
+  [/^F[12]_c$|fish/, "fish"], [/^MB_c$|^Y[23]_c$/, "benthos"], [/^Y4_c$/, "meiobenthos"], [/^mld/, "mld"], [/^NN$/, "buoyancy"], [/^nu[hms]$|^tke$|^eps$/, "mixing"],
   [/^(u10|v10|airt|rad|airp|hum|cloud|precip|taub|tx|ty)$/, "forcing"],
 ];
 export function varCat(name: string): Cat { return RULES.find(([rx]) => rx.test(name))?.[1] ?? "other"; }
@@ -38,22 +38,24 @@ const CAT: Record<Cat, { what: string; season?: string }> = {
   oxygen: { what: "溶解氧。表层与大气交换并有光合作用产氧；底层只有分解耗氧。", season: "冷水能溶解更多氧，冬季整柱较高；层化季节底层得不到补充，逐渐下降。" },
   dic: { what: "溶解无机碳（主要是 CO₂ 的各种形态）。光合作用消耗它，呼吸和分解产生它。" },
   diatoms: { what: "硅藻：较大的浮游植物，需要硅，生长快，是春季藻华的主角。", season: "早春光照增强、层化刚建立、营养盐最充足时最先爆发。" },
-  flagellates: { what: "鞭毛藻等小型浮游植物：不需要硅，在低营养盐环境中竞争力强。", season: "硅藻退场后的夏季更重要。" },
-  pico: { what: "微微型浮游植物（< 2 µm）：个体最小，在营养盐贫乏的夏季表层占优。" },
-  largephyto: { what: "大型浮游植物（如甲藻）。" },
+  flagellates: { what: "微型浮游植物（2–20 µm，以鞭毛藻为主；ECOSMO 和 ERGOM 里叫鞭毛藻）：不需要硅，在低营养盐环境中竞争力强。", season: "硅藻退场后的夏季更重要。" },
+  pico: { what: "超微型浮游植物（< 2 µm）：个体最小，在营养盐贫乏的夏季表层占优。" },
+  largephyto: { what: "小型浮游植物（20–200 µm，如甲藻）：不需要硅，个体较大，夏季层化后较常见。" },
   cyano: { what: "蓝藻：可以固氮，在温暖、氮缺乏的夏季占优（波罗的海尤其明显）。" },
   chl: { what: "叶绿素：浮游植物的光合色素，卫星海色观测看到的就是它。" },
   mesozoo: { what: "中型浮游动物（桡足类等，约 0.2–2 mm）：鱼最主要的食物。", season: "峰值通常比浮游植物晚几周：先有食物，捕食者才跟着多起来。" },
-  microzoo: { what: "微型浮游动物（纤毛虫等，约 20–200 µm）：吃小型浮游植物和鞭毛虫，又被中型浮游动物吃。", season: "能很快跟上小型藻类的增长。" },
-  hnf: { what: "异养鞭毛虫（约 2–20 µm）：吃细菌和最小的浮游植物，是“微食物环”的一环。" },
+  microzoo: { what: "微型浮游动物（纤毛虫等，约 20–200 µm）：吃较小的浮游植物和异养鞭毛虫，又被中型浮游动物吃。", season: "能很快跟上较小藻类的增长。" },
+  hnf: { what: "异养鞭毛虫（自己不进行光合作用的鞭毛虫，约 2–20 µm）：吃细菌和超微型浮游植物，是“微食物环”（细菌和小生物之间的物质循环）的一环。" },
   zoo: { what: "浮游动物：连接浮游植物与鱼的中间环节。", season: "峰值通常比浮游植物晚几周。" },
   bacteria: { what: "细菌：分解溶解有机物，把营养盐重新释放到水中。" },
-  dom: { what: "溶解有机物：浮游生物渗出和分解产生，是细菌的食物。" },
+  dom: { what: "溶解有机物：浮游生物渗出和分解产生，是细菌的食物。有的几天内就被吃掉（易降解），有的要几个月到几年（半难降解）；ERSEM 用 R1–R3 区分，Q1 是海底沉积物里的溶解有机物。" },
   detritus: { what: "颗粒碎屑：死亡的浮游生物和粪便。它们下沉，在途中和海底被分解成营养盐。", season: "藻华之后增加，并逐渐沉向底层。" },
   fish: { what: "鱼的生物量。鱼要经历多个世代才能对环境变化作出完整响应，所以变化比浮游生物慢得多。" },
   benthos: { what: "大型底栖动物（贝类、多毛类等）：以沉降到海底的有机物为食。", season: "在春华后的沉降高峰之后增加。" },
+  meiobenthos: { what: "小型底栖动物（线虫、桡足类等，体长不到 1 mm）：生活在沉积物里，吃细菌和沉积有机物。", season: "跟着沉降到海底的有机物变化。" },
   mld: { what: "表层混合层深度：从海面向下被风和冷却充分搅匀的那一层有多厚。", season: "冬季深（风大、表层冷却下沉），夏季浅（表层增温形成稳定的“盖子”）。" },
   mixing: { what: "湍流扩散系数等混合强度指标：数值越大，上下层交换越快。" },
+  buoyancy: { what: "浮力频率平方 N²：层化强度，越大越稳定。上轻下重的密度差越大，N² 越大，湍流越难把上下层搅混。", season: "夏季跃层处最大，冬季整柱接近 0。" },
   forcing: { what: "气象强迫（来自 ERA5 再分析）：风、气温、辐射等，驱动整个物理过程。" },
   other: { what: "模型输出变量。" },
 };
@@ -65,7 +67,7 @@ const ZOO = new Set<Cat>(["mesozoo", "microzoo", "hnf", "zoo"]);
 const finite = (v: any): v is number => typeof v === "number" && isFinite(v);
 const mean = (v: (number | null)[]) => { let s = 0, n = 0; for (const x of v) if (finite(x)) { s += x; n++; } return n ? s / n : NaN; };
 const monthOf = (iso: string) => +String(iso).slice(5, 7);
-const doyMonth = (d: number) => Math.min(12, Math.floor((d - 1) / 30.44) + 1);
+const doyMonth = (d: number) => new Date(Date.UTC(2001, 0, Math.round(d))).getUTCMonth() + 1;
 const sp = (x: number, d = 1) => `${x > 0 ? "+" : ""}${x.toFixed(d)}%`;
 const pct = (a: number, b: number) => (a ? ((b - a) / Math.abs(a)) * 100 : NaN);
 function monthlyMean(vals: (number | null)[], times: string[], months: number[]) {
@@ -101,13 +103,30 @@ export function ReadingToggle({ open, toggle }: { open: boolean; toggle: () => v
 }
 /** Figure with the reading panel on its right. The panel slides open and closed; the book button
  *  (<ReadingToggle>) in the tab's option bar is its switch, as AVAS puts panel toggles in the bar above. */
-export function FigAside({ open, figure, reading }: { open: boolean; figure: ReactNode; reading: ReactNode; toggle?: () => void }) {
+export function FigAside({ open, figure, reading, toggle }: { open: boolean; figure: ReactNode; reading: ReactNode; toggle?: () => void }) {
+  // when the column is too narrow for figure and notes side by side (e.g. the assistant is open), the notes float
+  // over the figure's right edge instead of squeezing the figure and clipping their own text
+  const ref = useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setNarrow(el.clientWidth < 760));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // in a narrow column the notes start hidden (the figure needs the room); each press of the book button shows/hides them
+  const [local, setLocal] = useState(false);
+  const firstOpen = useRef(true);
+  useEffect(() => { setLocal(false); }, [narrow]);
+  useEffect(() => { if (firstOpen.current) { firstOpen.current = false; return; } if (narrow) setLocal((v) => !v); }, [open]);
+  const shown = narrow ? local : open;
   return (
-    <div className="fig-aside">
+    <div className={`fig-aside ${narrow ? "narrow" : ""}`} ref={ref}>
       <div className="fig-main">{figure}</div>
-      <aside className={`reading-aside ${open ? "open" : ""}`} aria-hidden={!open} aria-label="读图说明">
+      <RightPane id="reading" open={shown} onClose={() => (narrow ? setLocal(false) : toggle?.())} initial={340} min={260} max={560} label="读图说明" className="reading-rpane">
         <div className="reading-aside-inner">{reading}</div>
-      </aside>
+      </RightPane>
     </div>
   );
 }
@@ -142,7 +161,9 @@ export function HovReading({ panels, mld, v, label, diff }: { panels: any[]; mld
   const m0 = mld?.[0];
   let strat: number[] = [];
   if (m0 && !m0.missing) for (let m = 1; m <= 12; m++) { const x = monthlyMean(m0.values, m0.time, [m]); if (finite(x) && x < 0.5 * H) strat.push(m); }
-  if (strat.length === 12) strat = [];
+  const perm = strat.length === 12; // shallower than half the depth all year: permanently stratified
+  if (perm) strat = [];
+  const neverStrat = !!(m0 && !m0.missing) && !perm && !strat.length;
 
   if (diff) {
     let s = 0, n = 0, pos = 0, best = { a: 0, t: "", z: 0 };
@@ -164,7 +185,8 @@ export function HovReading({ panels, mld, v, label, diff }: { panels: any[]; mld
   vals.forEach((row, k) => row.forEach((x, j) => { if (finite(x) && x > mx.v) mx = { v: x, t: time[j], z: depth[k] }; }));
   if (finite(mx.v)) facts.push(<>最大值 <b>{fmt(mx.v)}</b> {u}，出现在 {mx.t.slice(0, 7)}、约 {mx.z.toFixed(0)} m 深处。</>);
   if (strat.length) facts.push(<>混合层在 <b>{range(strat)}</b> 浅于水深的一半（{H.toFixed(0)} m 水柱）：这段时间水柱处于层化状态，其余月份基本混合。</>);
-  else if (m0 && !m0.missing) facts.push(<>混合层全年都较深：这个站点的水柱基本常年混合，没有稳定的层化期。</>);
+  else if (perm) facts.push(<>混合层全年都浅于水深的一半（{H.toFixed(0)} m 水柱）：水柱常年层化（深水或热带站点常见）。</>);
+  else if (neverStrat) facts.push(<>混合层全年都较深：这个站点的水柱基本常年混合，没有稳定的层化期。</>);
 
   if (se.tropical && (cat === "temp" || NUTRIENT.has(cat))) facts.push(<>热带站点：下文的“冬季 / 夏季”只是相对的冷季和暖季，季节差异通常比温带小得多。</>);
   if (cat === "temp") {
@@ -173,7 +195,13 @@ export function HovReading({ panels, mld, v, label, diff }: { panels: any[]; mld
     if (finite(wS - wB) && Math.abs(wS - wB) < 0.5) facts.push(<>冬季（{se.wl}）表底温差不到 0.5 °C：冬季风大、表层冷却下沉，整柱充分混合。</>);
     why.push(<>表层吸收太阳热量后变轻，像盖子一样浮在冷而重的底层水上；风和潮流的搅拌不足以打破这个密度差时，就形成温跃层。秋季降温和风暴使表层变重，跃层逐渐下移直到消失。</>);
   } else if (NUTRIENT.has(cat)) {
-    if (finite(wS) && finite(sS) && wS > 0) facts.push(sS < 0.3 * wS ? <>表层从冬季的 {fmt(wS)} 降到夏季的 <b>{fmt(sS)}</b> {u}（只剩 {Math.round((sS / wS) * 100)}%）：被浮游植物吸收殆尽。</> : <>表层夏季（{fmt(sS)}）仍有冬季（{fmt(wS)}）的 {Math.round((sS / wS) * 100)}%：营养盐没有被耗尽，浮游植物更可能受光照限制。</>);
+    if (finite(wS) && finite(sS) && wS > 0) {
+      const r = sS / wS, rp = Math.round(r * 100);
+      facts.push(r < 0.1 ? <>表层从冬季的 {fmt(wS)} 降到夏季的 <b>{fmt(sS)}</b> {u}（只剩 {rp}%）：被浮游植物吸收殆尽。</>
+        : r < 0.3 ? <>表层从冬季的 {fmt(wS)} 降到夏季的 <b>{fmt(sS)}</b> {u}（剩 {rp}%）：大部分被浮游植物吸收。</>
+        : r <= 1 ? <>表层夏季（{fmt(sS)}）仍有冬季（{fmt(wS)}）的 {rp}%：营养盐没有被耗尽，浮游植物更可能受光照限制。</>
+        : <>表层夏季（{fmt(sS)}）反而比冬季（{fmt(wS)}）高，是冬季的 {rp}%：这里没有“冬季积累、夏季耗尽”的典型循环，营养盐没有被耗尽，浮游植物更可能受光照限制。</>);
+    }
     if (finite(sB) && finite(sS) && sB > 1.5 * sS) facts.push(<>同期底层保持 {fmt(sB)} {u}，是表层的 {fmt(sB / Math.max(sS, 1e-9))} 倍：营养盐被“锁”在跃层以下，要等秋冬混合才回到表层。</>);
     why.push(<>浮游植物只能在有光的上层生长，它们吸收营养盐后死亡下沉，把营养盐带到深处分解释放。层化期间上下几乎不交换，于是上层越来越“饿”，下层越积越多。</>);
   } else if (cat === "oxygen") {
@@ -188,13 +216,21 @@ export function HovReading({ panels, mld, v, label, diff }: { panels: any[]; mld
     // summer sub-surface maximum
     const prof = depth.map((_, k) => monthlyMean(vals[k], time, se.summer3));
     const kmax = prof.indexOf(Math.max(...prof.filter(finite)));
-    if (PHYTO.has(cat) && kmax >= 0 && depth[kmax] > Math.max(5, 0.1 * H) && prof[kmax] > 1.2 * prof[si]) facts.push(<>夏季（{se.s3l}）浓度最大的位置在约 <b>{depth[kmax].toFixed(0)} m</b>，比表层高 {Math.round((prof[kmax] / Math.max(prof[si], 1e-9) - 1) * 100)}%：这是次表层叶绿素最大值。</>);
+    const dcm = PHYTO.has(cat) && kmax >= 0 && depth[kmax] > Math.max(5, 0.1 * H) && prof[kmax] > 1.2 * prof[si];
+    if (dcm) facts.push(<>夏季（{se.s3l}）浓度最大的位置在约 <b>{depth[kmax].toFixed(0)} m</b>，比表层高 {Math.round((prof[kmax] / Math.max(prof[si], 1e-9) - 1) * 100)}%：这是次表层叶绿素最大值。</>);
     if (cat === "detritus" && finite(sB) && finite(sS) && sB > 1.5 * sS) facts.push(<>夏季底层是表层的 {fmt(sB / Math.max(sS, 1e-9))} 倍：碎屑在下沉并在底部积累。</>);
     if (PHYTO.has(cat)) {
-      if (se.nh(pk + 1) >= 3 && se.nh(pk + 1) <= 5) why.push(<>春季光照增强、层化刚建立，浮游植物被留在有光的上层，营养盐又最充足，于是爆发藻华；营养盐耗尽后表层浓度下降。</>);
-      else if (se.nh(pk + 1) >= 6 && se.nh(pk + 1) <= 9) why.push(<>这里浮游植物在夏季最多，而不是典型的春华：层化后，跃层附近同时有光（来自上方）和营养盐（来自下方），浮游植物在那里持续生长，次表层的贡献超过了表层的春季峰值。可以对照营养盐的时间–深度图，看跃层下的营养盐是否在被缓慢消耗。</>);
+      const nm = se.nh(pk + 1);
+      if (nm >= 3 && nm <= 5) why.push(neverStrat
+        ? <>春季光照增强，营养盐经过冬季积累又最充足，于是爆发藻华；这里水柱全年混合，藻华主要由光照的季节变化控制。</>
+        : <>春季光照增强、层化刚建立，浮游植物被留在有光的上层，营养盐又最充足，于是爆发藻华；营养盐耗尽后表层浓度下降。</>);
+      else if (nm >= 6 && nm <= 9) why.push(dcm
+        ? <>这里浮游植物在夏季最多，而不是典型的春华：层化后，跃层附近同时有光（来自上方）和营养盐（来自下方），浮游植物在那里持续生长，次表层的贡献超过了表层的春季峰值。可以对照营养盐的时间–深度图，看跃层下的营养盐是否在被缓慢消耗。</>
+        : neverStrat
+          ? <>全年混合的水柱里浮游植物主要受光照限制，光最强的夏季长得最快。</>
+          : <>这里浮游植物在夏季最多，而不是典型的春华：夏季光照最强，说明营养盐供应（来自底层或分解再生）足以支撑持续生长。可以对照营养盐的时间–深度图核实。</>);
       else why.push(<>浮游植物的生长同时受光照（冬季弱）和营养盐（夏季表层少）限制，峰值出现在两者都较充足的时段。</>);
-      why.push(<>夏季上面有光缺营养、下面有营养缺光，只有跃层附近两者兼得，所以浓度最大值常下移到次表层。</>);
+      if (dcm) why.push(<>夏季上面有光缺营养、下面有营养缺光，只有跃层附近两者兼得，所以浓度最大值下移到次表层。藻类是在那里就地生长的，不是从表层沉下去的。</>);
     }
     if (ZOO.has(cat)) why.push(<>浮游动物以浮游植物（或更小的浮游动物）为食，食物先增长，它们才跟着增长，所以峰值滞后几周；它们的捕食又会压低浮游植物，帮助结束藻华。</>);
     if (cat === "detritus") why.push(<>死亡的浮游生物和粪便比水重，会下沉；层化期间混合弱，它们沉到跃层以下和海底附近，在那里被细菌分解，消耗氧并释放营养盐。</>);
@@ -213,6 +249,8 @@ export function HovReading({ panels, mld, v, label, diff }: { panels: any[]; mld
 export function SeriesReading({ data, kind, v, label, mode, repeat }: { data: any; kind: "annual" | "series"; v: string; label: string; mode: string; repeat: boolean }) {
   const cat = varCat(v);
   const se = useSeason();
+  const site: any = useApp((st) => (st.project as any)?.site_info ?? (st.project as any)?.site);
+  const northSea = typeof site?.lat === "number" && typeof site?.lon === "number" && site.lat >= 51 && site.lat <= 61.5 && site.lon >= -4 && site.lon <= 9.5;
   const ss = (data?.series ?? []).filter((s: any) => !s.missing);
   if (!ss.length) return null;
   const u = data.units ?? "";
@@ -227,7 +265,7 @@ export function SeriesReading({ data, kind, v, label, mode, repeat }: { data: an
     const a = info[0];
     facts.push(<>{a.s.label}：峰值在约 <b>{doyMonth(a.dmax)} 月</b>（{fmt(a.max)} {u}），最低在 {doyMonth(a.dmin)} 月（{fmt(a.min)}），全年平均 {fmt(a.avg)}{a.min > 0 ? `，季节最高是最低的 ${fmt(a.max / a.min)} 倍` : ""}。</>);
     info.slice(1).forEach((b: any) => {
-      const dd = b.dmax - a.dmax;
+      const dd = ((((b.dmax - a.dmax + 182) % 365) + 365) % 365) - 182; // shortest way round the year (Dec→Jan is a few days, not 11 months)
       facts.push(<>{b.s.label}：年均 <b>{sp(pct(a.avg, b.avg))}</b>，峰值{Math.abs(dd) < 4 ? "时间基本相同" : `${dd > 0 ? "推迟" : "提前"}约 ${Math.abs(dd)} 天`}，峰值高度 {sp(pct(a.max, b.max))}。</>);
     });
     if (a.s.years > 1) {
@@ -245,10 +283,12 @@ export function SeriesReading({ data, kind, v, label, mode, repeat }: { data: an
   if (kind === "annual") { const m = ss[0].mean as number[]; peakMonth = doyMonth(ss[0].doy[m.indexOf(Math.max(...m.filter(finite)))]); }
   if (PHYTO.has(cat) && kind === "annual") {
     if (se.nh(peakMonth) >= 3 && se.nh(peakMonth) <= 5) why.push(<>峰值在春季：光照增强、层化刚建立、营养盐最充足，浮游植物爆发藻华；之后表层营养盐耗尽而下降。秋季风暴把底层营养盐重新搅上来，有时会出现第二个较小的秋华。</>);
-    else if (se.nh(peakMonth) >= 6 && se.nh(peakMonth) <= 9) why.push(<>峰值在夏季而不是典型的春华：层化后跃层附近同时有光和营养盐，浮游植物在次表层持续生长并积累。到“时间–深度”页可以看到这个次表层最大值。</>);
+    else if (se.nh(peakMonth) >= 6 && se.nh(peakMonth) <= 9) why.push(mode === "surface"
+      ? <>表层浮游植物在夏季最多，而不是典型的春华：夏季光照最强。水柱全年混合时，浮游植物主要受光照限制，光最强的夏季长得最快；到“时间–深度”页可以看混合层深度和营养盐是否被耗尽。</>
+      : <>峰值在夏季而不是典型的春华，可能有两种原因：水柱层化时，跃层附近同时有光和营养盐，浮游植物在次表层就地生长并积累；水柱全年混合时，浮游植物主要受光照限制，光最强的夏季长得最快。到“时间–深度”页看混合层深度和有没有次表层最大值，就能分辨是哪一种。</>);
     else why.push(<>峰值出现在 {peakMonth} 月：浮游植物的生长同时受光照和营养盐限制，峰值落在两者都较充足的时段。</>);
   } else if (CAT[cat].season) why.push(<>{CAT[cat].season}</>);
-  if (cat === "fish") why.push(<>Vijayakumaran 等 (2026)用 IBTS 拖网调查的单位捕捞量（CPUE）年循环与模拟的鱼 1 / 鱼 2 比较：鱼 1 在夏季开始上升、生物量高于鱼 2。</>);
+  if (/^F[12]_c$/.test(v) && northSea) why.push(<>北海站点可以拿拖网调查来检验鱼 1、鱼 2 的季节变化：国际底拖网调查（IBTS）记录了单位捕捞努力量渔获（CPUE），即每拖一小时网捕到多少鱼。已有的北海一维模拟与它比较时，鱼 1 在夏季开始上升，生物量高于鱼 2。<span className="soft">（观测对照参考：Vijayakumaran 等 2026）</span></>);
   return <Reading what={<><b>{label}</b>（{modeTxt[mode] ?? mode}）：{CAT[cat].what}</>} facts={facts} why={why}
     how={kind === "annual" ? "横轴是一年中的日期，粗线是分析时段各年同一天的平均，阴影是各年的最小–最大范围；每种颜色是一个运行。" : "横轴是完整的模拟时间，包括预热年份；可以看出模型是否逐年稳定下来。"} />;
 }
@@ -285,6 +325,7 @@ export function ProfileReading({ data, v, label }: { data: any; v: string; label
 
 // ------------------------------------------------------------------ column animation (state at one instant)
 export function ColumnReading({ date, depth, temps, mld, phyto, nut, nutMax, hasFish }: { date: string; depth: number[]; temps: number[]; mld?: number | null; phyto: number[]; nut: number[]; nutMax: number; hasFish: boolean }) {
+  // `phyto` is the diatom column (P1_c / ECO_dia / ergom_pp) and `nutMax` the maximum over all depths and the whole analysis window
   const si = depth.indexOf(Math.min(...depth)), bi = depth.indexOf(Math.max(...depth)), H = depth[bi];
   const dT = temps[si] - temps[bi];
   const facts: ReactNode[] = [];
@@ -292,45 +333,50 @@ export function ColumnReading({ date, depth, temps, mld, phyto, nut, nutMax, has
   facts.push(<>此刻（{date}）表底温差 <b>{dT.toFixed(1)} °C</b>{finite(mld) ? `，混合层 ${mld.toFixed(0)} m（占水深 ${Math.round((Math.min(mld, H) / H) * 100)}%）` : ""}：水柱<b>{state}</b>。</>);
   if (phyto.length) {
     const k = phyto.indexOf(Math.max(...phyto.filter(finite)));
-    if (k >= 0) facts.push(<>浮游植物最多的位置在约 <b>{depth[k].toFixed(0)} m</b>{finite(mld) ? (depth[k] > mld + 2 ? "，在混合层以下（次表层）" : "，在混合层之内") : ""}。</>);
+    if (k >= 0) facts.push(<>硅藻最多的位置在约 <b>{depth[k].toFixed(0)} m</b>{finite(mld) ? (depth[k] > mld + 2 ? "，在混合层以下（次表层）：表层营养盐已耗尽，藻类在跃层附近就地生长（上有光、下有营养盐）" : "，在混合层之内：混合层内分布较均匀") : ""}。</>);
   }
   if (nut.length && nutMax > 0) {
     const r = nut[si] / nutMax;
-    facts.push(<>表层营养盐是全年最高值的 <b>{Math.round(r * 100)}%</b>：{r < 0.15 ? "接近耗尽，浮游植物生长受营养盐限制" : r < 0.5 ? "正在被消耗" : "充足"}。</>);
+    facts.push(<>表层营养盐是分析时段全水柱最高值的 <b>{Math.round(r * 100)}%</b>：{r < 0.15 ? "接近耗尽，浮游植物生长受营养盐限制" : r < 0.5 ? "正在被消耗" : "充足"}。</>);
   }
   return <Reading facts={facts}
-    why={[<>拖动时间条看一年的循环：冬季混合、营养盐充足但光照弱 → 春季层化建立、藻华爆发 → 夏季表层营养盐耗尽、浮游植物退到次表层 → 秋冬风暴混合，营养盐回到表层，为下一年做准备。</>]}
-    how={`左边的水柱按温度着色（暖色为暖水），虚线是混合层底；右边是同一时刻各变量的剖面，每个变量除以它全年的最大值，便于放在一起比较。${hasFish ? "鱼形符号按浮游动物的垂向分布摆放，只是“鱼跟着食物走”的示意，模型中的鱼没有垂向位置。" : ""}`} />;
+    why={[<>拖动时间条看一年的循环：冬季混合、营养盐充足但光照弱 → 春季层化建立、藻华爆发 → 夏季表层营养盐耗尽，层化的水柱里藻类在跃层附近就地生长 → 秋冬风暴混合，营养盐回到表层，为下一年做准备。全年混合的浅水站点没有层化这一步，主要看光照的季节变化。</>]}
+    how={`左边的水柱按温度着色（暖色为暖水），虚线是混合层底；右边是同一时刻各变量的剖面，每个变量除以它在分析时段的最大值，便于放在一起比较。${hasFish ? "鱼形符号按浮游动物的垂向分布摆放，只是“鱼跟着食物走”的示意，模型中的鱼没有垂向位置。" : ""}`} />;
 }
 
 // ------------------------------------------------------------------ MIZER size spectrum
-export function SpectrumReading({ ds }: { ds: any[] }) {
+export function SpectrumReading({ ds, wMinF }: { ds: any[]; wMinF?: number }) {
+  // fishing threshold: the run's MIZER parameter w_minF when the caller passes it, else the builder default
+  const given = finite(wMinF) ? wMinF : finite(ds[0]?.w_minF) ? (ds[0].w_minF as number) : null;
+  const wfGiven = given !== null;
+  const wf: number = given ?? 80;
+  const wfTxt = wfGiven ? `${fmt(wf)} g` : "默认 80 g";
   const stats = ds.map((d) => {
     const xs: number[] = [], ys: number[] = [];
     d.w.forEach((w: number, i: number) => { const y = d.density[i]; if (w >= 1 && w <= 1000 && finite(y) && y > 0) { xs.push(Math.log10(w)); ys.push(Math.log10(y)); } });
     const mx = mean(xs), my = mean(ys);
     let sxy = 0, sxx = 0; xs.forEach((x, i) => { sxy += (x - mx) * (ys[i] - my); sxx += (x - mx) ** 2; });
     let big = 0, all = 0;
-    d.w.forEach((w: number, i: number) => { const dw = i ? w - d.w[i - 1] : 0; const b = (d.density[i] ?? 0) * dw; if (finite(b)) { all += b; if (w >= 80) big += b; } });
+    d.w.forEach((w: number, i: number) => { const dw = i ? w - d.w[i - 1] : 0; const b = (d.density[i] ?? 0) * dw; if (finite(b)) { all += b; if (w >= wf) big += b; } });
     return { l: d.label, slope: sxx ? sxy / sxx : NaN, big, all };
   });
   const a = stats[0];
   const facts: ReactNode[] = [];
-  if (finite(a.slope)) facts.push(<>{a.l}：1–1000 g 范围内谱斜率约 <b>{a.slope.toFixed(2)}</b>（{a.slope < -1.3 ? "比 −1 陡：大鱼相对较少" : a.slope > -0.7 ? "比 −1 平缓：大鱼相对较多" : "接近 −1"}）；≥ 80 g 的可捕鱼约占总生物量的 {Math.round((a.big / Math.max(a.all, 1e-12)) * 100)}%。</>);
-  if (finite(a.all) && a.all > 0 && a.big / a.all < 0.05) facts.push(<>可捕的大鱼（≥ 80 g）几乎没有：MIZER 从很小的鱼苗开始，大鱼要经过多年生长才会出现。预热只有一两年时，谱的大端偏低主要反映“还没长大”，而不是生态结论；研究用途请增加预热年数。</>);
+  if (finite(a.slope)) facts.push(<>{a.l}：1–1000 g 范围内谱斜率约 <b>{a.slope.toFixed(2)}</b>（{a.slope < -1.3 ? "比 −1 陡：大鱼相对较少" : a.slope > -0.7 ? "比 −1 平缓：大鱼相对较多" : "接近 −1"}）；≥ {wfTxt} 的可捕鱼约占总生物量的 {Math.round((a.big / Math.max(a.all, 1e-12)) * 100)}%。</>);
+  if (finite(a.all) && a.all > 0 && a.big / a.all < 0.05) facts.push(<>可捕的大鱼（≥ {wfTxt}）几乎没有：MIZER 从很小的鱼苗开始，大鱼要经过多年生长才会出现。预热只有一两年时，谱的大端偏低主要反映“还没长大”，而不是生态结论；研究用途请增加预热年数。</>);
   stats.slice(1).forEach((b) => facts.push(<>{b.l}：斜率 {b.slope.toFixed(2)}，可捕鱼生物量 {sp(pct(a.big, b.big))}，总生物量 {sp(pct(a.all, b.all))}。</>));
   return <Reading what="群落粒径谱：把所有鱼按个体体重分档，看每个体重档有多少生物量。它不分物种，只关心“多大”，因为在海洋里“谁吃谁”主要由个体大小决定。"
     facts={facts}
     why={[<>斜率 −1（双对数坐标下）表示每个对数体重区间的生物量大致相等，这是经典的 Sheldon 谱。能量每向上传一级只有一小部分被转化，所以大鱼通常更少；捕捞会额外移除大鱼，使谱的大端变陡。</>,
-      <>双向耦合时鱼会把自己的食物吃少，粒径谱整体降低；单向耦合时食物不受鱼的影响，谱往往偏高（参考 Powley 等 2026 图 S3/S4）。</>]}
-    how="横轴是个体湿重（对数坐标），纵轴是单位体重区间的生物量密度（对数坐标）；红色虚线是捕捞下限 80 g，右侧的鱼才会被捕捞。" />;
+      <>双向耦合时鱼会把自己的食物吃少，粒径谱整体降低；单向耦合时食物不受鱼的影响，谱往往偏高。<span className="soft">（方法参考：Powley 等 2026）</span></>]}
+    how={`横轴是个体湿重（对数坐标），纵轴是单位体重区间的生物量密度（对数坐标）；红色虚线是捕捞下限（${wfTxt}），右侧的鱼才会被捕捞。`} />;
 }
 
 // ------------------------------------------------------------------ food web state
 export function WebReading() {
   return <Reading what="食物网：每个节点是一个生物或物质库，箭头表示谁吃谁（物质从被吃者流向捕食者）。"
     facts={[<>节点里的条形是该类群在分析时段的年均生物量，在同一营养级内相对比较：条越长，说明这个类群在当前运行中越重要。</>, <>悬停或点击节点会高亮它的食物和捕食者，可以追踪一条能量通路，例如 硅藻 → 中型浮游动物 → 鱼。</>]}
-    why={[<>同一营养级里哪个类群占优，决定了能量走哪条路：以硅藻和中型浮游动物为主的“经典食物链”把更多能量传给鱼；以小型藻类、微型浮游动物和细菌为主的“微食物环”中，能量在小生物之间多次周转、损耗更大。</>]}
+    why={[<>同一营养级里哪个类群占优，决定了能量走哪条路：以硅藻和中型浮游动物为主的“经典食物链”把更多能量传给鱼；以超微型和微型浮游植物、微型浮游动物和细菌为主的“微食物环”中，能量在小生物之间多次周转、损耗更大。</>]}
     how="从下往上是营养级：营养盐与碎屑 → 浮游植物 → 浮游动物 → 鱼与底栖动物。切换运行可以比较不同配置下各类群的相对大小。" />;
 }
 
@@ -363,7 +409,11 @@ export function CompareReading({ t, runs }: { t: any; runs: any[] }) {
   if (big.length) facts.push(<>变化最大的：{big.slice(0, 5).map((r: any, i: number) => <span key={r.key}>{i ? "，" : ""}{r.label.trim()} <b>{sp(r.pct[last])}</b></span>)}。</>);
   if (small.length) facts.push(<>几乎不变（&lt; 3%）：{small.slice(0, 6).map((r: any) => r.label.trim()).join("、")}。</>);
   const co2 = rows.find((r: any) => r.key === "co2");
-  if (co2 && finite(co2.values[0]) && finite(co2.values[last]) && co2.values[0] !== co2.values[last]) facts.push(<>海气 CO₂ 通量从 {fmt(co2.values[0])} 变为 {fmt(co2.values[last])} {co2.units}（正值为海洋吸收）；这个量接近 0，请看差值而不是百分比。</>);
+  if (co2 && finite(co2.values[0]) && finite(co2.values[last]) && co2.values[0] !== co2.values[last]) {
+    const c0 = co2.values[0], c1 = co2.values[last];
+    const nearZero = c0 * c1 < 0 || Math.min(Math.abs(c0), Math.abs(c1)) < 0.15 * Math.max(Math.abs(c0), Math.abs(c1));
+    facts.push(<>海气 CO₂ 通量从 {fmt(c0)} 变为 {fmt(c1)} {co2.units}（正值为海洋吸收），差 {fmt(c1 - c0)}{nearZero ? (c0 * c1 < 0 ? "；两个运行符号相反，百分比没有意义，请看差值" : "；其中一个运行接近 0，百分比会被放大，请看差值") : ""}。</>);
+  }
   if (newIn.length) facts.push(<>基准中没有、比较运行中新出现的类群：{newIn.join("、")}（无法算百分比）。</>);
   const cas = cascadeText(chg);
   const why: ReactNode[] = [];

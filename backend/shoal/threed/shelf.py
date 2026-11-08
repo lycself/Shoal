@@ -374,6 +374,8 @@ def study_results(pid: str, sid: str) -> dict:
     for f in sorted(d.glob("results_*.json")):
         r = json.loads(f.read_text())
         for m in r.get("meta", {}).values():
+            # studies computed by older versions carry older wording: show today's names
+            m["label"] = {"浮游植物碳（深度积分）": "浮游植物生物量（以碳计，深度积分）", "浮游动物碳（深度积分）": "浮游动物生物量（以碳计，深度积分）"}.get(m["label"], m["label"])
             z = m["label"].strip()
             if z in ZOO_NAMES:
                 m["label"] = "  " + ZOO_NAMES[z]

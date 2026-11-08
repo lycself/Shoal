@@ -1,7 +1,9 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { ask } from "../dialog";
 import { api, on } from "../api";
 import { MapCanvas } from "../components/MapCanvas";
-import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Seg, Split, Stat, StatusBadge, Tabs, fmt, robustAbs, useAsync, HelpLink, PanelToggle } from "../components/ui";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Seg, Split, Stat, StatusBadge, Tabs, fmt, fmtLat, fmtLon, robustAbs, useAsync, HelpLink, PanelToggle } from "../components/ui";
+import { ShelfEnsemble } from "../components/ShelfEnsemble";
 import { Shelf3DView, ShelfPlates, ShelfRegions } from "../components/ShelfViews";
 import { FigureReading, changeOfMeans, configKind, pairKeyOf, referenceIndex } from "../components/ShelfExplain";
 import { CellPanel } from "../components/CellPanel";
@@ -31,15 +33,16 @@ export default function ShelfPage() {
   const job = Object.values(jobs).find((j) => j.kind === "shelf" && j.study_id === sel && (j.status === "running" || j.status === "queued"));
   return (
     <div className="page fill">
+      <Split header={
       <div className="page-header">
         <div>
           <div className="row"><PanelToggle id="shelf" label="研究列表" /><div className="page-title">三维陆架</div><span className="badge">水柱集合</span><HelpLink chapter="11-shelf-3d" title="从水柱到陆架（教程）" /></div>
         </div>
         <div className="page-actions"><Btn icon="add" onClick={() => setPlanning(true)}>新建研究</Btn></div>
       </div>
-      <Split id="shelf" label="研究列表" initial={260} side={
+      } id="shelf" label="研究列表" initial={260} side={
         <>
-          <div className="tree-head">研究<span className="actions"><IconBtn icon="add" title="新建" size="sm" onClick={() => setPlanning(true)} /></span></div>
+          <div className="tree-head">研究<span className="actions"><IconBtn icon="add" title="新建陆架研究" size="sm" onClick={() => setPlanning(true)} /><PanelToggle id="shelf" label="研究列表" inPanel /></span></div>
           <div className="split-scroll">
             {(studies.data ?? []).map((s) => (
               <div key={s.id} className={`tree-item flat ${s.id === sel ? "active" : ""}`} onClick={() => setSel(s.id)} style={{ paddingTop: 7, paddingBottom: 7 }}>
@@ -105,7 +108,7 @@ function PlanModal({ pid, onClose, onCreated }: { pid: string; onClose: () => vo
   }, [configs.data]);
   const doPlan = async () => { setBusy(true); try { setPlan(await api.post(`/projects/${pid}/shelf/plan`, f)); } catch (e: any) { toast(e.message, "bad"); } finally { setBusy(false); } };
   const create = async (start: boolean) => {
-    if (start && plan?.estimate?.level === "heavy" && !confirm(`预计耗时 ${plan.estimate.wall_minutes} 分钟，资源占用较高。仍然开始？`)) return;
+    if (start && plan?.estimate?.level === "heavy" && !(await ask(`预计耗时 ${plan.estimate.wall_minutes} 分钟，资源占用较高。仍然开始？`, { ok: "开始计算" }))) return;
     setBusy(true);
     try {
       const s = await api.post(`/projects/${pid}/shelf`, f);
@@ -179,7 +182,7 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
   const [cmp, setCmp] = useState<"value" | "diff" | "pct">("value");
   const [metric, setMetric] = useState("");
   const [month, setMonth] = useState(0);
-  const [view, setView] = useState<"map" | "plates" | "regions" | "3d">("map");
+  const [view, setView] = useState<"map" | "plates" | "regions" | "3d" | "ensemble">("map");
   const [cellSel, setCellSel] = useState<{ point: { lat: number; lon: number }; at: { clientX: number; clientY: number } } | null>(null);
   const [readOpen, toggleRead] = useReadingOpen();
   const cfgOf = (r: any) => (cfgs.data ?? []).find((c) => c.id === r?.config_id);
@@ -235,11 +238,10 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
       <div className="toolbar">
         <b style={{ color: "var(--fg-strong)", fontSize: 14 }}>{study.name}</b>
         <StatusBadge status={st} />
-        <span className="soft small ellipsis">{study.box.join(" / ")} · {study.res}° · {study.min_depth}–{study.max_depth} m · {study.forcing_year} 年强迫 · {study.years} 年（末年分析）· {study.nlev} 层</span>
-        <span className="grow" />
-        {!job && st !== "running" && <Btn size="sm" variant={study.status === "done" ? undefined : "primary"} icon={study.status === "done" ? "refresh" : "play"} onClick={async () => { if (study.status === "done" && !confirm("重新计算会覆盖现有结果，确定吗？")) return; await api.post(`/projects/${pid}/shelf/${sid}/start`); toast("已开始", "ok"); onChanged(); }}>{study.status === "done" ? "重新计算" : "开始计算"}</Btn>}
+        <span className="soft small ellipsis" style={{ flex: "1 1 0", minWidth: 0 }} title="研究范围、网格、参与计算的水深、气象年份与模拟年数">{fmtLat(study.box[0], 0)}–{fmtLat(study.box[1], 0)}，{fmtLon(study.box[2], 0)}–{fmtLon(study.box[3], 0)} · 网格 {study.res}° · 水深 {study.min_depth}–{study.max_depth} m 的格点 · {study.forcing_year} 年气象 · 共 {study.years} 年（分析最后一年）· {study.nlev} 层</span>
+        {!job && st !== "running" && <Btn size="sm" variant={study.status === "done" ? undefined : "primary"} icon={study.status === "done" ? "refresh" : "play"} onClick={async () => { if (study.status === "done" && !(await ask("重新计算会覆盖现有结果，确定吗？", { danger: true, ok: "重新计算" }))) return; await api.post(`/projects/${pid}/shelf/${sid}/start`); toast("已开始", "ok"); onChanged(); }}>{study.status === "done" ? "重新计算" : "开始计算"}</Btn>}
         {job && <Btn size="sm" icon="debug-stop" className="danger-text" onClick={() => api.post(`/jobs/${job.id}/cancel`)}>停止</Btn>}
-        <IconBtn icon="trash" title="删除研究" danger onClick={async () => { if (confirm("删除该陆架研究及其全部输出？")) { await api.del(`/projects/${pid}/shelf/${sid}`); onDeleted(); } }} />
+        <IconBtn icon="trash" title="删除研究" danger onClick={async () => { if (await ask("删除该陆架研究及其全部输出？", { danger: true, ok: "删除" })) { await api.del(`/projects/${pid}/shelf/${sid}`); onDeleted(); } }} />
       </div>
       {job && <div style={{ padding: "10px 14px", borderBottom: "1px solid var(--border)" }}><div className="row"><Icon name="loading" spin /><span className="grow">{job.message || "准备中…"}</span><span className="soft num">{Math.round(job.progress * 100)}%</span></div><Progress value={job.progress} style={{ marginTop: 6 }} /></div>}
       {study.error && !job && study.status === "failed" && <div style={{ padding: 12 }}><Notice kind="danger">{study.error}</Notice></div>}
@@ -252,10 +254,12 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
             { id: "plates", label: "图版", icon: "files", tip: "两种配置并排对比的多面板图" },
             { id: "regions", label: "区域统计", icon: "table", tip: "按海区或水深分区的平均值" },
             { id: "3d", label: "三维视图", icon: "globe", tip: "立体地形和水柱，直观看出哪里浅、哪里深" },
+            { id: "ensemble", label: "逐月走势", icon: "pulse", tip: "每根水柱一条线，看各处的季节变化有多一致、按水深分区落在哪里" },
           ]} />
           {cellSel && view === "map" && <CellPanel at={cellSel.at} point={cellSel.point} results={results} ci={ci} cj={cmp !== "value" ? cj : (results.length > 1 ? cj : undefined)} metric={metric.startsWith("monthly:") ? "fish_ww" : metric} boxes={boxes.data ?? []} onClose={() => setCellSel(null)} />}
           {view === "plates" && <div className="split-scroll" style={{ padding: 16 }}><ShelfPlates study={study} results={results} configs={cfgs.data ?? []} boxes={boxes.data ?? []} /></div>}
           {view === "regions" && <div className="split-scroll" style={{ padding: 16 }}><ShelfRegions pid={pid} sid={sid} study={study} configs={cfgs.data ?? []} results={results} /></div>}
+          {view === "ensemble" && <div className="split-scroll" style={{ padding: 16 }}><ShelfEnsemble results={results} /></div>}
           {view === "3d" && <div className="split-scroll" style={{ padding: 16 }}><Shelf3DView study={study} results={results} boxes={boxes.data ?? []} configs={cfgs.data ?? []} /></div>}
           {view === "map" && <>
           <div className="optbar">
@@ -279,13 +283,14 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
               <MapCanvas box={study.box} cell={study.res} points={points} varName={varName} diverging={cmp !== "value"} range={range} units={unit} height={520}
                 onPointClick={(p, at) => setCellSel({ point: { lat: p.lat, lon: p.lon }, at })} selected={cellSel?.point}
                 title={`${(label ?? "").trim()}${cmp === "value" ? ` · ${results[ci]?.config_name}` : cmp === "diff" ? `：${results[cj]?.config_name} − ${results[ci]?.config_name}` : `：${results[cj]?.config_name} 相对 ${results[ci]?.config_name} 的变化`}`} />
-              {readOpen && <div>
+              {/* always mounted, so opening and closing can slide instead of popping */}
+              <div className="fwr-side" aria-hidden={!readOpen}><div className="fwr-inner">
               <FigureReading metric={metric} label={label ?? metric} unit={metric.startsWith("monthly:") ? "" : meta[metric]?.units ?? ""} mode={cmp}
                 pairs={pairs} nameA={results[ci]?.config_name} nameB={results[cj]?.config_name}
                 descA={cfgOf(results[ci])?.description} descB={cfgOf(results[cj])?.description}
                 pairKey={pairKeyOf(cfgOf(results[ci]), cfgOf(results[cj]))} boxes={boxes.data ?? []}
                 chg={chg} otherLabels={Object.fromEntries(Object.entries(meta).map(([k, m]: any) => [k, m.label]))} res={study.res} years={study.years} />
-              </div>}
+              </div></div>
             </div>
           </div>
           </>}

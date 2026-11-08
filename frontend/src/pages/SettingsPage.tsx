@@ -5,22 +5,24 @@ import { useApp } from "../store";
 import { UpdateSection } from "../components/AppUpdate";
 
 export default function SettingsPage() {
-  const { toast, kernel, theme, setTheme } = useApp();
+  const { toast, kernel, theme, setTheme, setDirty } = useApp();
   const s = useAsync(() => api.get("/settings"), []);
   const [form, setForm] = useState<any>(null);
   const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
   const [testing, setTesting] = useState(false);
-  useEffect(() => { if (s.data) setForm(structuredClone(s.data)); }, [s.data]);
+  const [saved, setSaved] = useState<string>("");
+  useEffect(() => { if (s.data) { setForm(structuredClone(s.data)); setSaved(JSON.stringify(s.data)); } }, [s.data]);
+  const dirty = !!form && JSON.stringify(form) !== saved;
+  useEffect(() => { setDirty("settings", dirty ? "设置页" : null); return () => setDirty("settings", null); }, [dirty]);
   if (!form) return <Loading />;
   const a = form.assistant;
   const setA = (k: string, v: any) => setForm({ ...form, assistant: { ...a, [k]: v } });
-  const save = async () => { const r = await api.put("/settings", form); setForm(structuredClone(r)); toast("设置已保存（并行数在重启后端后生效）", "ok"); };
+  const save = async () => { const r = await api.put("/settings", form); setForm(structuredClone(r)); setSaved(JSON.stringify(r)); toast("设置已保存（并行数在重启后端后生效）", "ok"); };
   const sys = kernel?.system, k = kernel?.kernel;
   return (
-    <div className="page" style={{ maxWidth: 960 }}>
+    <div className="page settings-page" style={{ maxWidth: 960 }}>
       <div className="page-header">
-        <div><div className="page-title">设置</div><div className="page-hint">保存在工作区的 settings.json。</div></div>
-        <div className="page-actions"><Btn variant="primary" icon="save" onClick={save}>保存</Btn></div>
+        <div><div className="page-title">设置</div><div className="page-hint">保存在工作区的 settings.json。主题切换立即生效，其他设置点“保存”后生效。</div></div>
       </div>
 
       <div className="section">
@@ -34,8 +36,8 @@ export default function SettingsPage() {
       <div className="section">
         <div className="section-header"><Icon name="server-process" /><h3>计算</h3></div>
         <div className="form">
-          <span className="label">并行 GOTM 进程</span>
-          <span className="control"><input className="input num" style={{ maxWidth: 100 }} type="number" min={1} max={sys?.cpu_logical ?? 16} value={form.max_parallel_runs} onChange={(e) => setForm({ ...form, max_parallel_runs: +e.target.value })} /><span className="unit">个</span></span>
+          <span className="label" data-tip="同时运行几个模型（每个占一个处理器核）">同时运行的模型数</span>
+          <span className="control"><input className="input num" type="number" min={1} max={sys?.cpu_logical ?? 16} value={form.max_parallel_runs} onChange={(e) => setForm({ ...form, max_parallel_runs: +e.target.value })} /><span className="unit">个</span></span>
           {sys && <><span /><span className="hint">本机 {sys.platform}，{sys.cpu_physical} 物理核 / {sys.cpu_logical} 逻辑核，内存 {sys.memory_total_gb} GB，磁盘剩余 {sys.disk_free_gb} GB。建议不超过物理核数。</span></>}
         </div>
       </div>
@@ -65,7 +67,7 @@ export default function SettingsPage() {
       <div className="section">
         <div className="section-header"><Icon name="package" /><h3>计算内核</h3></div>
         {k && (
-          <div className="panel panel-pad">
+          <div className="kernel-info">
             <div className="kv">
               {[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E 模块", k.e2e?.source === "official" ? (k.e2e?.corrections ? "官方 ECOSMO E2E v2.0 + 可选修正补丁" : "官方 ECOSMO E2E v2.0（编译于修正补丁之前）") + "；另含按论文方程重写的对照版本" : "按论文方程重写（未编入官方代码）"], ["可执行文件", k.gotm_path], ["pyfabm", k.pyfabm_available ? "可用" : "不可用"], ["编译时间", k.built ? new Date(k.built).toLocaleString() : "–"]].map(([a1, b]) => (
                 <Fragment key={String(a1)}><span className="k">{a1}</span><span className="v mono">{b ?? "–"}</span></Fragment>
@@ -74,6 +76,12 @@ export default function SettingsPage() {
           </div>
         )}
         <div className="hint" style={{ marginTop: 8 }}>重新编译：<code>pnpm kernel</code>。官方 ECOSMO E2E v2.0 源码随软件提供（<code>kernel/vendor/ecosmo-e2e</code>，CC BY 4.0），和按论文方程重写的版本一起编进内核。</div>
+      </div>
+      {/* save bar: appears with the first change, stays at the bottom of the window next to the fields it saves */}
+      <div className={`save-bar ${dirty ? "show" : ""}`} aria-hidden={!dirty}>
+        <span className="warn-text">有未保存的修改</span><span className="grow" />
+        <Btn onClick={() => s.data && setForm(structuredClone(s.data))}>放弃修改</Btn>
+        <Btn variant="primary" icon="save" onClick={save}>保存</Btn>
       </div>
     </div>
   );

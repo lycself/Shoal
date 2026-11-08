@@ -99,7 +99,7 @@ DESIGNS = {
     "topdown": {
         "label": "高营养级的下行控制", "hosts": "any",
         "question": "鱼和底栖动物对浮游生物有多大影响？",
-        "description": "每个宿主 5 个对照：仅低营养级 / 加大型底栖 / 加鱼类 / 鱼类+底栖（完整）/ 只提高浮游动物死亡率 20%（判断鱼的作用能否用闭合项代替）。",
+        "description": "每个宿主 5 个对照：仅低营养级 / 加大型底栖 / 加鱼类 / 鱼类+底栖（完整）/ 只提高浮游动物死亡率 20%（看鱼的作用能不能用“浮游动物多死一点”来代替）。",
         "runs_per_host": 5, "ref": PAPER2 + " §3.3",
     },
     "hosts": {
@@ -145,7 +145,7 @@ def design_contents(designs: list[str], hosts: list[str]) -> tuple[list[dict], l
             "mb": cfg(f"{h}_mb", f"{L} + 大型底栖", "只耦合大型底栖功能群", {"host": h, "htl": {"kind": "e2e", "e2e": {"macrobenthos": True, "fish1": False, "fish2": False}}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
             "fish": cfg(f"{h}_fish", f"{L} + 鱼类", "两个鱼类功能群（浮游食性、底栖/鱼食性），没有大型底栖", {"host": h, "htl": {"kind": "e2e", "e2e": {"macrobenthos": False, "fish1": True, "fish2": True}}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
             "control": cfg(f"{h}_control", f"{L} + 鱼类 + 底栖（完整）", "两个鱼类功能群和大型底栖动物，最完整的配置", {"host": h, "htl": {"kind": "e2e"}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
-            "zoo120": cfg(f"{h}_zoo120", f"{L} 浮游动物死亡率 +20%", "没有鱼，只把浮游动物死亡率提高 20%，用闭合项近似捕食", {"host": h, "htl": {"kind": "none"}, "ltl": {"zoo_mortality_factor": 1.2}}, ref),
+            "zoo120": cfg(f"{h}_zoo120", f"{L} 浮游动物死亡率 +20%", "没有鱼，只把浮游动物死亡率提高 20%：用“多死一点”代替鱼的捕食", {"host": h, "htl": {"kind": "none"}, "ltl": {"zoo_mortality_factor": 1.2}}, ref),
         }
 
     def mizer_cfgs() -> dict[str, str]:

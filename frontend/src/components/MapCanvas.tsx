@@ -104,9 +104,14 @@ export function MapCanvas({ box, points = [], cell, scale, range, onPick, marker
     return () => { alive = false; };
   }, [lat0, lat1, lon0, lon1, res]);
   useEffect(() => {
-    const ro = new ResizeObserver(() => wrap.current && setW(wrap.current.clientWidth));
+    // redraw once the size has settled, not on every frame of a panel sliding open (that made the map flicker)
+    let t = 0, first = true;
+    const ro = new ResizeObserver(() => {
+      if (first) { first = false; if (wrap.current) setW(wrap.current.clientWidth); return; }
+      window.clearTimeout(t); t = window.setTimeout(() => wrap.current && setW(wrap.current.clientWidth), 120);
+    });
     if (wrap.current) ro.observe(wrap.current);
-    return () => ro.disconnect();
+    return () => { window.clearTimeout(t); ro.disconnect(); };
   }, []);
 
   const [vmin, vmax] = useMemo(() => {
@@ -116,7 +121,7 @@ export function MapCanvas({ box, points = [], cell, scale, range, onPick, marker
     return extent(v);
   }, [points, range]);
 
-  const M = compact ? { l: 34, r: 6, t: 6, b: 20 } : { l: 44, r: 10, t: 8, b: 26 };
+  const M = compact ? { l: 34, r: 16, t: 6, b: 20 } : { l: 44, r: 20, t: 8, b: 26 }; // right margin leaves room for the last longitude label
   const kx = Math.cos(((lat0 + lat1) / 2) * Math.PI / 180);
   const aspect = ((lon1 - lon0) * kx) / (lat1 - lat0);
   const availW = Math.max(200, w - M.l - M.r);
@@ -300,7 +305,7 @@ export function MapCanvas({ box, points = [], cell, scale, range, onPick, marker
         {selected && cell && <div className="map-cell-selected" style={cellRect(selected)} />}
         {tip && <div className="map-tip" style={{ left: Math.min(tip.x + 14, W - 200), top: tip.y + 14 }}>{tip.lines.map((l, i) => <div key={i} className={i === 0 ? "t" : l.startsWith("点击") ? "h" : undefined}>{l}</div>)}</div>}
       </div>
-      <div className="row wrap" style={{ marginTop: 6, gap: 18, paddingLeft: M.l }}>
+      <div className="row wrap" style={{ marginTop: 6, gap: 18, paddingLeft: M.l, maxWidth: W, overflow: "hidden" }}>
         {hasValues && (
           <div className="colorbar">
             <span className="num">{fmt(vmin)}</span>

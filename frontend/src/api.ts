@@ -1,6 +1,20 @@
 // Backend client: JSON over /api (proxied by Vite to FastAPI) and a WebSocket event stream.
 
+import { prettyUnit } from "./units";
+
 export class ApiError extends Error {}
+
+/** Model output carries units as "mg C/m^2", "g m-2"…; show them all one way (mg C m⁻², g m⁻²). */
+function tidyUnits(x: any, depth = 0): any {
+  if (depth > 8 || x === null || typeof x !== "object") return x;
+  if (Array.isArray(x)) { if (x.length && typeof x[0] === "object") x.forEach((v) => tidyUnits(v, depth + 1)); return x; }
+  for (const k of Object.keys(x)) {
+    const v = x[k];
+    if ((k === "units" || k === "unit") && typeof v === "string") x[k] = prettyUnit(v);
+    else if (v && typeof v === "object") tidyUnits(v, depth + 1);
+  }
+  return x;
+}
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(`/api${path}`, {
@@ -20,7 +34,9 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     throw new ApiError(msg || `${res.status} ${res.statusText}`);
   }
   const ct = res.headers.get("content-type") || "";
-  return (ct.includes("application/json") ? JSON.parse(text) : text) as T;
+  if (!ct.includes("application/json")) return text as T;
+  const data = JSON.parse(text);
+  return (method === "GET" || method === "POST" ? tidyUnits(data) : data) as T;
 }
 
 export const api = {

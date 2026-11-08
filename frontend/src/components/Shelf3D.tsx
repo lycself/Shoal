@@ -173,7 +173,7 @@ export function Shelf3D({ box, points, cell, scale, range, units, height = 560, 
   };
   return (
     <div style={{ position: "relative" }}>
-      <div ref={host} style={{ width: "100%", height, borderRadius: 6, overflow: "hidden", background: dark ? "#16181b" : "#f3f6f9", cursor: hovered.current && onPick ? "pointer" : "grab" }}
+      <div ref={host} style={{ width: "100%", height, borderRadius: 6, overflow: "hidden", background: dark ? "var(--figure-bg), #16181b" : "#f3f6f9", cursor: hovered.current && onPick ? "pointer" : "grab" }}
         onMouseMove={onMove} onMouseDown={(e) => { down.current = { x: e.clientX, y: e.clientY }; }} onMouseUp={onUp} onMouseLeave={() => { setHover(null); setTip(null); }} />
       {tip && <div className="map-tip" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</div>}
       <div className="row" style={{ position: "absolute", left: 10, bottom: 10, gap: 14 }}>

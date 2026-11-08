@@ -28,8 +28,11 @@ export const WORLD_SITES: { name: string; lat: number; lon: number; note: string
 const WORLD: [number, number, number, number] = [-78, 84, -180, 180];
 const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x));
 function regionBox(lat: number, lon: number): [number, number, number, number] {
-  const la0 = clamp(Math.floor(lat - 7), -80, 76), lo0 = clamp(Math.floor(lon - 10), -180, 160);
-  return [la0, la0 + 14, lo0, lo0 + 20];
+  // 14° of latitude and enough longitude for a landscape map (about 3:2 on screen) at any latitude
+  const la0 = clamp(Math.floor(lat - 7), -80, 76);
+  const span = Math.min(48, Math.round((14 * 1.5) / Math.max(0.3, Math.cos((lat * Math.PI) / 180))));
+  const lo0 = clamp(Math.floor(lon - span / 2), -180, 180 - span);
+  return [la0, la0 + 14, lo0, lo0 + span];
 }
 
 /** How well the two papers' setup transfers to a place (plain sentences, warnings flagged). */
@@ -45,7 +48,7 @@ export function siteNotes(lat: number, lon: number, depth?: number | null): { te
   if (Math.abs(lat) > 60) n.push({ text: "高纬度：模型不含海冰，冬季冰覆盖的海区物理过程会有偏差。", warn: true });
   if (depth != null && depth > 300) n.push({ text: `水深 ${depth.toFixed(0)} m：本软件面向陆架海（一般 < 200 m）。开阔大洋需要更多层数、更长预热，而且缺少水平输运的影响更大。`, warn: true });
   if (depth != null && depth < 10) n.push({ text: `水深仅 ${depth.toFixed(0)} m：潮间带、海草和底栖附着藻等过程不在模型中。`, warn: true });
-  if (!nwes) n.push({ text: "潮流混合默认按北海中部设置；强潮海区（如东海、乔治浅滩）或弱潮海区（如波罗的海、地中海）请在“站点与物理”中调整潮流强度。" });
+  if (!nwes) n.push({ text: "潮流混合默认按北海中部设置；强潮海区（如东海、乔治浅滩）或弱潮海区（如波罗的海、地中海）请在“站点与物理”页左下的“模拟设置 → 潮流混合”里调整。" });
   return n;
 }
 

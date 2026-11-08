@@ -14,14 +14,36 @@ from pathlib import Path
 import numpy as np
 import xarray as xr
 
-from .ecosystem.hosts import HOSTS
+from .ecosystem.hosts import HOSTS, MGC_PER_MMOLN
 from .nclock import NC_LOCK, locked
 
 
 @functools.lru_cache(maxsize=24)
 def _open_cached(path: str, mtime: float) -> xr.Dataset:
     ds = xr.open_dataset(path, decode_times=True)
-    return ds.squeeze(drop=True)
+    return _label_means(ds.squeeze(drop=True))
+
+
+def _label_means(ds: xr.Dataset) -> xr.Dataset:
+    """Put time-mean output at the middle of its averaging interval.
+
+    flexout (time_method: mean) first writes the instantaneous initial state at
+    the start time and then stamps each mean at the END of its interval: the
+    record dated 2014-01-01 is the mean of 31 Dec 2013, and in monthly output the
+    record dated 2014-02-01 is the January mean. Left as is, monthly climatologies
+    are shifted by one month and an analysis window "from 2014-01-01" picks up the
+    last interval of the previous year (and a stray record of the following year).
+    """
+    if ds.sizes.get("time", 0) < 2:
+        return ds
+    if not any("time: mean" in str(v.attrs.get("cell_methods", "")) for v in ds.data_vars.values()):
+        return ds
+    t = ds["time"].values
+    mid = t[:-1] + (t[1:] - t[:-1]) / 2
+    attrs = dict(ds["time"].attrs)
+    ds = ds.isel(time=slice(1, None)).assign_coords(time=mid)
+    ds["time"].attrs.update(attrs)
+    return ds
 
 
 def open_result(run_dir: Path) -> xr.Dataset:
@@ -122,7 +144,10 @@ def _column(ds: xr.Dataset, var: str, mode: str) -> tuple[xr.DataArray, str]:
         return da, units
     h = ds["h"]
     if mode == "integral":
-        return (da * h).sum("z"), units.replace("/m^3", "/m^2").replace("m-3", "m-2").replace("/m3", "/m2").replace("/m**3", "/m**2")
+        per_area = units.replace("/m^3", "/m^2").replace("m-3", "m-2").replace("/m3", "/m2").replace("/m**3", "/m**2")
+        if per_area == units:  # not a per-volume quantity (temperature, salinity, ...): the integral carries an extra metre
+            per_area = f"{units} m".strip()
+        return (da * h).sum("z"), per_area
     if mode == "mean":
         return (da * h).sum("z") / h.sum("z"), units
     if mode == "surface":
@@ -166,7 +191,10 @@ def annual_cycle(run_dirs: list[tuple[str, Path]], var: str, mode: str = "integr
             out.append({"label": label, "missing": True})
             continue
         da, units = _column(ds, var, mode)
-        doy = da["time"].dt.dayofyear
+        # day of a 365-day year: in leap years 29 Feb joins 28 Feb and later days move back one,
+        # so the same calendar date of every year falls in the same bin (1..365)
+        t = da["time"].dt
+        doy = (t.dayofyear - (t.is_leap_year & (t.dayofyear > 59))).rename("dayofyear")
         g = da.groupby(doy)
         mean = g.mean()
         lo = g.min()
@@ -206,7 +234,7 @@ def _annual_mean(ds, var, mode="integral"):
 
 
 ZOO_NAMES = {"Z4_c": "中型浮游动物 Z4", "Z5_c": "微型浮游动物 Z5", "Z6_c": "异养鞭毛虫 Z6",
-             "ECO_mesozoo": "中型浮游动物", "ECO_microzoo": "微型浮游动物", "ergom_zz": "浮游动物"}
+             "ECO_mesozoo": "中型浮游动物", "ECO_microzoo": "微型浮游动物", "ergom_zz": "浮游动物（ERGOM 只有一类）"}
 
 
 @locked
@@ -223,29 +251,44 @@ def summary(run_dir: Path, run: dict) -> dict:
         if val is not None and math.isfinite(val):
             rows.append({"key": key, "label": label, "value": float(f"{val:.5g}"), "units": units, "note": note})
 
+    def as_carbon(val, units):
+        # ERGOM plankton are in nitrogen (mmol N): report them as carbon (Redfield, as the HTL coupling does)
+        # so the "carbon" rows mean the same thing for every host and can be compared between runs
+        u = re.sub(r"[\s^*]", "", units).lower()
+        if val is not None and u.startswith("mmoln/"):
+            return val * MGC_PER_MMOLN, "mg C m⁻²"
+        return val, ("mg C m⁻²" if u == "mgc/m2" else units)
+
     def isum(names, mode="integral"):
         vals = [_annual_mean(ds, n, mode) for n in names]
         vals = [v for v in vals if v]
         if not vals:
             return None, ""
-        return sum(v[0] for v in vals), vals[0][1]
+        return as_carbon(sum(v[0] for v in vals), vals[0][1])
 
     v, u = isum(host.phyto_carbon)
-    add("phyto", "浮游植物碳（深度积分）", v, u)
+    add("phyto", "浮游植物生物量（以碳计，深度积分）", v, u)
     v, u = isum(host.zoo_carbon)
-    add("zoo", "浮游动物碳（深度积分）", v, u)
+    add("zoo", "浮游动物生物量（以碳计，深度积分）", v, u)
     zoo_names = ZOO_NAMES
     for z in host.zoo_carbon:
         v = _annual_mean(ds, z)
         if v:
-            add(f"zoo_{z}", f"  {zoo_names.get(z, z)}", v[0], v[1])
+            add(f"zoo_{z}", f"  {zoo_names.get(z, z)}", *as_carbon(*v))
     v, u = isum(host.chlorophyll)
-    add("chl", "叶绿素（深度积分）", v, u)
+    add("chl", "叶绿素（深度积分）", v, "mg Chl m⁻²" if re.sub(r"[\s^*]", "", u).lower() in ("mg/m2", "mgchl/m2", "mgchla/m2") else u)
     if host.npp:
         v, u = isum(host.npp)
         if v is not None:
             add("npp", "净初级生产（深度积分）", v * (365.0 if "d" in u else 365.0 * 86400 if "s" in u else 1.0) / 1000.0,
                 "g C m⁻² yr⁻¹")
+    # ERGOM reports net COMMUNITY production (primary production minus all respiration), in nitrogen per day.
+    # It is not net primary production, so it gets its own row, converted to carbon with the Redfield factor.
+    if host.id == "ergom" and "ergom_NPR" in ds:
+        v = _annual_mean(ds, "ergom_NPR")
+        if v and re.sub(r"[\s^*]", "", v[1]).lower().startswith("mmol/m2/d"):
+            add("ncp", "净群落生产（以碳计，深度积分）", v[0] * MGC_PER_MMOLN * 365.0 / 1000.0, "g C m⁻² yr⁻¹",
+                "ERGOM 输出的是净群落生产：初级生产减去所有生物（含浮游动物、细菌）的呼吸，不是净初级生产")
     # HTL
     for inst, label in (("F1", "鱼 1（浮游食性）"), ("F2", "鱼 2（底栖/鱼食性）"), ("MB", "大型底栖动物")):
         if f"{inst}_c" in ds:
@@ -285,26 +328,51 @@ def compare(runs: list[tuple[str, Path, dict]]) -> dict:
             if r["key"] not in meta:
                 keys.append(r["key"])
                 meta[r["key"]] = {"label": r["label"], "units": r["units"]}
+    def unit_key(u):
+        return re.sub(r"[\s^*]", "", str(u)).lower()
+
     rows = []
     for k in keys:
-        vals = []
+        vals, units = [], []
         for _, t in tables:
-            v = next((r["value"] for r in t["rows"] if r["key"] == k), None)
-            vals.append(v)
+            r = next((r for r in t["rows"] if r["key"] == k), None)
+            vals.append(r["value"] if r else None)
+            units.append(unit_key(r["units"]) if r else None)
         base = vals[0]
-        pct = [None if (v is None or base in (None, 0)) else round((v - base) / abs(base) * 100, 1) for v in vals]
+        # a change in percent only makes sense between values in the same units (e.g. not mmol N vs mg C)
+        pct = [None if (v is None or base in (None, 0) or u != units[0]) else round((v - base) / abs(base) * 100, 1)
+               for v, u in zip(vals, units)]
         rows.append({"key": k, **meta[k], "values": vals, "pct": pct})
     return {"labels": [l for l, _ in tables], "rows": rows}
 
 
 @locked
 def difference(run_a: Path, run_b: Path, var: str, start: str | None = None, end: str | None = None) -> dict:
-    a = hovmoller(run_a, var, start, end)
-    b = hovmoller(run_b, var, start, end)
-    n = min(len(a["time"]), len(b["time"]))
-    va = np.array(a["values"], dtype=float)[:, :n]
-    vb = np.array(b["values"], dtype=float)[:, :n]
-    return {**a, "time": a["time"][:n], "values": _clean(vb - va), "kind": "difference"}
+    """b − a on the dates both runs share, with b interpolated onto a's depths if the grids differ."""
+    ds_a = _window(open_result(run_a), start, end)
+    ds_b = _window(open_result(run_b), start, end)
+    for ds in (ds_a, ds_b):
+        if var not in ds:
+            raise KeyError(f"输出中没有变量 {var}")
+        if "z" not in ds[var].dims:
+            raise ValueError(f"{var} 不是随深度变化的变量")
+    common = np.intersect1d(ds_a["time"].values, ds_b["time"].values)
+    if common.size == 0:
+        raise ValueError("两次运行没有重叠的时间段，无法相减")
+    da = ds_a[var].sel(time=common).transpose("z", "time")
+    db = ds_b[var].sel(time=common).transpose("z", "time")
+    za, zb = _depth(ds_a), _depth(ds_b)
+    oa, ob = np.argsort(za), np.argsort(zb)
+    va = da.values[oa, :]
+    vb = db.values[ob, :]
+    if za.shape != zb.shape or not np.allclose(za[oa], zb[ob], atol=1e-3):
+        vb = np.stack([np.interp(za[oa], zb[ob], vb[:, j]) for j in range(vb.shape[1])], axis=1)
+    diff = _thin_time(xr.DataArray(vb - va, dims=("z", "time"), coords={"time": common}))
+    return {
+        "var": var, "units": ds_a[var].attrs.get("units", ""), "long_name": ds_a[var].attrs.get("long_name", var),
+        "time": [str(np.datetime_as_string(t, unit="D")) for t in diff["time"].values],
+        "depth": _clean(za[oa], 4), "values": _clean(diff.values), "kind": "difference",
+    }
 
 
 # ----------------------------------------------------------- size spectrum
@@ -355,7 +423,16 @@ def foodweb_state(run_dir: Path, run: dict) -> dict:
             continue
         if re.search(r"(_c|^ECO_[a-z]+|^ergom_[a-z]+)$", name) and not name.endswith("_sms"):
             da, units = _column(ds, name, "integral")
-            out[name] = {"value": float(da.mean()), "units": units}
+            val = float(da.mean())
+            # ERGOM plankton and detritus are in nitrogen; the food-web view weighs links by prey biomass,
+            # so every node must be in the same currency as the fish (carbon)
+            if name in ("ergom_pp", "ergom_ff", "ergom_bb", "ergom_zz", "ergom_dd", "ergom_fl") and re.sub(r"[\s^*]", "", units).lower().startswith("mmol"):
+                val, units = val * MGC_PER_MMOLN, "mg C m⁻²"
+            out[name] = {"value": val, "units": units}
+    if "fish_c_tot" in ds:
+        # the MIZER food-web node reads "fish_c"; the size classes fish_c1..N (mmol C m-2) do not match the
+        # pattern above, so give the community total in carbon (fish_c_tot is g wet mass m-2, 0.12 g WM per mmol C)
+        out["fish_c"] = {"value": float(ds["fish_c_tot"].mean()) / 0.12 * 12.011, "units": "mg C m-2"}
     for k in ("F1_consumption", "F2_consumption", "MB_consumption"):
         if k in ds:
             out[k] = {"value": float(ds[k].mean()), "units": ds[k].attrs.get("units", "")}

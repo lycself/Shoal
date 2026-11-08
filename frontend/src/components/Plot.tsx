@@ -1,8 +1,8 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 // @ts-ignore - the dist bundle has no types
 import Plotly from "plotly.js-dist-min";
 import { useApp } from "../store";
-import { cssVar } from "./ui";
+import { Icon, cssVar } from "./ui";
 
 /** Categorical series palette, light / dark variants (readable on both backgrounds). */
 const SERIES: [string, string][] = [ // design:allow-colour categorical palette
@@ -56,8 +56,8 @@ export function colorscaleFor(v: string, dark = false, diverging = false): [numb
 export function themeLayout(dark: boolean, extra: any = {}): any {
   const fg = cssVar("--fg") || (dark ? "#cdd1d7" : "#2f3640");
   const soft = cssVar("--fg-muted");
-  const grid = dark ? "#2e3035" : "#eceef1";
-  const line = dark ? "#4a4e56" : "#b4bcc6";
+  const grid = cssVar("--plot-grid") || (dark ? "#2e3035" : "#eceef1");
+  const line = cssVar("--plot-line") || (dark ? "#4a4e56" : "#b4bcc6");
   const axis = { gridcolor: grid, linecolor: line, zerolinecolor: line, tickcolor: line, showline: true, mirror: true, ticks: "outside", ticklen: 4, automargin: true, title: { font: { size: 12, color: soft } } };
   const base: any = {
     paper_bgcolor: "rgba(0,0,0,0)",
@@ -83,31 +83,67 @@ function deepMerge(a: any, b: any): any {
   return o;
 }
 
-export function Plot({ data, layout, height, fill, config, onClick }: { data: any[]; layout?: any; height?: number; fill?: boolean; config?: any; onClick?: (ev: any) => void }) {
+// Chinese tips for the plot toolbar
+Plotly.register({ moduleType: "locale", name: "zh-CN", dictionary: {
+  "Zoom": "框选放大", "Pan": "拖动平移", "Zoom in": "放大", "Zoom out": "缩小", "Reset axes": "还原默认视图", "Autoscale": "自动缩放",
+  "Download plot as a png": "下载为 PNG 图片", "Download plot": "下载图片", "Box Select": "框选", "Lasso Select": "套索选择",
+  "Show closest data on hover": "悬停显示最近的数据", "Compare data on hover": "悬停比较数据", "Toggle Spike Lines": "显示参考线",
+  "Reset camera to default": "还原默认视角", "Double-click to zoom back out": "双击还原",
+}, format: {} });
+
+/** `layout` may be a function of the plot's real pixel size, so callouts can be placed for the space they really have. */
+export function Plot({ data, layout, height, fill, config, onClick }: { data: any[]; layout?: any | ((px: [number, number]) => any); height?: number; fill?: boolean; config?: any; onClick?: (ev: any) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const dark = useApp((s) => s.dark);
+  const [zoomed, setZoomed] = useState(false);
+  const layoutRef = useRef(layout); layoutRef.current = layout;
+  const drawRef = useRef<() => void>(() => {});
+  const draw = () => {
+    const el = ref.current;
+    if (!el) return;
+    const box: [number, number] = [Math.max(200, el.clientWidth - 90), Math.max(120, (height && !fill ? height : el.clientHeight) - 80)];
+    const l = themeLayout(dark, (typeof layout === "function" ? layout(box) : layout) || {});
+    if (height && !fill) l.height = height;
+    Plotly.react(el, data, l, {
+      responsive: true, displaylogo: false, displayModeBar: "hover", locale: "zh-CN", doubleClick: "reset", showTips: false,
+      modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d", "toggleSpikelines"],
+      toImageButtonOptions: { format: "png", scale: 3, filename: "shoal" }, ...(config || {}),
+    });
+  };
+  drawRef.current = draw;
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const l = themeLayout(dark, layout || {});
-    if (height && !fill) l.height = height;
-    Plotly.react(el, data, l, {
-      responsive: true, displaylogo: false, displayModeBar: "hover",
-      modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d", "toggleSpikelines"],
-      toImageButtonOptions: { format: "png", scale: 3, filename: "shoal" }, ...(config || {}),
+    draw();
+    setZoomed(false);
+    (el as any).removeAllListeners?.("plotly_relayout");
+    // any change of an axis range by the user (box zoom, pan, scroll) shows the "还原" button
+    (el as any).on?.("plotly_relayout", (ev: any) => {
+      const keys = Object.keys(ev || {});
+      if (keys.some((k) => /axis\d*\.range/.test(k))) setZoomed(true);
+      else if (keys.some((k) => /axis\d*\.autorange/.test(k))) setZoomed(false);
     });
     if (onClick) {
       (el as any).removeAllListeners?.("plotly_click");
       (el as any).on?.("plotly_click", onClick);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, layout, height, dark, config, onClick, fill]);
   useEffect(() => {
     const el = ref.current;
-    const ro = new ResizeObserver(() => el && el.offsetParent && Plotly.Plots.resize(el));
+    // resize once the container has settled (e.g. after a side panel slides), not on every animation frame:
+    // redrawing a plot 10 times during a 180 ms slide is what made pages flicker
+    let t = 0;
+    const ro = new ResizeObserver(() => { window.clearTimeout(t); t = window.setTimeout(() => { if (!el || !el.offsetParent) return; if (typeof layoutRef.current === "function") drawRef.current(); else Plotly.Plots.resize(el); }, 140); });
     if (el) ro.observe(el);
-    return () => { ro.disconnect(); if (el) Plotly.purge(el); };
+    return () => { window.clearTimeout(t); ro.disconnect(); if (el) Plotly.purge(el); };
   }, []);
-  return <div ref={ref} className={fill ? "plot-fill" : "plot"} style={fill ? undefined : { height: height ?? 320 }} />;
+  return (
+    <div className={fill ? "plot-fill" : "plot"} style={fill ? undefined : { height: height ?? 320 }}>
+      <div ref={ref} className="plot-canvas" />
+      {zoomed && <button type="button" className="plot-reset" onClick={() => { draw(); setZoomed(false); }} title="回到默认大小（也可以双击图）"><Icon name="screen-normal" />还原</button>}
+    </div>
+  );
 }
 
 /** CSS gradient for a Plotly colour scale (for custom legends). */

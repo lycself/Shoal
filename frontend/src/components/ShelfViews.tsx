@@ -20,8 +20,11 @@ export function ShelfPlates({ study, results, configs = [], boxes = [] }: { stud
   const keys = Object.keys(meta);
   const cfgOf = (r: any) => configs.find((c) => c.id === r?.config_id);
   const [kind, setKind] = useState<"triple" | "pct">("triple");
-  const [metric, setMetric] = useState(keys.find((k) => /fish_ww|F1_c/.test(k)) ?? keys[0]);
   const [ref0, ref1] = referenceIndex(results.map((r) => configKind(cfgOf(r))));
+  // default to a metric both configurations on screen have (a fish-free baseline has no fish biomass), fish first
+  const hasIn = (r: any, k: string) => (r?.points ?? []).some((p: any) => p.metrics?.[k] != null);
+  const both = keys.filter((k) => hasIn(results[ref0], k) && hasIn(results[ref1], k));
+  const [metric, setMetric] = useState(both.find((k) => /fish_ww|F1_c/.test(k)) ?? both.find((k) => /^zoo_Z4|^zoo$/.test(k)) ?? both[0] ?? keys[0]);
   const [pick, setPick] = useState<[number, number] | null>(null);
   const [ia, ib] = pick ?? [ref0, ref1];
   const A = results[ia], B = results[ib];
@@ -50,8 +53,9 @@ export function ShelfPlates({ study, results, configs = [], boxes = [] }: { stud
         <Seg size="sm" value={kind} onChange={setKind} options={[["triple", "两配置 + 差值"], ["pct", "多指标百分比变化"]]} />
         {kind === "triple" && <span className="opt">指标<Select size="sm" value={metric} onChange={setMetric}>{keys.map((k) => <option key={k} value={k}>{optLabel(meta[k].label)}</option>)}</Select></span>}
         <span className="opt">基准<Select size="sm" value={ia} onChange={(v) => setPick([+v, +v === ib ? ia : ib])}>{results.map((r, i) => <option key={i} value={i}>{r.config_name}</option>)}</Select></span>
-        <IconBtn icon="arrow-swap" size="sm" title="交换基准与比较" onClick={() => setPick([ib, ia])} />
-        <span className="opt">比较<Select size="sm" value={ib} onChange={(v) => setPick([+v === ia ? ib : ia, +v])}>{results.map((r, i) => <option key={i} value={i}>{r.config_name}</option>)}</Select></span>
+        {/* the swap button stays with the picker it swaps, even when the toolbar wraps */}
+        <span className="row" style={{ gap: 4, flexWrap: "nowrap" }}><IconBtn icon="arrow-swap" size="sm" title="交换基准与比较" onClick={() => setPick([ib, ia])} />
+        <span className="opt">比较<Select size="sm" value={ib} onChange={(v) => setPick([+v === ia ? ib : ia, +v])}>{results.map((r, i) => <option key={i} value={i}>{r.config_name}</option>)}</Select></span></span>
       </div>
       {kind === "triple" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 14 }}>

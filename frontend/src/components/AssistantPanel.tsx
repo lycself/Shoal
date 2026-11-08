@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { api, on } from "../api";
 import { Markdown } from "./Markdown";
-import { Btn, Icon, IconBtn } from "./ui";
+import { Btn, Icon, IconBtn, useAsync } from "./ui";
 import { useApp } from "../store";
 
 interface Item { kind: "user" | "bot" | "tool" | "err" | "proposal"; text?: string; proposal?: any }
@@ -18,7 +18,12 @@ const TOOL_LABEL: Record<string, string> = {
 };
 
 export default function AssistantPanel() {
-  const { toggleAssistant, setPage } = useApp();
+  const { toggleAssistant, setPage, assistantOpen } = useApp();
+  // is an AI service configured? (re-read whenever the panel opens, e.g. after visiting Settings)
+  const cfg = useAsync(() => api.get<any>("/settings"), [assistantOpen]);
+  const a = cfg.data?.assistant ?? {};
+  const ready = !cfg.data || a.has_key || /localhost|127\.0\.0\.1/.test(a.base_url ?? "");
+  const timer = useRef<number | undefined>(undefined);
   const [items, setItems] = useState<Item[]>([]);
   const [conv, setConv] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -33,8 +38,8 @@ export default function AssistantPanel() {
       if (e.type === "text") setItems((x) => [...x, { kind: "bot", text: e.text }]);
       if (e.type === "tool") setItems((x) => [...x, { kind: "tool", text: TOOL_LABEL[e.name] ?? e.name }]);
       if (e.type === "proposal") setItems((x) => [...x, { kind: "proposal", proposal: e.proposal }]);
-      if (e.type === "error") { setItems((x) => [...x, { kind: "err", text: e.text }]); setBusy(false); }
-      if (e.type === "done") setBusy(false);
+      if (e.type === "error") { setItems((x) => [...x, { kind: "err", text: e.text }]); setBusy(false); clearTimeout(timer.current); }
+      if (e.type === "done") { setBusy(false); clearTimeout(timer.current); }
     });
     const ask = (ev: Event) => send((ev as CustomEvent).detail);
     window.addEventListener("assistant-ask", ask);
@@ -48,10 +53,15 @@ export default function AssistantPanel() {
     setText("");
     setBusy(true);
     const st = useApp.getState();
+    // the id is made here, before the request, so no reply event can arrive for a conversation we don't know yet
+    const id = convRef.current ?? Math.random().toString(16).slice(2, 12);
+    convRef.current = id; setConv(id);
+    clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => { setBusy(false); setItems((x) => [...x, { kind: "err", text: "等了 3 分钟还没有回复：AI 服务可能太慢或连接中断。可以再问一次，或到设置里测试连接。" }]); }, 180000);
     try {
-      const r = await api.post("/assistant/chat", { conv: convRef.current, message: msg, context: { project_id: st.projectId, page: st.page, selected_run_ids: st.selectedRuns } });
-      setConv(r.conv); convRef.current = r.conv;
-    } catch (e: any) { setItems((x) => [...x, { kind: "err", text: e.message }]); setBusy(false); }
+      const r = await api.post("/assistant/chat", { conv: id, message: msg, context: { project_id: st.projectId, page: st.page, selected_run_ids: st.selectedRuns } });
+      if (r.error) { setItems((x) => [...x, { kind: "err", text: r.error }]); setBusy(false); clearTimeout(timer.current); }
+    } catch (e: any) { setItems((x) => [...x, { kind: "err", text: e.message }]); setBusy(false); clearTimeout(timer.current); }
   }
 
   return (
@@ -62,11 +72,17 @@ export default function AssistantPanel() {
         <IconBtn icon="close" title="关闭" size="sm" onClick={toggleAssistant} />
       </div>
       <div className="assist-log" ref={log}>
-        {!items.length && (
+        {!items.length && !ready && (
+          <div className="col" style={{ gap: 10 }}>
+            <b style={{ color: "var(--fg-strong)" }}>先接上一个 AI 服务</b>
+            <div className="muted small" style={{ lineHeight: 1.7 }}>助手需要一个大模型接口才能回答。到设置里填写接口地址、模型名和 API Key（OpenAI 兼容的服务都可以；本机运行的模型不需要 Key），保存后回到这里就能提问。</div>
+            <div><Btn size="sm" icon="settings-gear" onClick={() => setPage("settings")}>去设置 AI 服务</Btn></div>
+          </div>
+        )}
+        {!items.length && ready && (
           <div className="col" style={{ gap: 10 }}>
             <div className="muted small" style={{ lineHeight: 1.6 }}>我可以解释模型原理与方法来源、读取你的项目和结果、检索入门教程、启动模拟，并对配置提出修改建议（需你批准）。</div>
             {SUGGEST.map(([ic, s]) => <button key={s} className="suggest" onClick={() => send(s)}>{s}</button>)}
-            <div className="soft small">首次使用请在 <a onClick={() => setPage("settings")}>设置</a> 中配置 AI 服务。</div>
           </div>
         )}
         {items.map((it, i) => it.kind === "proposal" ? <Proposal key={i} p={it.proposal} /> : (
@@ -74,12 +90,12 @@ export default function AssistantPanel() {
             {it.kind === "bot" ? <Markdown text={it.text!} /> : it.kind === "tool" ? <><Icon name="tools" />{it.text}</> : it.text}
           </div>
         ))}
-        {busy && <div className="msg tool"><Icon name="loading" spin />思考中…</div>}
+        {busy && <div className="msg tool row"><Icon name="loading" spin /><span className="grow">思考中…</span><a className="small" onClick={() => { setBusy(false); clearTimeout(timer.current); }}>不等了</a></div>}
       </div>
       <div className="assist-input">
-        <textarea className="input" value={text} placeholder="提问（Enter 发送，Shift+Enter 换行）" onChange={(e) => setText(e.target.value)}
+        <textarea className="input" value={text} disabled={!ready} placeholder={ready ? "提问（Enter 发送，Shift+Enter 换行）" : "配置 AI 服务后可以提问"} onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(text); } }} />
-        <div className="row"><span className="soft small grow">上下文：当前项目与已选运行会一并发送</span><Btn variant="primary" size="sm" icon="send" disabled={busy || !text.trim()} onClick={() => send(text)}>发送</Btn></div>
+        <div className="row"><span className="soft small grow">上下文：当前项目与已选运行会一并发送</span><IconBtn icon="send" title="发送（Enter）" disabled={busy || !text.trim() || !ready} onClick={() => send(text)} /></div>
       </div>
     </aside>
   );
@@ -99,7 +115,7 @@ function Proposal({ p }: { p: any }) {
       <div className="panel-pad col" style={{ gap: 8 }}>
         <div className="small">{p.reason}</div>
         <pre style={{ margin: 0, background: "var(--bg-sunk)", padding: 8, borderRadius: 6, fontSize: 11.5, overflow: "auto" }}>{JSON.stringify(p.spec_patch, null, 2)}</pre>
-        {status === "pending" ? <div className="row"><Btn size="sm" variant="primary" icon="check" onClick={() => act(false)}>应用</Btn><Btn size="sm" icon="close" onClick={() => act(true)}>拒绝</Btn></div>
+        {status === "pending" ? <div className="row"><Btn size="sm" icon="check" onClick={() => act(false)}>应用</Btn><Btn size="sm" icon="close" onClick={() => act(true)}>拒绝</Btn></div>
           : <span className={`badge ${status === "applied" ? "ok" : ""}`}>{status === "applied" ? "已应用" : "已拒绝"}</span>}
       </div>
     </div>

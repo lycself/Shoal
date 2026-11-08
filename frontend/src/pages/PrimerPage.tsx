@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Markdown, parseFrontMatter } from "../components/Markdown";
-import { Btn, Icon } from "../components/ui";
+import { Btn, Icon, IconBtn, SearchInput } from "../components/ui";
 import { useApp } from "../store";
 import { askTutor } from "../tutor";
 
@@ -14,10 +14,11 @@ const CHAPTERS: Chapter[] = Object.entries(files).map(([path, raw]) => {
   return { id, title: meta.title || id, order: +(meta.order ?? 99), summary: meta.summary || "", body: clean };
 }).sort((a, b) => a.order - b.order);
 const PARTS: [string, (o: number) => boolean][] = [
-  ["开始", (o) => o === 0],
-  ["基础：从物理到浮游生态", (o) => o >= 1 && o <= 5],
-  ["高营养级与耦合", (o) => o >= 6 && o <= 8],
-  ["方法来源与拓展", (o) => o >= 9],
+  ["开始", (o) => o <= 1],
+  ["基础概念：海水与浮游生物", (o) => o >= 2 && o <= 5],
+  ["低营养级与鱼", (o) => o >= 6 && o <= 9],
+  ["研究问题", (o) => o >= 10 && o <= 12],
+  ["拓展", (o) => o >= 13],
 ];
 
 // below these page widths the panels float over the article (drawers) instead of taking room from it
@@ -33,6 +34,7 @@ export default function PrimerPage() {
   const host = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(1400);
   const [drawer, setDrawer] = useState<null | "nav" | "toc">(null);
+  const navW = usePanelWidth("nav", 252, 200, 420), tocW = usePanelWidth("toc", 220, 170, 380);
   useLayoutEffect(() => {
     const el = host.current;
     if (!el) return;
@@ -90,9 +92,12 @@ export default function PrimerPage() {
 
   return (
     <div className="learn" ref={host}>
-      <aside className={`learn-nav ${navOpen ? "open" : ""} ${floating.nav ? "drawer" : ""}`} aria-label="章节目录" aria-hidden={!navOpen}>
-        <div className="learn-panel-inner">
-          <div style={{ padding: "12px 10px 8px" }}><div className="search"><Icon name="search" /><input placeholder="搜索教程" value={q} onChange={(e) => setQ(e.target.value)} /></div></div>
+      <aside className={`learn-nav ${navOpen ? "open" : ""} ${floating.nav ? "drawer" : ""} ${navW.live !== null ? "dragging" : ""}`} aria-label="章节目录" aria-hidden={!navOpen}
+        style={navOpen ? { width: navW.width } : undefined}>
+        <div className="learn-panel-inner" style={{ width: navW.inner }}>
+          <div className="row" style={{ padding: "12px 6px 8px 10px", gap: 4 }}><div className="grow"><SearchInput placeholder="搜索教程" value={q} onChange={setQ} /></div>
+            {/* the fold button lives on the panel it folds */}
+            <IconBtn icon="layout-sidebar-left" size="sm" title={floating.nav ? "关闭章节目录（Esc）" : "收起章节目录（也可以拖动或双击右边缘）"} onClick={() => toggle("nav")} /></div>
           <div className="split-scroll" style={{ padding: "0 6px 14px" }}>
             {PARTS.map(([name, f]) => (
               <div key={name} style={{ marginBottom: 10 }}>
@@ -108,14 +113,15 @@ export default function PrimerPage() {
           </div>
         </div>
       </aside>
+      {navOpen && !floating.nav && <div className="sash" onMouseDown={navW.drag(1, () => setLearnPanel("nav", false))} onDoubleClick={() => setLearnPanel("nav", false)} data-tip="拖动调整章节目录宽度，拖到很窄或双击收起" />}
       <div className="learn-main" ref={main}>
         <div className="learn-bar">
-          <button className={`learn-bar-btn ${navOpen ? "on" : ""}`} onClick={() => toggle("nav")} data-tip={navOpen ? "收起章节目录" : "显示章节目录"} aria-pressed={navOpen}><Icon name="list-tree" /><span>章节</span></button>
+          <button className={`learn-bar-btn reveal ${navOpen ? "gone" : ""}`} tabIndex={navOpen ? -1 : 0} onClick={() => toggle("nav")} data-tip={navOpen ? "收起章节目录" : "显示章节目录"} aria-pressed={navOpen}><Icon name="list-tree" /><span>章节</span></button>
           <div className="learn-crumbs ellipsis">
             <span className="soft">{part}</span><Icon name="chevron-right" className="soft" /><span>{cur.title}</span>
             {active && <><Icon name="chevron-right" className="soft" /><span className="soft">{active}</span></>}
           </div>
-          {hasToc && <button className={`learn-bar-btn ${tocOpen ? "on" : ""}`} onClick={() => toggle("toc")} data-tip={tocOpen ? "收起“本页内容”" : "显示“本页内容”"} aria-pressed={tocOpen}><span>本页内容</span><Icon name="list-selection" /></button>}
+          {hasToc && <button className={`learn-bar-btn reveal ${tocOpen ? "gone" : ""}`} tabIndex={tocOpen ? -1 : 0} onClick={() => toggle("toc")} data-tip={tocOpen ? "收起“本页内容”" : "显示“本页内容”"} aria-pressed={tocOpen}><span>本页内容</span><Icon name="list-selection" /></button>}
         </div>
         {hits ? (
           <div className="learn-article">
@@ -131,7 +137,6 @@ export default function PrimerPage() {
               <div className="learn-kicker">第 {cur.order} 章 · {part}</div>
               <h1 className="page-title" style={{ fontSize: 24 }}>{cur.title}</h1>
               <div className="row" style={{ marginTop: 8 }}>
-                <span className="learn-status"><Icon name="warning" />AI 撰写，待审核</span>
                 {cur.summary && <span className="soft small ellipsis">{cur.summary}</span>}
                 <span className="grow" />
                 <Btn size="sm" icon="sparkle" onClick={() => askTutor(`请讲解入门教程“${cur.title}”这一章：核心概念、关键方程，以及它们在 Shoal 里对应的设置和结果。`)}>问讲解员</Btn>
@@ -145,15 +150,42 @@ export default function PrimerPage() {
           </article>
         )}
       </div>
-      {hasToc && (
-        <nav className={`learn-toc ${tocOpen ? "open" : ""} ${floating.toc ? "drawer" : ""}`} aria-label="本页内容" aria-hidden={!tocOpen}>
-          <div className="learn-panel-inner">
-            <div className="learn-part">本页内容</div>
+      {hasToc && (<>
+        {tocOpen && !floating.toc && <div className="sash" onMouseDown={tocW.drag(-1, () => setLearnPanel("toc", false))} onDoubleClick={() => setLearnPanel("toc", false)} data-tip="拖动调整“本页内容”宽度，拖到很窄或双击收起" />}
+        <nav className={`learn-toc ${tocOpen ? "open" : ""} ${floating.toc ? "drawer" : ""} ${tocW.live !== null ? "dragging" : ""}`} aria-label="本页内容" aria-hidden={!tocOpen} style={tocOpen ? { width: tocW.width } : undefined}>
+          <div className="learn-panel-inner" style={{ width: tocW.inner }}>
+            <div className="learn-part row" style={{ paddingRight: 0 }}><span className="grow">本页内容</span><IconBtn icon="layout-sidebar-right" size="sm" title={floating.toc ? "关闭“本页内容”（Esc）" : "收起“本页内容”"} onClick={() => toggle("toc")} /></div>
             {toc.map((t) => <button key={t} className={`learn-item ${active === t ? "active" : ""}`} onClick={() => goSection(t)} tabIndex={tocOpen ? 0 : -1}><span className="ellipsis">{t}</span></button>)}
           </div>
         </nav>
-      )}
+      </>)}
       {drawer && <div className="learn-scrim" onClick={() => setDrawer(null)} />}
     </div>
   );
+}
+
+/** Width of a primer side panel: dragged on its edge (direction +1 = panel on the left), remembered, folded when dragged narrow. */
+function usePanelWidth(id: string, initial: number, min: number, max: number) {
+  const key = `e2e.learn.${id}.w`;
+  const [w, setW] = useState(() => { try { return Math.max(min, Math.min(max, Number(localStorage.getItem(key)) || initial)); } catch { return initial; } });
+  const [live, setLive] = useState<number | null>(null);
+  const drag = (dir: 1 | -1, onFold: () => void) => (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const x0 = e.clientX, w0 = w;
+    let last = w0;
+    document.body.classList.add("dragging");
+    const move = (ev: MouseEvent) => { last = w0 + dir * (ev.clientX - x0); setLive(Math.max(0, Math.min(max, last))); };
+    const up = () => {
+      document.body.classList.remove("dragging");
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      setLive(null);
+      if (last < min / 2) onFold();
+      else { const v = Math.max(min, Math.min(max, last)); setW(v); try { localStorage.setItem(key, String(Math.round(v))); } catch { /* ignore */ } }
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  return { width: live ?? w, inner: Math.max(live ?? 0, w), live, drag };
 }

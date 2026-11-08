@@ -4,7 +4,8 @@ import { api } from "../api";
 import { useApp } from "../store";
 import { FoodWebGraph } from "./FoodWebGraph";
 import { Plot, colorscaleFor, seriesColor } from "./Plot";
-import { Empty, Icon, Loading, Notice, Select, cssVar, fmt, useAsync } from "./ui";
+import { Empty, Icon, Loading, Notice, Seg, Select, cssVar, fmt, useAsync } from "./ui";
+import { annualEvents, eventLayer, headroom, useSiteLat } from "./annotate";
 
 type Host = "ersem" | "ecosmo" | "ergom";
 const MGC_N = 79.5663;
@@ -14,14 +15,14 @@ export const ROLES: Record<string, { label: string; unit: string; depth: boolean
   phosphate: { label: "磷酸盐", unit: "mmol P m⁻³", depth: true, vars: { ersem: ["N1_p", 1], ecosmo: ["ECO_pho", 1 / 1273.06], ergom: ["ergom_po", 1] } },
   silicate: { label: "硅酸盐", unit: "mmol Si m⁻³", depth: true, vars: { ersem: ["N5_s", 1], ecosmo: ["ECO_sil", 1 / MGC_N] } },
   oxygen: { label: "溶解氧", unit: "mmol O₂ m⁻³", depth: true, vars: { ersem: ["O2_o", 1], ecosmo: ["ECO_oxy", 1], ergom: ["ergom_o2", 1] } },
-  flagellates: { label: "鞭毛藻 / 小型浮游植物", unit: "mg C m⁻³", depth: true, vars: { ersem: ["P2_c", 1], ecosmo: ["ECO_fla", 1], ergom: ["ergom_ff", MGC_N] } },
+  flagellates: { label: "微型浮游植物 / 鞭毛藻", unit: "mg C m⁻³", depth: true, vars: { ersem: ["P2_c", 1], ecosmo: ["ECO_fla", 1], ergom: ["ergom_ff", MGC_N] } },
   diatoms: { label: "硅藻", unit: "mg C m⁻³", depth: true, vars: { ersem: ["P1_c", 1], ecosmo: ["ECO_dia", 1], ergom: ["ergom_pp", MGC_N] } },
-  microzoo: { label: "小型浮游动物", unit: "mg C m⁻³", depth: true, vars: { ersem: ["Z5_c", 1], ecosmo: ["ECO_microzoo", 1] } },
+  microzoo: { label: "微型浮游动物", unit: "mg C m⁻³", depth: true, vars: { ersem: ["Z5_c", 1], ecosmo: ["ECO_microzoo", 1] } },
   mesozoo: { label: "中型浮游动物", unit: "mg C m⁻³", depth: true, vars: { ersem: ["Z4_c", 1], ecosmo: ["ECO_mesozoo", 1], ergom: ["ergom_zz", MGC_N] } },
   detritus: { label: "碎屑", unit: "mg C m⁻³", depth: true, vars: { ersem: ["R6_c", 1], ecosmo: ["ECO_det", 1], ergom: ["ergom_dd", MGC_N] } },
   sediment: { label: "沉积有机碳", unit: "mg C m⁻²", depth: false, vars: { ersem: ["Q6_c", 1], ecosmo: ["ECO_sed1", 1], ergom: ["ergom_fl", MGC_N] } },
   temp: { label: "温度", unit: "°C", depth: true, vars: { ersem: ["temp", 1], ecosmo: ["temp", 1], ergom: ["temp", 1] } },
-  salt: { label: "盐度", unit: "g kg⁻¹", depth: true, vars: { ersem: ["salt", 1], ecosmo: ["salt", 1], ergom: ["salt", 1] } },
+  salt: { label: "盐度", unit: "PSU", depth: true, vars: { ersem: ["salt", 1], ecosmo: ["salt", 1], ergom: ["salt", 1] } },
 };
 const ROW_SETS: Record<string, [string, string[]]> = {
   physics: ["物理", ["temp", "salt"]],
@@ -87,19 +88,19 @@ export function PlatesTab({ pid, runs, start }: { pid: string; runs: any[]; star
   const configs = useAsync(() => api.get<any[]>(`/projects/${pid}/configs`), [pid]);
   const cfgOf = (r: any) => configs.data?.find((c) => c.id === r.config_id);
   const PLATES: [Plate, string, string][] = [
-    ["matrix", "变量 × 运行：时间–深度矩阵", "Vijayakumaran 等 (2026) 图 2–5"],
-    ["htl", "高营养级年循环", "Vijayakumaran 等 (2026) 图 7"],
-    ["bars", "相对基准的差异", "Vijayakumaran 等 (2026) 图 12"],
-    ["years", "多年变化", "Powley 等 (2026) 图 2"],
-    ["fluxdiff", "库与通量差异图", "Powley 等 (2026) 图 6"],
-    ["scan", "参数扫描响应", "Powley 等 (2026) 表 S2/S3"],
+    ["matrix", "变量 × 运行：时间–深度矩阵", "Vijayakumaran 等 2026"],
+    ["htl", "高营养级年循环", "Vijayakumaran 等 2026"],
+    ["bars", "相对基准的差异", "Vijayakumaran 等 2026"],
+    ["years", "多年变化", "Powley 等 2026"],
+    ["fluxdiff", "库与通量差异图", "Powley 等 2026"],
+    ["scan", "参数扫描响应", "Powley 等 2026"],
   ];
   return (
     <>
       <div className="optbar">
         <span className="opt">图版<Select size="sm" value={plate} onChange={(v) => setPlate(v as Plate)} style={{ minWidth: 260 }}>{PLATES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</Select></span>
-        <span className="soft small">形式参考：{PLATES.find((x) => x[0] === plate)?.[2]}</span>
         <span className="soft small grow">列 / 系列 = 左侧勾选的运行（按勾选顺序，第一个为基准）。导出：图右上角相机按钮（PNG，3 倍分辨率）。</span>
+        <span className="soft small">（方法参考：{PLATES.find((x) => x[0] === plate)?.[2]}）</span>
       </div>
       <div className="split-scroll" style={{ padding: "12px 16px" }}>
         {plate === "matrix" && <MatrixPlate pid={pid} runs={runs} start={start} />}
@@ -174,7 +175,7 @@ function MatrixPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: s
   }, [data.data, dark]);
   return (
     <div className="col" style={{ gap: 10 }}>
-      <div className="row"><span className="soft small">变量组</span>{Object.entries(ROW_SETS).map(([k, [l]]) => <button key={k} className={`btn sm ${set === k ? "primary" : ""}`} onClick={() => setSet(k)}>{l}</button>)}</div>
+      <div className="row"><span className="soft small">变量组</span><Seg size="sm" value={set} onChange={setSet as any} options={Object.entries(ROW_SETS).map(([k, [l]]) => [k, l] as [string, string])} /></div>
       {data.loading ? <Loading /> : fig && <Plot height={fig.height} data={fig.traces} layout={fig.layout} />}
       <PlateNote read="横轴是一年（J–D），纵轴是深度（向下越深），颜色是浓度；每一列是一个勾选的运行，同一行共用色标，可以直接比较深浅。" show={MATRIX_NOTES[set].show} look={MATRIX_NOTES[set].look}
         tech="每行色标上限取 99.5% 分位数，避免单个峰值压扁颜色。不同宿主的单位已统一：营养盐 mmol m⁻³，浮游生物与碎屑 mg C m⁻³（ERGOM 按 Redfield 比 6.625 换算为碳）。" />
@@ -189,6 +190,7 @@ function useAnnual(pid: string, runs: any[], vars: string[], start?: string, mod
 
 function HtlPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: string }) {
   const dark = useApp((s) => s.dark);
+  const lat = useSiteLat();
   const vars = ["MB_c", "F1_c", "F2_c", "fish_c_tot"];
   const titles: Record<string, string> = { MB_c: "大型底栖动物", F1_c: "鱼 1（浮游食性）", F2_c: "鱼 2（底栖 / 鱼食性）", fish_c_tot: "鱼类群落（MIZER，湿重）" };
   const d = useAnnual(pid, runs, vars, start);
@@ -201,19 +203,31 @@ function HtlPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: stri
   panels.forEach((p, i) => {
     const xa = i ? `x${i + 1}` : "x", ya = i ? `y${i + 1}` : "y";
     layout[i ? `xaxis${i + 1}` : "xaxis"] = { domain: [i * (w + gap), i * (w + gap) + w], anchor: ya, ...MONTH_AXIS };
-    layout[i ? `yaxis${i + 1}` : "yaxis"] = { anchor: xa, title: { text: p.v === "fish_c_tot" ? p.res.units : "mg C m⁻²" } };
+    layout[i ? `yaxis${i + 1}` : "yaxis"] = { anchor: xa, title: { text: p.res.units || "mg C m⁻²" } };
     layout.annotations.push({ text: `<b>(${LETTERS[i]}) ${titles[p.v]}</b>`, xref: "paper", yref: "paper", x: i * (w + gap), y: 1.02, xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 12 } });
     p.res.series.forEach((s: any, k: number) => {
       if (s.missing) return;
       traces.push({ x: s.doy, y: s.mean, type: "scatter", mode: "lines", name: s.label, legendgroup: s.label, showlegend: i === 0, xaxis: xa, yaxis: ya, line: { color: seriesColor(runs.findIndex((r) => r.label === s.label), dark), width: 2 } });
     });
+    // the first run's seasonal peak, labelled in the panel
+    const s0 = p.res.series.find((x: any) => !x.missing);
+    if (s0) {
+      // the range covers every run in the panel; the label goes where it covers none of their curves
+      const live = p.res.series.filter((x: any) => !x.missing);
+      const yr = headroom(live.flatMap((x: any) => x.mean), 0.35);
+      const ev = eventLayer(annualEvents(p.v, s0.doy, s0.mean, lat).slice(0, 1).map((e) => ({ ...e, detail: `${e.sub} · ${fmt(e.y, 3)}` })),
+        { xaxis: xa, yaxis: ya, series: live.map((x: any) => ({ x: x.doy, y: x.mean })), xRange: [1, 365], yRange: yr, px: [Math.max(160, (window.innerWidth - 760) / n - 40), 300] });
+      layout.annotations.push(...ev.annotations);
+      if (ev.marker) traces.push(ev.marker);
+      layout[i ? `yaxis${i + 1}` : "yaxis"].range = yr;
+    }
   });
   return (
     <div className="col" style={{ gap: 8 }}>
       <Plot height={380} data={traces} layout={layout} />
       <PlateNote read="每条线是一个运行，纵轴是整根水柱的生物量（深度积分），横轴是一年中的月份，取分析时段的平均。"
         show={["浮游食性的鱼 1 跟着浮游动物的季节变化：春夏食物增加后开始增长。", "鱼 2（底栖与鱼食性）吃底栖动物和其他鱼，食物来源更稳定，季节变化较平缓。", "大型底栖动物依赖春华后沉降的有机物，响应比浮游生物晚。"]}
-        look={["Vijayakumaran 等 (2026)图 7 用 IBTS 拖网调查的 CPUE 年循环与鱼 1 / 鱼 2 比较：鱼 1 在夏季开始上升、生物量高于鱼 2。可以对照模型是否抓住了这种季节性和两者的高低关系。"]} />
+        look={["如果站点在北海，可以对照底拖网调查（IBTS）的季节规律：浮游食性鱼类在夏季开始增多（方法参考：Vijayakumaran 等 2026）。拖网的单位捕捞量只反映相对多少，不能直接和模型生物量比数值。"]} />
     </div>
   );
 }
@@ -241,7 +255,7 @@ function BarsPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: str
   const base = (host: string) => runs.find((r) => r.spec.host === host)!;
   const n = hosts.length, gap = 0.06, w = (1 - gap * (n - 1)) / n;
   // treatment type from the run's own configuration (not its name)
-  const TYPES: [string, string, string][] = [["control", "鱼类 + 底栖 − 基准", "#1d5fa8"], ["mb", "大型底栖 − 基准", "#5b9bd5"], ["fish", "鱼类 − 基准", "#a9cbe8"], ["zoo120", "浮游动物死亡率 +20% − 基准", "#c9a227"], ["mizer", "粒径谱鱼类 − 基准", "#7048e8"]]; // design:allow-colour paper-style blues
+  const TYPES: [string, string, string][] = [["control", "完整（鱼 + 底栖）− 基准", "#1d5fa8"], ["mb", "大型底栖 − 基准", "#5b9bd5"], ["fish", "鱼类 − 基准", "#a9cbe8"], ["zoo120", "浮游动物死亡率 +20% − 基准", "#c9a227"], ["mizer", "粒径谱鱼类 − 基准", "#7048e8"]]; // design:allow-colour paper-style blues
   const kindOf = (r: any) => {
     const h = r.spec?.htl ?? {}, e = h.e2e ?? {};
     if (h.kind === "none") return (r.spec?.ltl?.zoo_mortality_factor ?? 1) > 1 ? "zoo120" : "ltl";
@@ -249,13 +263,19 @@ function BarsPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: str
     const mb = e.macrobenthos !== false, fi = e.fish1 !== false || e.fish2 !== false;
     return mb && fi ? "control" : mb ? "mb" : "fish";
   };
-  const typeOf = (r: any) => (TYPES.find(([k]) => k === kindOf(r)) ?? ["", r.label, seriesColor(runs.indexOf(r), dark)]) as [string, string, string];
+  const typeOf = (r: any) => {
+    const t = (TYPES.find(([k]) => k === kindOf(r)) ?? ["", r.label, seriesColor(runs.indexOf(r), dark)]) as [string, string, string];
+    // the zooplankton-mortality treatment is named after the factor the run actually used
+    if (t[0] === "zoo120") { const f = +(r.spec?.ltl?.zoo_mortality_factor ?? 1.2); return [t[0], `浮游动物死亡率 ${f >= 1 ? "+" : ""}${Math.round((f - 1) * 100)}% − 基准`, t[2]] as [string, string, string]; }
+    return t;
+  };
   const traces: any[] = [];
   const shown = new Set<string>();
-  const layout: any = { barmode: "group", margin: { l: 64, r: 10, t: 64, b: 96 }, annotations: [], legend: { orientation: "h", x: 0, y: 1.16, yanchor: "bottom" } };
+  // legend under the plot (above it, it ran into the host titles); category names stay horizontal where they fit
+  const layout: any = { barmode: "group", bargap: 0.25, margin: { l: 64, r: 10, t: 30, b: 70 }, annotations: [], legend: { orientation: "h", x: 0, y: -0.28, yanchor: "top", font: { size: 11.5 } } };
   hosts.forEach((h, i) => {
     const xa = i ? `x${i + 1}` : "x", ya = i ? `y${i + 1}` : "y";
-    layout[i ? `xaxis${i + 1}` : "xaxis"] = { domain: [i * (w + gap), i * (w + gap) + w], anchor: ya, tickangle: -40 };
+    layout[i ? `xaxis${i + 1}` : "xaxis"] = { domain: [i * (w + gap), i * (w + gap) + w], anchor: ya, tickangle: n > 2 ? -30 : 0, automargin: true };
     layout[i ? `yaxis${i + 1}` : "yaxis"] = { anchor: xa, title: i === 0 ? { text: "与基准之差 (mg C m⁻²)" } : undefined, zeroline: true, zerolinewidth: 1.2 };
     layout.annotations.push({ text: `<b>${h.toUpperCase()}</b>`, xref: "paper", yref: "paper", x: i * (w + gap) + w / 2, y: 1.0, yanchor: "bottom", showarrow: false });
     const b = base(h);
@@ -270,11 +290,11 @@ function BarsPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: str
   });
   return (
     <div className="col" style={{ gap: 8 }}>
-      <Plot height={420} data={traces} layout={layout} />
-      <PlateNote read="每个面板是一个宿主模型；柱子是相对该宿主第一个勾选运行（建议“仅低营养级”）的差值，颜色区分处理：对照、仅底栖、仅鱼类、浮游动物死亡率 +20%。"
+      <Plot height={460} data={traces} layout={layout} />
+      <PlateNote read="每个面板是一个宿主模型；柱子是相对该宿主第一个勾选运行（建议“仅低营养级”）的差值，颜色区分处理：完整（鱼 + 底栖）、仅底栖、仅鱼类、只提高浮游动物死亡率。"
         show={["加入鱼后浮游动物通常减少：这是“下行控制”，捕食者压低了猎物。", "加入大型底栖动物后碎屑通常减少：底栖动物吃掉了沉到海底的有机物。", "“浮游动物死亡率 +20%”是只调低营养级闭合项的对照：如果它的效果和加入鱼相似，说明鱼的作用在这里主要相当于额外的浮游动物死亡。"]}
         look={["同一处理在三个宿主中方向是否一致：三个宿主方向一致，结论就比较可靠；不一致，说明结论取决于用了哪个宿主模型。这是判断结论是否稳健的关键。"]}
-        tech="深度积分、分析时段年均，与 Vijayakumaran 等 (2026) 图 12 的 Control − LTL / MB − LTL / Fish − LTL 形式相同。" />
+        tech="深度积分、分析时段年均；每个处理减去同一宿主的“仅低营养级”运行（方法参考：Vijayakumaran 等 2026）。" />
     </div>
   );
 }
@@ -311,7 +331,10 @@ function YearsPlate({ pid, runs }: { pid: string; runs: any[] }) {
       layout[i ? "yaxis2" : "yaxis"] = { title: { text: s.units } };
     });
     const st = panel.find((s: any) => s?.start)?.start;
-    if (st) (layout.shapes ??= []).push({ type: "line", xref: xa, yref: `${ya} domain`, x0: st, x1: st, y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--fg-soft") } });
+    if (st) {
+      (layout.shapes ??= []).push({ type: "line", xref: xa, yref: `${ya} domain`, x0: st, x1: st, y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--fg-soft") } });
+      layout.annotations.push({ x: st, xref: xa, yref: `${ya} domain`, y: 1, yanchor: "top", xanchor: "left", text: " 分析期开始", showarrow: false, font: { size: 10.5, color: cssVar("--fg-muted") } });
+    }
   });
   return (
     <div className="col" style={{ gap: 8 }}>
@@ -319,7 +342,7 @@ function YearsPlate({ pid, runs }: { pid: string; runs: any[] }) {
       <PlateNote read="横轴是模拟年份，纵轴是年平均值；虚线左边是预热期，右边才是用于分析的年份。"
         show={["曲线逐渐变平说明模型接近“周期稳态”：每年重复同样的强迫，结果不再逐年漂移。", "鱼类比浮游生物慢得多才稳定：浮游生物几周就能调整，鱼要经历多个世代。", "如果分析年份的曲线仍在明显上升或下降，结论可能受初始值影响，应增加预热年数。"]}
         look={["离线（单向）与双向耦合的差异是在预热中逐渐拉开、然后稳定，还是一直在变：前者说明差异是稳健的。"]}
-        tech="Powley 等 (2026)图 2 比较了不同清滤参数下离线 / 双向耦合的鱼类湿重与浮游动物碳。" />
+        tech="同样的比较也可以在不同清滤参数下重复，看差异是否稳健（方法参考：Powley 等 2026）。" />
     </div>
   );
 }
@@ -341,7 +364,7 @@ function FluxDiffPlate({ pid, runs }: { pid: string; runs: any[] }) {
       <FoodWebGraph graph={gb} state={gb.state} delta={delta} />
       <PlateNote read="每个节点是一个碳库（营养盐、浮游植物、浮游动物、鱼、碎屑……），按营养级从下到上排列；颜色和数字是第二个运行相对第一个运行的百分比变化，红色增加、蓝色减少。基准中不存在的类群（如鱼类）不着色。"
         show={["相邻营养级颜色一红一蓝交替，就是营养级联：某个捕食者变少，它的猎物变多，猎物的猎物又变少。", "越往食物链底部，变化通常越小：扰动在逐级传递中被其他过程（光、营养盐、其他捕食者）缓冲。"]}
-        look={["对照Powley 等 (2026)图 6，看哪些碳库变化方向一致。"]} />
+        look={["看哪些碳库的变化方向一致、哪些相反：方向相反的相邻营养级就是级联（方法参考：Powley 等 2026）。"]} />
     </div>
   );
 }
@@ -398,7 +421,7 @@ function ScanPlate({ pid, runs, cfgOf }: { pid: string; runs: any[]; cfgOf: (r: 
       </div>
       <PlateNote read="(a) 横轴是参数值，纵轴是所选指标；(b) 是响应最大的几个指标相对扫描中点的百分比变化；下表按弹性排序。"
         show={["曲线越陡，指标对这个参数越敏感；弹性 = 1 表示参数增加 1% 时指标增加约 1%，|弹性| 大于 0.5 标红。", "曲线弯曲（非线性）说明存在阈值或饱和，例如食物不足时鱼对捕食参数特别敏感。", "同一个参数往往让食物链上相邻的类群反向变化，这是营养级联在参数空间中的表现。"]}
-        look={["弹性大的参数应优先用观测标定。Powley 等 (2026)用一系列短期试算标定捕捞参数（F、w_f，表 S3）和清滤率（γ、q，表 S2），参数扫描把这一过程自动化。"]} />
+        look={["弹性大的参数应优先用观测标定，例如捕捞参数（F、w_f）和清滤率（γ、q）。参数扫描把一系列短期试算自动化（方法参考：Powley 等 2026）。"]} />
     </div>
   );
 }

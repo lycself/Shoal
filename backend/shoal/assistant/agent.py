@@ -125,7 +125,12 @@ def _tool(name: str, args: dict, conv: str) -> object:
         vals = [v for v in s["mean"] if v is not None]
         imax = s["mean"].index(max(vals))
         imin = s["mean"].index(min(vals))
-        monthly = [round(sum(x for x in s["mean"][i * 30:(i + 1) * 30] if x is not None) / 30, 4) for i in range(12)]
+        # calendar months of a 365-day year (annual_cycle folds 29 Feb into 28 Feb, so doy is 1..365)
+        edges = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334, 365]
+        monthly = []
+        for i in range(12):
+            xs = [x for d, x in zip(s["doy"], s["mean"]) if edges[i] < d <= edges[i + 1] and x is not None]
+            monthly.append(round(sum(xs) / len(xs), 4) if xs else None)
         return {"units": ac["units"], "annual_mean": sum(vals) / len(vals), "max": max(vals), "max_doy": s["doy"][imax],
                 "min": min(vals), "min_doy": s["doy"][imin], "monthly_means": monthly}
     if name == "list_output_variables":
@@ -170,8 +175,20 @@ def test_connection(data: dict) -> dict:
         return {"ok": False, "error": str(e)}
 
 
+def _configured(cfg: dict) -> bool:
+    base = cfg.get("base_url") or ""
+    return bool(cfg.get("api_key")) or "localhost" in base or "127.0.0.1" in base
+
+
+NOT_CONFIGURED = "尚未配置 AI 服务：请在“设置 → AI 助手”中填写接口地址、模型和 API Key（本地模型可不填 Key）。"
+
+
 def start_chat(data: dict) -> dict:
     conv = data.get("conv") or uuid.uuid4().hex[:10]
+    # answer a missing configuration in the HTTP reply itself: an event sent from the worker thread can
+    # arrive before the client knows which conversation it belongs to, and the user would wait forever
+    if not _configured(load_settings()["assistant"]):
+        return {"conv": conv, "error": NOT_CONFIGURED}
     msgs = CONVERSATIONS.setdefault(conv, [{"role": "system", "content": SYSTEM}])
     ctx = data.get("context") or {}
     text = data["message"]
@@ -185,8 +202,8 @@ def start_chat(data: dict) -> dict:
 def _loop(conv: str) -> None:
     cfg = load_settings()["assistant"]
     msgs = CONVERSATIONS[conv]
-    if not cfg.get("api_key") and "localhost" not in (cfg.get("base_url") or "") and "127.0.0.1" not in (cfg.get("base_url") or ""):
-        events.emit("assistant", {"conv": conv, "type": "error", "text": "尚未配置 AI 服务：请在“设置 → AI 助手”中填写接口地址、模型和 API Key（本地模型可不填 Key）。"})
+    if not _configured(cfg):
+        events.emit("assistant", {"conv": conv, "type": "error", "text": NOT_CONFIGURED})
         return
     try:
         client = _client(cfg)

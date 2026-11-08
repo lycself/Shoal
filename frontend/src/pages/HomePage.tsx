@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ask } from "../dialog";
 import { api } from "../api";
 import { MapCanvas } from "../components/MapCanvas";
 import { Btn, Icon, IconBtn, Logo, Modal, StatusBadge, fmtLatLon, useAsync } from "../components/ui";
@@ -95,7 +96,7 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
       facts: done.length ? <>可分析 {done.length} 次运行：指标对比、时间–深度矩阵、年循环、差值、粒径谱、食物网差异</> : <>需要至少一次完成的运行</>,
       action: "打开" },
     { n: 5, page: "results", title: "模型验证与稳态检查", state: done.length ? "optional" : "todo",
-      facts: <>与 WOA23 气候态比较温盐与营养盐（偏差、RMSE、相关、Taylor 图）；检查预热是否达到稳态</>, action: "验证",
+      facts: <>把模拟的温度、盐度、营养盐和多年观测平均值（WOA23）比一比；看预热够不够、结果是否已经稳定</>, action: "验证",
       onAction: () => { if (done[0]) setSelectedRuns([done[0].id]); setPage("results"); setTimeout(() => window.dispatchEvent(new CustomEvent("results-tab", { detail: "validate" })), 50); } },
     { n: 6, page: "shelf", title: "三维陆架（可选）", state: (shelves.data ?? []).some((s) => s.status === "done") ? "done" : (shelves.data ?? []).some((s) => s.status === "running") ? "busy" : "optional",
       facts: <>{shelves.data?.length ?? 0} 项陆架研究 · 水柱集合，空间分布图与区域统计</>, action: "打开" },
@@ -113,7 +114,6 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
           <div className="page-hint">{p.description}</div>
           {p.paper && <div className="soft small" style={{ marginTop: 2, fontStyle: "italic" }}>方法参考：{p.paper}</div>}
         </div>
-        <div className="page-actions"><Btn icon="new-folder" onClick={onNew}>新建项目…</Btn></div>
       </div>
       <div className="hub">
         <section>
@@ -157,12 +157,12 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
             </div>
           </section>
           <section>
-            <div className="sec-title">其他项目<span className="grow" /><IconBtn icon="refresh" title="刷新" size="sm" onClick={() => refreshProjects()} /></div>
+            <div className="sec-title">其他项目<span className="grow" /><Btn size="sm" icon="new-folder" onClick={onNew}>新建项目…</Btn><IconBtn icon="refresh" title="刷新项目列表" size="sm" onClick={() => refreshProjects()} /></div>
             <div className="plain-list">
               {projects.filter((x) => x.id !== p.id).map((x) => (
                 <div key={x.id} className="row hover" onClick={() => openProject(x.id)}>
                   <span className="grow ellipsis" title={x.site?.name}>{x.name}</span>
-                  <IconBtn icon="trash" title="移到回收站" danger size="sm" onClick={async (e) => { e.stopPropagation(); if (!confirm(`将项目“${x.name}”移到回收站（workspace/trash）？`)) return; await api.del(`/projects/${x.id}`); toast("已移到回收站", "ok"); refreshProjects(); }} />
+                  <IconBtn icon="trash" title="移到回收站" danger size="sm" onClick={async (e) => { e.stopPropagation(); if (!(await ask(`将项目“${x.name}”移到回收站（workspace/trash）？可以从那里手动恢复。`, { danger: true, ok: "移到回收站" }))) return; await api.del(`/projects/${x.id}`); toast("已移到回收站", "ok"); refreshProjects(); }} />
                 </div>
               ))}
               {projects.length <= 1 && <div className="soft small">没有其他项目</div>}
@@ -226,7 +226,7 @@ function NewProject({ onClose, initial }: { onClose: () => void; initial?: { lat
             <label className="row soft small" style={{ gap: 6, fontWeight: 400, cursor: "pointer" }}><input type="checkbox" checked={offline} onChange={(e) => setOffline(e.target.checked)} />没有网络：使用离线算例</label></div>
           {offline
             ? <div className="soft" style={{ padding: "40px 0", lineHeight: 1.7 }}>使用 GOTM 官方算例（北海北部 59.33°N 1.28°E，110 m，1998 年）自带的气象与剖面，不需要下载任何数据，适合课堂演示或无网络环境。</div>
-            : <SitePicker lat={loc.lat} lon={loc.lon} onChange={(lat, lon, n) => setLoc({ lat, lon, label: n ?? "" })} height={330} />}
+            : <SitePicker lat={loc.lat} lon={loc.lon} onChange={(lat, lon, n) => setLoc({ lat, lon, label: n ?? "" })} height={440} />}
           {!offline && <div className="row wrap" style={{ gap: 12, marginTop: 10 }}>
             <span className="opt">站点名称<input className="input sm" value={loc.label} placeholder={fmtLatLon(loc.lat, loc.lon, 1)} onChange={(e) => setLoc({ ...loc, label: e.target.value })} style={{ width: 200 }} /></span>
             <span className="opt">气象年份<input className="input num sm" type="number" value={years[0]} onChange={(e) => setYears([+e.target.value, years[1]])} style={{ width: 70 }} />–<input className="input num sm" type="number" value={years[1]} onChange={(e) => setYears([years[0], +e.target.value])} style={{ width: 70 }} /></span>

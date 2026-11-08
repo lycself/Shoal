@@ -3,6 +3,7 @@ import { createContext, useContext, useMemo, useRef, useState } from "react";
 import { askTutor } from "../tutor";
 import { Plot } from "../components/Plot";
 import { Seg, cssVar, fmt } from "../components/ui";
+import { eventLayer } from "../components/annotate";
 import { BOLTZMANN, BOX_DEFAULTS, BoxParams, lastYearMax, lastYearMean, preference, runBox, windowPreference } from "./models";
 
 function Slider({ label, value, min, max, step, onChange, unit, log }: { label: string; value: number; min: number; max: number; step?: number; onChange: (v: number) => void; unit?: string; log?: boolean }) {
@@ -89,15 +90,22 @@ function Stratification() {
     return { days, mld, crit };
   }, [wind, q, loss]);
   const bloom = d.days.find((t) => t > 30 && d.mld[t] < d.crit[t]);
+  // the crossing where the mixed layer becomes shallower than the critical depth: the bloom starts there
+  const bloomEv = eventLayer(bloom !== undefined ? [{ x: bloom, y: d.mld[bloom], title: "水华开始", detail: `第 ${bloom} 天：混合层浅于临界深度` }] : [],
+    // the vertical bloom line counts as an obstacle too, so the label never sits on it
+    { series: [{ x: d.days, y: d.mld }, { x: d.days, y: d.crit }, ...(bloom !== undefined ? [{ x: Array.from({ length: 31 }, () => bloom), y: Array.from({ length: 31 }, (_, k) => k * 5) }] : [])], xRange: [0, 365], yRange: [0, 150], px: [520, 200] });
   return (
-    <LabShell title="混合层与临界深度：春季水华何时开始？" note="简化模型：加热期混合层由风生湍流与浮力通量平衡（Monin–Obukhov 尺度），冷却期对流加深；临界深度按 Sverdrup 思路随光照变化。混合层浅于临界深度时浮植净生长，水华开始。">
+    <LabShell title="混合层与临界深度：春季水华何时开始？" note="简化模型：海面受热时，风搅出的湍流要把轻的暖水往下压，浮力又把它往上托，两者打平的深度就是混合层底（这个深度叫 Monin–Obukhov 长度，风越大越深、加热越强越浅）；海面冷却时，表层水变重下沉，对流把混合层加深。临界深度按 Sverdrup 的思路随光照变化：混合层加深到这个深度时，整层浮游植物的光合作用刚好抵消呼吸和被吃掉的损失。混合层浅于临界深度时浮游植物净生长，水华开始。">
       <Slider label="10 m 风速" value={wind} min={2} max={16} onChange={setWind} unit="m/s" />
       <Slider label="热通量季节振幅" value={q} min={50} max={300} onChange={setQ} unit="W/m²" />
-      <Slider label="浮植损失（呼吸+摄食）" value={loss} min={0.02} max={0.5} onChange={setLoss} unit="d⁻¹" />
+      <Slider label="浮游植物损失（呼吸+摄食）" value={loss} min={0.02} max={0.5} onChange={setLoss} unit="d⁻¹" />
       <Plot height={280} data={[
         { x: d.days, y: d.mld, name: "混合层深度", type: "scatter", line: { color: cssVar("--accent"), width: 2.5 } },
         { x: d.days, y: d.crit, name: "临界深度", type: "scatter", line: { color: cssVar("--eco-phyto"), dash: "dash" } },
-      ]} layout={{ yaxis: { autorange: "reversed", title: "深度 m", range: [150, 0] }, xaxis: MONTH_TICKS, shapes: bloom ? [{ type: "line", x0: bloom, x1: bloom, yref: "paper", y0: 0, y1: 1, line: { color: cssVar("--eco-zoo"), dash: "dot" } }] : [] }} />
+        // the orange dotted line is a named trace, so the legend says what it is
+        ...(bloom !== undefined ? [{ x: [bloom, bloom], y: [0, 150], name: "水华开始日", type: "scatter", mode: "lines", line: { color: cssVar("--eco-zoo"), dash: "dot", width: 1.5 }, hoverinfo: "skip" }] : []),
+        ...(bloomEv.marker ? [bloomEv.marker] : []),
+      ]} layout={{ yaxis: { title: "深度 m", range: [150, 0] }, xaxis: MONTH_TICKS, showlegend: true, legend: { orientation: "h", x: 0, y: -0.2, yanchor: "top" }, margin: { b: 70 }, annotations: bloomEv.annotations }} />
       <div className="lab-readout">{bloom !== undefined ? <>预测水华开始：约第 <b>{bloom}</b> 天（{Math.floor(bloom / 30.4) + 1} 月）</> : "混合层始终深于临界深度：本年无水华"}</div>
     </LabShell>
   );
@@ -111,6 +119,12 @@ function NpzdBox({ compareOnly }: { compareOnly?: boolean }) {
   const ref = useMemo(() => runBox({ ...p, fish: "none" }), [p]);
   const y = p.years;
   const zoo = lastYearMean(res.t, res.Z, y), zooRef = lastYearMean(ref.t, ref.Z, y);
+  // the zooplankton peak of the last simulated year, placed where it covers none of the curves
+  const t0 = res.t[res.t.length - 1] - 365;
+  const kz = res.Z.reduce((b: number, v: number, i: number) => (res.t[i] >= t0 && v > (res.Z[b] ?? -1) ? i : b), res.t.findIndex((t: number) => t >= t0));
+  const yTop = Math.max(...res.P, ...res.Z, ...res.N, ...ref.Z) * 1.3;
+  const zEv = eventLayer(kz >= 0 ? [{ x: res.t[kz], y: res.Z[kz], title: "末年浮游动物高峰", detail: `第 ${Math.round(res.t[kz] % 365)} 天 · ${fmt(res.Z[kz])} mmol N m⁻³` }] : [],
+    { series: [{ x: res.t, y: res.P }, { x: res.t, y: res.Z }, { x: res.t, y: res.N }, { x: ref.t, y: ref.Z }], yRange: [0, yTop], px: [520, 220] });
   return (
     <LabShell title="NPZD 盒子模型 + 鱼类：单向与双向耦合" note="营养盐 N、浮游植物 P、浮游动物 Z、碎屑 D 以 mmol N m⁻³ 计；鱼类以 mg C m⁻² 计，按官方 ECOSMO E2E 代码的写法以浮游动物为食（食物取整个盒子的总量，半饱和常数 0.7 mmol N m⁻²，排泄随温度变化 θ = 0.5 eV），粪便、尸体和排泄全部返回（相当于修正版）。单向耦合：鱼类照常生长，但不从浮游动物中扣除被吃掉的量，也不返还排泄物；鱼吃多少都不会让食物变少，所以会无限制地指数增长（右轴改为对数）。">
       <div className="row" style={{ marginBottom: 10 }}>
@@ -129,7 +143,7 @@ function NpzdBox({ compareOnly }: { compareOnly?: boolean }) {
         { x: ref.t, y: ref.Z, name: "Z（无鱼类参照）", line: { color: cssVar("--eco-zoo"), dash: "dot", width: 1 } },
         { x: res.t, y: res.N, name: "营养盐 N", line: { color: cssVar("--eco-nut"), width: 1 } },
         ...(p.fish !== "none" ? [{ x: res.t, y: res.F, name: "鱼类 F（右轴）", yaxis: "y2", line: { color: cssVar("--eco-fish") } }] : []),
-      ].map((s) => ({ ...s, type: "scatter", mode: "lines" }))} layout={{ xaxis: { title: "天" }, yaxis: { title: "mmol N m⁻³" }, yaxis2: { overlaying: "y", side: "right", title: "mg C m⁻²", showgrid: false, type: p.fish === "one_way" ? "log" : "linear" } }} />
+      ].map((s) => ({ ...s, type: "scatter", mode: "lines" })).concat(zEv.marker ? [zEv.marker as any] : [])} layout={{ xaxis: { title: "天" }, yaxis: { title: "mmol N m⁻³", range: [0, yTop] }, annotations: zEv.annotations, yaxis2: { overlaying: "y", side: "right", title: "mg C m⁻²", showgrid: false, type: p.fish === "one_way" ? "log" : "linear" } }} />
       <div className="lab-readout">
         <span>最后一年平均浮游动物：<b>{fmt(zoo)}</b>（无鱼 {fmt(zooRef)}，{zooRef ? `${fmt(((zoo - zooRef) / zooRef) * 100, 2)}%` : ""}）</span>
         <span>夏季峰值：<b>{fmt(lastYearMax(res.t, res.Z, y))}</b></span>
@@ -150,6 +164,11 @@ function FunctionalResponse() {
   const rMg = r * 6.625 * 12.01;
   const g1 = xs.map((c) => (sigma * a1 * c) / (rMg + a1 * c + a2 * c2));
   const g2 = xs.map((c) => (sigma * a2 * c2) / (rMg + a1 * c + a2 * c2));
+  // where total intake reaches half of σ: the food level at which the grazer is half satisfied
+  const tot = g1.map((v, i) => v + g2[i]);
+  const kh = tot.findIndex((v) => v >= sigma / 2);
+  const frEv = eventLayer(kh > 0 ? [{ x: xs[kh], y: tot[kh], title: "吃到一半", detail: `饵料 1 ≈ ${xs[kh]} mg C m⁻³` }] : [],
+    { series: [{ x: xs, y: g1 }, { x: xs, y: g2 }, { x: xs, y: tot }], xRange: [0, 200], yRange: [0, sigma * 1.25], px: [520, 200] });
   return (
     <LabShell title="Michaelis–Menten 摄食与饵料偏好（E2E 式 1–3）" note="大型底栖动物的写法：G_X = σ a_X C_X / (r + Σ a C)，C 为最底层的浓度，r 以 mmol N m⁻³ 计、乘 79.6 换成碳。饵料 1 增多时，摄食者把更多“注意力”转向它，饵料 2 被摄食的量下降（开关效应）；总摄食在食物充足时趋于 σ。">
       <Slider label="最大摄食率 σ" value={sigma} min={0.01} max={0.3} onChange={setSigma} unit="d⁻¹" />
@@ -161,15 +180,18 @@ function FunctionalResponse() {
         { x: xs, y: g1, name: "摄食饵料 1", type: "scatter", line: { color: cssVar("--eco-phyto") } },
         { x: xs, y: g2, name: "摄食饵料 2", type: "scatter", line: { color: cssVar("--eco-zoo") } },
         { x: xs, y: g1.map((v, i) => v + g2[i]), name: "总摄食", type: "scatter", line: { color: cssVar("--accent"), width: 2.5 } },
-      ]} layout={{ xaxis: { title: "饵料 1 浓度 (mg C m⁻³)" }, yaxis: { title: "比摄食率 (d⁻¹)" } }} />
+        ...(frEv.marker ? [frEv.marker] : []),
+      ]} layout={{ xaxis: { title: "饵料 1 浓度 (mg C m⁻³)" }, yaxis: { title: "比摄食率 (d⁻¹)", range: [0, sigma * 1.25] }, annotations: [...frEv.annotations,
+        { xref: "paper", x: 1, xanchor: "right", y: sigma, yanchor: "bottom", text: `上限 σ = ${sigma}`, showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } }],
+        shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: sigma, y1: sigma, line: { dash: "dot", width: 1, color: cssVar("--fg-soft") } }] }} />
     </LabShell>
   );
 }
 
 // 4 ---------------------------------------------------------------- size preference
 const ERSEM_WINDOWS: [string, number, number, string][] = [
-  ["超微型藻 P3", 4.188e-15, 4.188e-12, cssVar("--eco-phyto")], ["微型藻 P2 / 鞭毛虫 Z6", 4.188e-12, 4.188e-9, "#5fae6e"],
-  ["硅藻 P1 / 小型藻 P4 / Z5", 4.188e-9, 4.188e-6, "#8bc28e"], ["中型浮游动物 Z4", 4.188e-6, 1e-3, cssVar("--eco-zoo")],
+  ["超微型浮游植物 P3", 4.188e-15, 4.188e-12, cssVar("--eco-phyto")], ["微型浮游植物 P2 / 异养鞭毛虫 Z6", 4.188e-12, 4.188e-9, "#5fae6e"],
+  ["硅藻 P1 / 小型浮游植物 P4 / 微型浮游动物 Z5", 4.188e-9, 4.188e-6, "#8bc28e"], ["中型浮游动物 Z4", 4.188e-6, 1e-3, cssVar("--eco-zoo")],
 ]; // design:allow-colour plot bands
 function SizePreference() {
   const [beta, setBeta] = useState(100);
@@ -181,7 +203,8 @@ function SizePreference() {
       <Slider label="最佳质量比 β" value={beta} min={10} max={10000} onChange={setBeta} log />
       <Slider label="偏好宽度 σ" value={sigma} min={0.5} max={4} onChange={setSigma} />
       <Plot height={280} data={preds.map((w, k) => ({ x: lw.map((x) => Math.pow(10, x)), y: lw.map((x) => preference(w, Math.pow(10, x), beta, sigma)), name: `捕食者 ${w} g`, type: "scatter", line: { width: 2 } }))}
-        layout={{ xaxis: { type: "log", title: "饵料湿重 (g)" }, yaxis: { title: "偏好 φ", range: [0, 1.05] }, shapes: ERSEM_WINDOWS.map(([, a, b, c]) => ({ type: "rect", x0: a, x1: b, yref: "paper", y0: 0, y1: 1, fillcolor: c, opacity: 0.12, line: { width: 0 } })) }} />
+        layout={{ xaxis: { type: "log", title: "饵料湿重 (g)" }, yaxis: { title: "偏好 φ", range: [0, 1.25] },
+          annotations: preds.map((w) => ({ x: Math.log10(w / beta), y: 1, text: `${w} g 的鱼最爱<br>${fmt(w / beta, 2)} g`, showarrow: false, yanchor: "bottom", font: { size: 10.5, color: cssVar("--fg-muted") } })), shapes: ERSEM_WINDOWS.map(([, a, b, c]) => ({ type: "rect", x0: a, x1: b, yref: "paper", y0: 0, y1: 1, fillcolor: c, opacity: 0.12, line: { width: 0 } })) }} />
       <table className="table" style={{ marginTop: 8 }}>
         <thead><tr><th>饵料窗口</th>{preds.map((w) => <th key={w} className="num">{w} g 的鱼</th>)}</tr></thead>
         <tbody>{ERSEM_WINDOWS.map(([n, a, b]) => <tr key={n}><td>{n}</td>{preds.map((w) => <td key={w} className="num">{fmt(windowPreference(w, a, b, beta, sigma), 2)}</td>)}</tr>)}</tbody>
@@ -202,7 +225,9 @@ function SpectrumSlope() {
       <Slider label="捕食者/饵料质量比 β" value={beta} min={10} max={10000} onChange={setBeta} log />
       <Plot height={260} data={[
         { x: ws, y: ws.map((w) => Math.pow(w, 2 - lam) / Math.pow(1e-12, 2 - lam)), name: "每对数区间生物量（相对值）", type: "scatter", line: { color: cssVar("--accent"), width: 2.5 } },
-      ]} layout={{ xaxis: { type: "log", title: "个体湿重 w (g)" }, yaxis: { type: "log", title: "相对生物量" } }} />
+      ]} layout={{ xaxis: { type: "log", title: "个体湿重 w (g)" }, yaxis: { type: "log", title: "相对生物量" },
+        annotations: [{ xref: "paper", yref: "paper", x: 0.02, y: 0.98, xanchor: "left", yanchor: "top", showarrow: false, bgcolor: cssVar("--bg"), font: { size: 11.5, color: cssVar("--fg-strong") },
+          text: `斜率 2 − λ = <b>${(2 - lam).toFixed(2)}</b>　${Math.abs(2 - lam) < 0.15 ? "接近 0：各粒径级生物量相近（Sheldon）" : 2 - lam < 0 ? "小于 0：越大的鱼越少" : "大于 0：大个体反而更多"}` }] }} />
     </LabShell>
   );
 }
@@ -221,7 +246,12 @@ function Arrhenius() {
       <Plot height={260} data={[
         { x: Ts, y: mizer, name: "MIZER 速率因子（参考 13 °C）", type: "scatter", line: { color: cssVar("--eco-fish"), width: 2.5 } },
         { x: Ts, y: e2e, name: "E2E 排泄因子（参考 0 °C）", type: "scatter", line: { color: cssVar("--eco-zoo"), width: 2.5 } },
-      ]} layout={{ xaxis: { title: "温度 (°C)" }, yaxis: { title: "相对速率" } }} />
+        { x: [13, 0], y: [1, 1], type: "scatter", mode: "markers", marker: { size: 8, color: [cssVar("--eco-fish"), cssVar("--eco-zoo")], line: { width: 1.5, color: cssVar("--bg") } }, showlegend: false, hoverinfo: "skip" },
+      ]} layout={{ xaxis: { title: "温度 (°C)" }, yaxis: { title: "相对速率" }, annotations: [
+        { x: 13, y: 1, text: "MIZER 参考 13 °C = 1", ax: 0, ay: 34, arrowhead: 0, arrowwidth: 1, arrowcolor: cssVar("--eco-fish"), font: { size: 10.5, color: cssVar("--fg-muted") }, bgcolor: cssVar("--bg") },
+        { x: 0, y: 1, text: "E2E 参考 0 °C = 1", ax: 40, ay: -30, arrowhead: 0, arrowwidth: 1, arrowcolor: cssVar("--eco-zoo"), font: { size: 10.5, color: cssVar("--fg-muted") }, bgcolor: cssVar("--bg"), xanchor: "left" },
+        { xref: "paper", yref: "paper", x: 0.02, y: 0.98, xanchor: "left", yanchor: "top", showarrow: false, font: { size: 11, color: cssVar("--fg-strong") }, bgcolor: cssVar("--bg"),
+          text: `10 °C 时：MIZER ×${(mizer[10] / mizer[0]).toFixed(2)}，E2E ×${e2e[10].toFixed(2)}（相对 0 °C）` }] }} />
     </LabShell>
   );
 }
@@ -249,7 +279,10 @@ function FishVertical() {
         <Plot height={280} data={[
           { x: f.map((v) => v * H), y: z, name: "鱼类分布 f(z)·H", type: "scatter", line: { color: cssVar("--eco-fish"), width: 2.5 } },
           { x: T.map((v) => v / 16), y: z, name: "温度 / 16 °C", type: "scatter", line: { color: cssVar("--eco-phys"), dash: "dot" } },
-        ]} layout={{ yaxis: { autorange: "reversed", title: "深度 m" }, xaxis: { title: "相对值" } }} />
+        ]} layout={{ yaxis: { autorange: "reversed", title: "深度 m" }, xaxis: { title: "相对值" }, annotations: [
+          { x: Math.max(...f) * H, y: f.indexOf(Math.max(...f)), text: `鱼最多 ${f.indexOf(Math.max(...f))} m`, ax: 30, ay: -18, arrowhead: 0, arrowwidth: 1, arrowcolor: cssVar("--eco-fish"), xanchor: "left", font: { size: 10.5, color: cssVar("--fg-strong") }, bgcolor: cssVar("--bg") },
+          { xref: "paper", x: 1, xanchor: "right", y: mld, yanchor: "bottom", text: `混合层底 ${mld} m`, showarrow: false, font: { size: 10.5, color: cssVar("--fg-muted") } }],
+          shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: mld, y1: mld, line: { dash: "dash", width: 1, color: cssVar("--fg-soft") } }] }} />
         <div className="col lab-readout" style={{ justifyContent: "center", gap: 10 }}>
           <div>鱼类感受温度：<b>{Teff.toFixed(2)} °C</b>（水柱平均 {Tmean.toFixed(2)} °C）</div>
           <div>相互作用深度：<b>{interaction.toFixed(1)} m</b>（水深 {H} m）</div>
@@ -274,12 +307,12 @@ function CouplingCompare() {
       <Slider label="鱼类初始生物量" value={fish0} min={100} max={5000} onChange={setFish0} unit="mg C m⁻²" log />
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <Plot height={260} data={[
-          { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.zoo), name: "浮游动物", marker: { color: cssVar("--eco-zoo") } },
-          { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.phy), name: "浮游植物", marker: { color: cssVar("--eco-phyto") } },
-          { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.det), name: "碎屑", marker: { color: cssVar("--eco-organic") } },
-        ]} layout={{ barmode: "group", yaxis: { title: "年均 mmol N m⁻³" } }} />
-        <Plot height={260} data={[{ type: "bar", x: runs.filter((r) => r.m !== "none").map((r) => lab[r.m]), y: runs.filter((r) => r.m !== "none").map((r) => r.fish), marker: { color: cssVar("--eco-fish") }, name: "鱼类" }]}
-          layout={{ yaxis: { title: "末年鱼类 mg C m⁻²" } }} />
+          { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.zoo), name: "浮游动物", marker: { color: cssVar("--eco-zoo") }, texttemplate: "%{y:.2f}", textposition: "outside", cliponaxis: false },
+          { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.phy), name: "浮游植物", marker: { color: cssVar("--eco-phyto") }, texttemplate: "%{y:.2f}", textposition: "outside", cliponaxis: false },
+          { type: "bar", x: runs.map((r) => lab[r.m]), y: runs.map((r) => r.det), name: "碎屑", marker: { color: cssVar("--eco-organic") }, texttemplate: "%{y:.2f}", textposition: "outside", cliponaxis: false },
+        ]} layout={{ barmode: "group", yaxis: { title: "年均 mmol N m⁻³", range: [0, Math.max(...runs.flatMap((r) => [r.zoo, r.phy, r.det])) * 1.25] }, legend: { orientation: "h", x: 0, y: -0.18, yanchor: "top" }, margin: { t: 12, b: 70 } }} />
+        <Plot height={260} data={[{ type: "bar", x: runs.filter((r) => r.m !== "none").map((r) => lab[r.m]), y: runs.filter((r) => r.m !== "none").map((r) => r.fish), marker: { color: cssVar("--eco-fish") }, name: "鱼类", texttemplate: "%{y:.3s}", textposition: "outside", cliponaxis: false }]}
+          layout={{ yaxis: { title: "末年鱼类 mg C m⁻²", range: [0, Math.max(...runs.map((r) => r.fish)) * 1.25] }, showlegend: false, margin: { t: 12, b: 70 } }} />
       </div>
     </LabShell>
   );
