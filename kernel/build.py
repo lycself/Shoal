@@ -7,7 +7,7 @@ Institutes compiled on top of FABM's defaults:
   ersem      (pmlmodelling/ersem)          LTL host used by both papers
   mizer      (pmlmodelling/fabm-mizer)     size-spectrum HTL (Powley et al. 2026)
   e2e        (kernel/e2e) functional-group fish/macrobenthos re-implemented from the published equations
-  ecosmoe2e  (src/ecosmo-e2e, optional) the official ECOSMO E2E v2.0 code (Vijayakumaran et al. 2026)
+  ecosmoe2e  (vendor/ecosmo-e2e) the official ECOSMO E2E v2.0 code (Vijayakumaran et al. 2026, CC BY 4.0)
 ECOSMO (nersc) and ERGOM (msi, iow) ship with FABM itself.
 
 System tools (found on PATH): gfortran, cmake, git, and NetCDF-Fortran (nf-config on macOS/Linux; on
@@ -203,11 +203,12 @@ def main() -> None:
     for name, url, rev in SOURCES:
         fetch(name, url, rev)
 
-    # E2E: the paper-equation implementation in kernel/e2e is always built. The official ECOSMO E2E v2.0
-    # code (Zenodo 10.5281/zenodo.20413770, archive ecosmoe2e_gmd.tar.gz) is built next to it when its
-    # folder has been copied to src/ecosmo-e2e (needs src/ecosmo-e2e/src/CMakeLists.txt). Both can then be
-    # used in one kernel: model names e2e/fish vs ecosmoe2e_fish.
-    official = SRC / "ecosmo-e2e" if (SRC / "ecosmo-e2e" / "src" / "CMakeLists.txt").is_file() else None
+    # E2E: the paper-equation implementation in kernel/e2e and the official ECOSMO E2E v2.0 code are built
+    # side by side (model names e2e/fish vs ecosmoe2e_fish). The official sources ship in vendor/ecosmo-e2e
+    # (CC BY 4.0, Zenodo 10.5281/zenodo.20413770, see its NOTICE.md); a full copy of the archive unpacked to
+    # src/ecosmo-e2e (e.g. a newer release) takes precedence.
+    official = next((d for d in (SRC / "ecosmo-e2e", HERE / "vendor" / "ecosmo-e2e")
+                     if (d / "src" / "CMakeLists.txt").is_file()), None)
     extra = "ersem;mizer;e2e"
     if official:
         extra += ";ecosmoe2e"

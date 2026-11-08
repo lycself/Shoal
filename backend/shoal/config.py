@@ -133,8 +133,9 @@ def kernel_info() -> dict:
         info["pygetm_available"] = True
     except Exception:
         info["pygetm_available"] = False
-    official = KERNEL_SRC / "ecosmo-e2e"
-    info["e2e_official_present"] = (official / "src" / "CMakeLists.txt").exists()
+    # sources of the official ECOSMO E2E code: vendored copy, or a full archive in kernel/src (kernel/build.py)
+    info["e2e_official_present"] = any((d / "src" / "CMakeLists.txt").exists()
+                                       for d in (KERNEL_SRC / "ecosmo-e2e", KERNEL_DIR / "vendor" / "ecosmo-e2e"))
     return info
 
 

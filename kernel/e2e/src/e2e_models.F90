@@ -10,8 +10,8 @@
 !   EGUsphere, doi:10.5194/egusphere-2026-3078   (Eqs. 1-19, Tables 1-3)
 !
 ! This is NOT the official ECOSMO E2E code (Zenodo 10.5281/zenodo.20413770).
-! When the official code is placed in kernel/src/ecosmo-e2e, kernel/build.py
-! compiles that instead.
+! The official code (kernel/vendor/ecosmo-e2e) is compiled next to this one by kernel/build.py
+! (FABM model names ecosmoe2e_fish / ecosmoe2e_mb versus e2e/fish / e2e/macrobenthos here).
 !
 ! Conventions
 !   internal currency: carbon in mg C, nitrogen/phosphorus/silicon in mmol,

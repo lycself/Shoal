@@ -157,7 +157,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                       ? "ECOSMO E2E v2.0 作者发布的 Fortran 代码，参数取自其发布的算例。鱼是随深度分布的浓度，跟着饵料走。"
                       : hosts?.e2e_engines?.official_available
                         ? "本软件按论文方程自己写的版本，只用于和官方代码对照：结果与官方代码有明显差别（见教程第 12 章）。"
-                        : "内核里没有官方代码，只能用本软件按论文方程重写的版本。把官方压缩包放到 kernel/src/ecosmo-e2e 并重新编译内核即可启用官方代码。"}</span>
+                        : "内核里没有官方代码，只能用本软件按论文方程重写的版本。重新编译内核（pnpm kernel）就会把官方代码一起编进去。"}</span>
                     {engine === "official" && (
                       <>
                         <span className="label">物质收支</span>

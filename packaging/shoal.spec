@@ -80,6 +80,6 @@ if MACOS:
             "LSUIElement": True,  # lives in the menu bar, no Dock icon; the work happens in the browser
             "LSMinimumSystemVersion": "12.0",
             "NSHighResolutionCapable": True,
-            "NSHumanReadableCopyright": "GPL-licensed components: GOTM, FABM, ERSEM, FABM-MIZER, ECOSMO E2E",
+            "NSHumanReadableCopyright": "Includes GOTM, FABM, ERSEM, FABM-MIZER (GPL) and ECOSMO E2E v2.0 (CC BY 4.0)",
         },
     )
