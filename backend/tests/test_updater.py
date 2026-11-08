@@ -139,8 +139,9 @@ class CheckNeverRaises(unittest.TestCase):
             time.sleep(0.5)
             names = [t.name for t in threading.enumerate()]
             self.assertIn("update-check", names)
-            # the unreachable server is retried a few times, then reported as an error
-            for _ in range(100):
+            # the unreachable server is retried a few times, then reported as an error (on Windows each
+            # refused connection to localhost takes about 2 s, so this can take ~12 s)
+            for _ in range(400):
                 if updater.state()["phase"] == "error":
                     break
                 time.sleep(0.1)
@@ -149,7 +150,8 @@ class CheckNeverRaises(unittest.TestCase):
             updater._stop.set()
             for t in threading.enumerate():
                 if t.name == "update-check":
-                    t.join(5)
+                    t.join(60)  # never let this thread leak into the next test
+                    self.assertFalse(t.is_alive())
 
 
 class InstallFailuresAreReported(unittest.TestCase):
@@ -205,7 +207,7 @@ class LauncherSurvivesUpdateProblems(unittest.TestCase):
         with urllib.request.urlopen(url, timeout=5) as r:
             return json.loads(r.read())
 
-    def wait_phase(self, proc, base, phase, timeout=20):
+    def wait_phase(self, proc, base, phase, timeout=60):
         """Poll until the update check settles, asserting the app stays up the whole time."""
         end = time.monotonic() + timeout
         while time.monotonic() < end:
@@ -234,7 +236,7 @@ class LauncherSurvivesUpdateProblems(unittest.TestCase):
         proc, base = self.launch(server.url)
         # the app answers while the check is still hanging
         self.assertTrue(self.get(base + "/health")["ok"])
-        self.wait_phase(proc, base, "error", timeout=30)
+        self.wait_phase(proc, base, "error", timeout=60)
         self.quit(proc, base)
 
 
