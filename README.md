@@ -154,3 +154,7 @@ git push origin v1.0.1
 - WOA23 气候态同时被用作松弛目标，因此“验证与稳态”里的 WOA 比较只是一致性检查，不是独立验证；独立验证需要现场观测。
 - E2E 默认用官方代码加修正补丁，论文的图对应“原样”设置；MIZER 初始鱼类为小量种子，需要足够预热年数；参数未在本站点重新标定。
 - 教程内容由 AI 撰写，每章标注“待审核”，使用前请对照原文核对公式与数值。
+
+## 许可证
+
+Shoal 以 [GNU GPL 第 3 版或更高版本](LICENSE)（GPL-3.0-or-later）发布：可以自由使用、修改和转发，转发时须同样以 GPL 提供源码。用 Shoal 算出的结果、图和论文不受许可证约束。安装包里的第三方组件（GOTM、FABM、ERSEM、FABM-MIZER、ECOSMO E2E、NetCDF 及 Python 库等）各有自己的许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
