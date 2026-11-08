@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { ask } from "../dialog";
 import { api } from "../api";
 import { MapCanvas } from "../components/MapCanvas";
 import { Plot, colorscaleFor, seriesColor } from "../components/Plot";
@@ -31,7 +32,7 @@ export default function SitePage() {
         <div className="page-actions">
           <StatusBadge status={siteJob ? "building" : p.site_status} />
           <Btn icon="edit" onClick={() => { setMoveTo(null); setEdit(true); }}>更换站点</Btn>
-          <Btn icon="refresh" disabled={!!siteJob} onClick={async () => { if (p.site_status === "ready" && !confirm("重新下载并生成站点的气象、气候态和地形数据？已有的运行结果不受影响，但之后的新运行会用新数据。")) return; await api.post(`/projects/${p.id}/site/build`); refreshProject(); }}>{p.site_status === "ready" ? "重新构建" : "构建站点"}</Btn>
+          <Btn icon="refresh" disabled={!!siteJob} onClick={async () => { if (p.site_status === "ready" && !(await ask("重新下载并生成站点的气象、气候态和地形数据？已有的运行结果不受影响，但之后的新运行会用新数据。", { ok: "重新构建" }))) return; await api.post(`/projects/${p.id}/site/build`); refreshProject(); }}>{p.site_status === "ready" ? "重新构建" : "构建站点"}</Btn>
         </div>
       </div>
       {siteJob && (
@@ -150,6 +151,7 @@ function MeteoChart({ m }: { m: any }) {
   // daily values as a faint trace, the 30-day running mean on top: the season reads at a glance, the weather stays visible
   const data: any[] = [];
   const annotations: any[] = [];
+  const yRanges: ([number, number] | undefined)[] = [];
   panels.forEach(([k, name, unit, ci], i) => {
     const ya = i ? `y${i + 1}` : "y", c = seriesColor(ci, dark);
     data.push({ x: m.date, y: m[k], name, type: "scatter", mode: "lines", line: { width: 1, color: c }, opacity: 0.35, xaxis: "x", yaxis: ya, hovertemplate: `%{x}<br>${name} %{y}<extra></extra>` });
@@ -157,14 +159,18 @@ function MeteoChart({ m }: { m: any }) {
     const evs = k === "airt" ? extremeEvents(m.date, m[k], "最热的一天", "最冷的一天", (d: string) => String(d).slice(0, 10))
       : k === "wind" ? extremeEvents(m.date, m[k], "风最大（风暴）", undefined, (d: string) => String(d).slice(0, 10))
       : k === "swr" ? extremeEvents(m.date, m[k], "日照最强", undefined, (d: string) => String(d).slice(0, 10)) : [];
-    const ev = eventLayer(evs.map((e) => ({ ...e, low: false })), { units: unit, yaxis: ya, digits: 3 });
-    ev.annotations.forEach((a: any, j: number) => { a.ay = j ? 26 : -22; a.ax = j ? -40 : 40; });
+    // each short panel gets head- and foot-room; labels go where they cover none of the daily or smoothed values
+    const vals = (m[k] as (number | null)[]).filter((v) => v !== null && isFinite(v as number)) as number[];
+    const lo = Math.min(...vals), hi = Math.max(...vals), r = hi - lo || 1;
+    const yr: [number, number] = [lo - 0.45 * r, hi + 0.55 * r];
+    const ev = eventLayer(evs.map((e) => ({ ...e, low: false })), { units: unit, yaxis: ya, digits: 3, series: [{ x: m.date, y: m[k] }], yRange: yr, wFrac: 0.16, hFrac: 0.3 });
     annotations.push(...ev.annotations);
     if (ev.marker) data.push(ev.marker);
+    yRanges[i] = yr;
   });
   const layout: any = { showlegend: false, margin: { l: 66, r: 20, t: 10, b: 36 }, xaxis: { anchor: `y${n}` }, hovermode: "x unified", annotations };
   panels.forEach(([, name, unit], i) => {
-    layout[i ? `yaxis${i + 1}` : "yaxis"] = { domain: [1 - (i + 1) * h - i * gap, 1 - i * gap - i * h], title: { text: `${name}<br><span style="font-size:10px">${unit}</span>` } };
+    layout[i ? `yaxis${i + 1}` : "yaxis"] = { domain: [1 - (i + 1) * h - i * gap, 1 - i * gap - i * h], title: { text: `${name}<br><span style="font-size:10px">${unit}</span>` }, ...(yRanges[i] ? { range: yRanges[i] } : {}) };
   });
   return (
     <div className="col" style={{ gap: 8 }}>
@@ -186,7 +192,6 @@ function WoaView({ w, depth }: { w: any; depth?: number }) {
   const z = useMemo(() => (w[v] ?? []).length ? w.depth.map((_: number, k: number) => w[v].map((prof: number[]) => prof[k])) : [], [w, v]);
   // per month: the depth where the profile changes fastest (thermocline, halocline, nutricline, oxycline)
   const cline = useMemo(() => (w[v] ?? []).map((prof: number[]) => clineDepth(w.depth, prof, v === "temperature" ? 0.03 : 0.08)), [w, v]);
-  const clineLabel = useMemo(() => { const k = cline.reduce((b: number, x: number | null, i: number) => (x !== null && (b < 0 || x < (cline[b] ?? Infinity)) ? i : b), -1); return k >= 0 ? { m: MONTHS[k], z: cline[k] } : null; }, [cline]);
   return (
     <div className="col" style={{ gap: 10 }}>
       <div className="row">
@@ -198,8 +203,8 @@ function WoaView({ w, depth }: { w: any; depth?: number }) {
         <Plot height={fillH(460)} data={[{ type: "heatmap", x: MONTHS, y: w.depth, z, colorscale: colorscaleFor(meta[v][2], dark), colorbar: { title: { text: meta[v][1], side: "right" }, thickness: 12, len: 0.9 }, hovertemplate: "%{x} %{y} m<br>%{z:.3f}<extra></extra>", zsmooth: "best" },
           { type: "contour", x: MONTHS, y: w.depth, z, showscale: false, contours: { coloring: "none", showlabels: true, labelfont: { size: 10, color: dark ? "#ddd" : "#333" } }, line: { color: dark ? "rgba(255,255,255,.45)" : "rgba(0,0,0,.35)", width: 0.8 }, hoverinfo: "skip" },
           ...(cline.some((x: number | null) => x !== null) ? [{ type: "scatter", mode: "lines+markers", x: MONTHS, y: cline, name: CLINE[v], connectgaps: false, line: { color: cssVar("--glow"), width: 2, dash: "dash" }, marker: { size: 6, color: cssVar("--glow") }, hovertemplate: `%{x} ${CLINE[v]} %{y:.0f} m<extra></extra>` }] : [])]}
-          layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" } }, margin: { l: 60, r: 10, t: 14, b: 36 }, title: { text: `${meta[v][0]}（${meta[v][1]}）` }, showlegend: false,
-            annotations: clineLabel ? [{ x: clineLabel.m, y: clineLabel.z, xref: "x", yref: "y", text: `<b>${CLINE[v]}</b><br><span style="font-size:10.5px;color:${cssVar("--fg-soft")}">上下变化最快的深度</span>`, showarrow: true, arrowhead: 0, arrowcolor: cssVar("--glow"), ax: 0, ay: 34, bgcolor: cssVar("--bg"), borderpad: 3, font: { size: 11.5, color: cssVar("--fg-strong") } }] : [] }} />
+          layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" } }, margin: { l: 60, r: 10, t: 14, b: 36 }, title: { text: `${meta[v][0]}（${meta[v][1]}）${cline.some((x: number | null) => x !== null) ? `　<span style="font-size:11px;color:${cssVar("--glow")}">┄ ${CLINE[v]}：上下变化最快的深度</span>` : ""}` }, showlegend: false,
+            annotations: [] }} />
       ) : (
         <Plot height={fillH(460)} data={(w[v] ?? []).map((prof: number[], m: number) => ({
           x: prof, y: w.depth, type: "scatter", mode: "lines", name: MONTHS[m], line: { width: 1.6, color: `hsl(${220 - (Math.cos(((m - 1) / 12) * 2 * Math.PI) * 0.5 + 0.5) * 200}, 65%, ${dark ? 62 : 45}%)` },
@@ -229,7 +234,7 @@ function SiteEditor({ onClose, at }: { onClose: () => void; at?: { lat: number; 
   const [s, setS] = useState<any>(at ? { ...p.site, kind: "generated", lat: at.lat, lon: at.lon, depth: null, name: fmtLatLon(at.lat, at.lon, 1) } : { ...p.site, kind: "generated" });
   const [path, setPath] = useState("");
   const save = async (site: any) => {
-    if (!confirm("更换站点会删除已下载的气象和剖面数据并重新下载；已有的运行结果会保留。继续吗？")) return;
+    if (!(await ask("更换站点会删除已下载的气象和剖面数据并重新下载；已有的运行结果会保留。继续吗？", { ok: "更换站点" }))) return;
     await api.patch(`/projects/${p.id}`, { site });
     await api.post(`/projects/${p.id}/site/build`);
     toast("站点已更新，正在重新构建", "ok");

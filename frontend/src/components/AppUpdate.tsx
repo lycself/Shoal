@@ -1,4 +1,5 @@
 // Version, automatic updates and quitting for the installed (desktop) app.
+import { ask } from "../dialog";
 // The backend checks GitHub on its own (see backend/shoal/desktop/updater.py); this page only shows the
 // state and starts the update. A failed check is shown as a line of text: it never blocks anything.
 import { useEffect } from "react";
@@ -104,7 +105,7 @@ export function UpdateSection() {
   const working = u.phase === "downloading" || u.phase === "installing";
   const quit = async () => {
     const n = info.active_jobs;
-    if (n && !window.confirm(`还有 ${n} 个计算在运行，退出会停止它们。确定退出吗？`)) return;
+    if (n && !(await ask(`还有 ${n} 个计算在运行，退出会停止它们。确定退出吗？`, { danger: true, ok: "退出" }))) return;
     try { await api.post("/app/quit", { force: true }); toast("Shoal 正在退出，可以关闭这个页面了", "ok"); } catch (e: any) { toast(e.message, "bad"); }
   };
   return (

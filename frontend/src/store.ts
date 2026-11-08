@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "./api";
+import { ask } from "./dialog";
 
 export type Page = "home" | "site" | "foodweb" | "experiments" | "results" | "shelf" | "primer" | "settings";
 
@@ -46,7 +47,7 @@ interface AppState {
   /** Pages with unsaved edits register here; leaving the page or the project asks first. */
   dirty: Record<string, string>;
   setDirty: (key: string, what: string | null) => void;
-  confirmLeave: () => boolean;
+  confirmLeave: () => Promise<boolean>;
   chapter: string | null;
   projects: Project[];
   projectId: string | null;
@@ -112,15 +113,16 @@ export const useApp = create<AppState>((set, get) => ({
   chapter: lsGet("e2e.chapter", "") || null,
   dirty: {},
   setDirty: (key, what) => { const d = { ...get().dirty }; if (what) d[key] = what; else delete d[key]; set({ dirty: d }); },
-  confirmLeave: () => {
+  confirmLeave: async () => {
     const items = Object.values(get().dirty);
     if (!items.length) return true;
-    if (!window.confirm(`${items.join("、")}还有没保存的修改，离开会丢掉这些修改。确定离开吗？`)) return false;
+    if (!(await ask(`${items.join("、")}还有没保存的修改，离开会丢掉这些修改。确定离开吗？`, { danger: true, ok: "放弃修改并离开", cancel: "留在这里" }))) return false;
     set({ dirty: {} });
     return true;
   },
   setPage: (p, opts) => {
-    if (p !== get().page && !get().confirmLeave()) return;
+    // leaving a page with unsaved edits asks first (the dialog is async, so the switch happens after the answer)
+    if (p !== get().page && Object.keys(get().dirty).length) { get().confirmLeave().then((ok) => ok && get().setPage(p, opts)); return; }
     lsSet("e2e.page", p);
     if (opts?.chapter) lsSet("e2e.chapter", opts.chapter);
     set({ page: p, chapter: opts?.chapter ?? get().chapter });
@@ -183,7 +185,7 @@ export const useApp = create<AppState>((set, get) => ({
   },
   projectLoading: !!lsGet("e2e.project", ""),
   openProject: async (id) => {
-    if (id !== get().projectId && !get().confirmLeave()) return;
+    if (id !== get().projectId && !(await get().confirmLeave())) return;
     lsSet("e2e.project", id ?? "");
     set({ projectId: id, project: null, selectedRuns: [], projectLoading: !!id });
     if (id) {

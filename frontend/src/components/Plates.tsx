@@ -212,10 +212,14 @@ function HtlPlate({ pid, runs, start }: { pid: string; runs: any[]; start?: stri
     // the first run's seasonal peak, labelled in the panel
     const s0 = p.res.series.find((x: any) => !x.missing);
     if (s0) {
-      const ev = eventLayer(annualEvents(p.v, s0.doy, s0.mean, lat).slice(0, 1).map((e) => ({ ...e, detail: `${e.sub} · ${fmt(e.y, 3)}` })), { xaxis: xa, yaxis: ya });
+      // the range covers every run in the panel; the label goes where it covers none of their curves
+      const live = p.res.series.filter((x: any) => !x.missing);
+      const yr = headroom(live.flatMap((x: any) => x.mean), 0.35);
+      const ev = eventLayer(annualEvents(p.v, s0.doy, s0.mean, lat).slice(0, 1).map((e) => ({ ...e, detail: `${e.sub} · ${fmt(e.y, 3)}` })),
+        { xaxis: xa, yaxis: ya, series: live.map((x: any) => ({ x: x.doy, y: x.mean })), xRange: [1, 365], yRange: yr, wFrac: 0.45, hFrac: 0.16 });
       layout.annotations.push(...ev.annotations);
       if (ev.marker) traces.push(ev.marker);
-      layout[i ? `yaxis${i + 1}` : "yaxis"].range = headroom(s0.mean, 0.3);
+      layout[i ? `yaxis${i + 1}` : "yaxis"].range = yr;
     }
   });
   return (

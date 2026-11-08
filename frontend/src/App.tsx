@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api, connectEvents, on, onConnection } from "./api";
-import { Icon, IconBtn, Loading, Logo, MenuEntry, MenuList, Modal, Progress, RightPane, StatusBadge, Toasts, TooltipLayer } from "./components/ui";
+import { ConfirmHost, Icon, IconBtn, Loading, Logo, MenuEntry, MenuList, Modal, Progress, RightPane, StatusBadge, Toasts, TooltipLayer } from "./components/ui";
+import { ask } from "./dialog";
 import { Page, SIDE_COLLAPSED, SIDE_MAX, SIDE_MIN, useApp } from "./store";
 import HomePage from "./pages/HomePage";
 import SitePage from "./pages/SitePage";
@@ -132,7 +133,7 @@ export default function App() {
       { label: "项目概览", icon: "home", disabled: !project, onClick: () => setPage("home") },
       { label: "关闭项目", icon: "close", disabled: !project, onClick: () => { setPage("home"); s.openProject(null); } },
       { label: "把当前项目移到回收站…", icon: "trash", disabled: !project, onClick: async () => {
-        if (!project || !confirm(`将项目“${project.name}”移到回收站（workspace/trash）？可以从那里手动恢复。`)) return;
+        if (!project || !(await ask(`将项目“${project.name}”移到回收站（workspace/trash）？可以从那里手动恢复。`, { danger: true, ok: "移到回收站" }))) return;
         await api.del(`/projects/${project.id}`); s.toast("已移到回收站", "ok"); setPage("home"); await s.openProject(null); s.refreshProjects();
       } },
       { type: "separator" },
@@ -140,7 +141,7 @@ export default function App() {
     ] },
     { label: "运行", items: () => [
       { label: "运行实验…", icon: "play", disabled: !project, onClick: () => setPage("experiments") },
-      { label: "构建 / 更新站点数据", icon: "cloud-download", disabled: !project, onClick: async () => { if (project!.site_status === "ready" && !confirm("重新下载并生成站点的气象、气候态和地形数据？已有的运行结果不受影响。")) return; await api.post(`/projects/${project!.id}/site/build`); s.refreshProject(); setPage("site"); } },
+      { label: "构建 / 更新站点数据", icon: "cloud-download", disabled: !project, onClick: async () => { if (project!.site_status === "ready" && !(await ask("重新下载并生成站点的气象、气候态和地形数据？已有的运行结果不受影响。", { ok: "重新构建" }))) return; await api.post(`/projects/${project!.id}/site/build`); s.refreshProject(); setPage("site"); } },
       { label: "陆架集合（三维）…", icon: "globe", disabled: !project, onClick: () => setPage("shelf") },
       { type: "separator" },
       { label: `停止全部任务${active.length ? `（${active.length}）` : ""}`, icon: "debug-stop", disabled: !active.length, danger: true, onClick: stopAll },
@@ -250,6 +251,7 @@ export default function App() {
         </Modal>
       )}
       <Toasts />
+      <ConfirmHost />
       <TooltipLayer />
     </div>
   );

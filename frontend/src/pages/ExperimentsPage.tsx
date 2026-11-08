@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ask } from "../dialog";
 import { api, on } from "../api";
 import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Split, StatusBadge, useAsync, HelpLink, PanelToggle } from "../components/ui";
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
@@ -83,7 +84,7 @@ export default function ExperimentsPage() {
                       onClick={() => analyze(exp.items.map((it: any) => latest(it.config_id)).filter((r: any) => r?.status === "done").map((r: any) => r.id))}>对比结果</Btn>
                     <Btn size="sm" icon="edit" onClick={() => setEdit(exp)}>编辑</Btn>
                     <div className="divider" />
-                    <Btn size="sm" variant={allDone ? undefined : "primary"} icon="run-all" onClick={() => { if (!allDone || confirm(`这组实验的 ${exp.items.length} 个配置都已经算完。再全部运行一遍会新增一批运行记录（旧的保留），确定吗？`)) start(exp); }}>{allDone ? "重新全部运行" : "全部运行"}</Btn>
+                    <Btn size="sm" variant={allDone ? undefined : "primary"} icon="run-all" onClick={async () => { if (!allDone || await ask(`这组实验的 ${exp.items.length} 个配置都已经算完。再全部运行一遍会新增一批运行记录（旧的保留），确定吗？`, { ok: "重新运行" })) start(exp); }}>{allDone ? "重新全部运行" : "全部运行"}</Btn>
                   </>;
                 })()}
               </div>
@@ -232,7 +233,7 @@ function AllRuns({ runs, jobFor, analyze, onFile, reload, pid }: { runs: any[]; 
                     <IconBtn icon="settings" title="gotm.yaml" onClick={() => onFile({ rid: r.id, name: "gotm.yaml" })} />
                     <a className="icon-btn" title="下载 NetCDF" href={st === "done" ? `/api/projects/${pid}/runs/${r.id}/file/result.nc` : undefined} style={st === "done" ? undefined : { opacity: 0.35, pointerEvents: "none" }}><Icon name="cloud-download" /></a>
                     {(st === "running" || st === "queued") && j ? <IconBtn icon="debug-stop" title="停止" danger onClick={() => api.post(`/jobs/${j.id}/cancel`)} />
-                      : <IconBtn icon="trash" title="删除" danger onClick={async () => { if (!confirm("删除该运行及其输出？")) return; try { await api.del(`/projects/${pid}/runs/${r.id}`); useApp.getState().toast("已删除运行", "ok"); } catch (e: any) { useApp.getState().toast(`删除失败：${e.message}`, "bad"); } reload(); }} />}
+                      : <IconBtn icon="trash" title="删除" danger onClick={async () => { if (!(await ask("删除该运行及其输出文件？", { danger: true, ok: "删除" }))) return; try { await api.del(`/projects/${pid}/runs/${r.id}`); useApp.getState().toast("已删除运行", "ok"); } catch (e: any) { useApp.getState().toast(`删除失败：${e.message}`, "bad"); } reload(); }} />}
                   </td>
                 </tr>
               );
@@ -251,7 +252,7 @@ function ExpEditor({ exp, configs, onClose, onSaved }: { exp: any; configs: any[
   const idx = (id: string) => e.items.findIndex((i: any) => i.config_id === id);
   return (
     <Modal title={exp.id ? "编辑实验" : "新实验"} icon="beaker" onClose={onClose} width={640} footer={<>
-      {exp.id && <Btn className="danger-text" icon="trash" onClick={async () => { if (confirm("删除该实验（运行记录保留）？")) { await api.del(`/projects/${project!.id}/experiments/${exp.id}`); onSaved(); } }}>删除</Btn>}
+      {exp.id && <Btn className="danger-text" icon="trash" onClick={async () => { if (await ask("删除该实验？运行记录会保留。", { danger: true, ok: "删除" })) { await api.del(`/projects/${project!.id}/experiments/${exp.id}`); onSaved(); } }}>删除</Btn>}
       <span className="grow" />
       <Btn onClick={onClose}>取消</Btn>
       <Btn variant="primary" icon="check" onClick={async () => { await api.post(`/projects/${project!.id}/experiments`, e); toast("实验已保存", "ok"); onSaved(); }}>保存</Btn>

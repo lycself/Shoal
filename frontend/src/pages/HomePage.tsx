@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ask } from "../dialog";
 import { api } from "../api";
 import { MapCanvas } from "../components/MapCanvas";
 import { Btn, Icon, IconBtn, Logo, Modal, StatusBadge, fmtLatLon, useAsync } from "../components/ui";
@@ -162,7 +163,7 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
               {projects.filter((x) => x.id !== p.id).map((x) => (
                 <div key={x.id} className="row hover" onClick={() => openProject(x.id)}>
                   <span className="grow ellipsis" title={x.site?.name}>{x.name}</span>
-                  <IconBtn icon="trash" title="移到回收站" danger size="sm" onClick={async (e) => { e.stopPropagation(); if (!confirm(`将项目“${x.name}”移到回收站（workspace/trash）？`)) return; await api.del(`/projects/${x.id}`); toast("已移到回收站", "ok"); refreshProjects(); }} />
+                  <IconBtn icon="trash" title="移到回收站" danger size="sm" onClick={async (e) => { e.stopPropagation(); if (!(await ask(`将项目“${x.name}”移到回收站（workspace/trash）？可以从那里手动恢复。`, { danger: true, ok: "移到回收站" }))) return; await api.del(`/projects/${x.id}`); toast("已移到回收站", "ok"); refreshProjects(); }} />
                 </div>
               ))}
               {projects.length <= 1 && <div className="soft small">没有其他项目</div>}

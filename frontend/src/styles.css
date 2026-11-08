@@ -573,16 +573,17 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .menubar-tools .icon-btn { width: 26px; height: 26px; }
 .menubar-tools .icon-btn.run:not(:disabled) { color: var(--ok); }
 .menubar-tools .icon-btn.stop:not(:disabled) { color: var(--danger); }
-.menu { position: absolute; top: 100%; left: 0; min-width: 230px; padding: 4px; background: var(--bg-tooltip); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: var(--shadow-pop); z-index: 60; }
-.menu-row { position: relative; display: flex; align-items: center; height: 26px; padding: 0 8px 0 2px; border-radius: 4px; cursor: default; white-space: nowrap; color: var(--fg); font-size: 12.5px; }
+/* rendered inside the menubar button: reset the button's centred text and font weight */
+.menu { position: absolute; top: 100%; left: 0; min-width: 168px; width: max-content; max-width: 320px; text-align: left; font-weight: 400; padding: 4px; background: var(--bg-tooltip); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: var(--shadow-pop); z-index: 60; }
+.menu-row { position: relative; display: flex; align-items: center; gap: 0; height: 26px; padding: 0 10px 0 2px; text-align: left; border-radius: 4px; cursor: default; white-space: nowrap; color: var(--fg); font-size: 12.5px; }
 .menu-row:hover { background: var(--accent); color: var(--on-accent); }
 .menu-row.disabled { opacity: .45; }
 .menu-row.disabled:hover { background: transparent; color: var(--fg); }
 .menu-row.danger:not(:hover) { color: var(--danger); }
-.menu-check { width: 26px; display: inline-flex; justify-content: center; }
+.menu-check { width: 26px; flex: none; display: inline-flex; justify-content: center; }
 .menu-check .codicon { font-size: 14px; }
-.menu-text { flex: 1; padding-right: 28px; }
-.menu-key { opacity: .65; font-size: 11.5px; }
+.menu-text { flex: 1 1 auto; text-align: left; padding-right: 20px; }
+.menu-key { flex: none; margin-left: auto; opacity: .65; font-size: 11.5px; font-variant-numeric: tabular-nums; }
 .menu-sub { position: absolute; left: 100%; top: -5px; }
 .menu-sub .menu { position: static; }
 .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
@@ -604,6 +605,7 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .learn-toc.open { width: 220px; border-left: 1px solid var(--border); }
 .learn-panel-inner { height: 100%; min-height: 0; }
 .learn-nav .learn-panel-inner { width: 252px; display: flex; flex-direction: column; }
+.learn-nav.dragging, .learn-toc.dragging { transition: none; }
 .learn-toc .learn-panel-inner { width: 220px; overflow: auto; padding: 12px 8px; font-size: 12px; }
 /* narrow page: the panels float over the article */
 .learn-nav.drawer, .learn-toc.drawer { position: absolute; top: 0; bottom: 0; z-index: 20; }
@@ -713,3 +715,7 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .toast-action { font-weight: 600; white-space: nowrap; margin-left: 6px; }
 .toast-close { border: 0; background: none; color: var(--fg-soft); cursor: pointer; padding: 0 0 0 4px; display: inline-flex; }
 .toast-close:hover { color: var(--fg-strong); }
+
+.modal.confirm { width: min(440px, 100%); }
+.btn.danger-fill { background: var(--danger); border-color: var(--danger); color: #fff; }
+.btn.danger-fill:hover { filter: brightness(1.08); }

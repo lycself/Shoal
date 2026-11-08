@@ -66,12 +66,65 @@ export function extremeEvents(x: (number | string)[], y: (number | null)[], hiTi
   return out;
 }
 
-/** Plotly annotations + a marker trace for a list of events. Labels sit on the page colour so curves never cut them. */
-export function eventLayer(events: SeasonEvent[], opts: { units?: string; xaxis?: string; yaxis?: string; digits?: number; color?: string } = {}) {
+export interface PlaceSeries { x: (number | string)[]; y: (number | null)[] }
+const toNum = (x: number | string) => (typeof x === "number" ? x : Date.parse(x));
+
+/**
+ * Where to put each callout so it hides no data: try spots around the point (above, beside, below, near and far),
+ * count the plotted points (and interpolated segments) a label box there would cover, plus other labels, and take
+ * the cheapest. Coordinates are data units, so the result goes to Plotly with axref/ayref set to the axes.
+ */
+export function placeCallouts(events: SeasonEvent[], series: PlaceSeries[], opts: { xRange?: [number, number]; yRange?: [number, number]; wFrac?: number; hFrac?: number } = {}) {
+  const pts: [number, number][] = [];
+  for (const s of series) {
+    const xs = s.x.map(toNum);
+    const dense = xs.length >= 150;
+    for (let i = 0; i < xs.length; i++) {
+      const y = s.y[i];
+      if (y === null || !isFinite(y)) continue;
+      pts.push([xs[i], y]);
+      const y2 = s.y[i + 1];
+      // sparse curves (12 months, a profile): add points along each segment so the line itself counts
+      if (!dense && i + 1 < xs.length && y2 !== null && y2 !== undefined && isFinite(y2)) for (let k = 1; k < 8; k++) pts.push([xs[i] + ((xs[i + 1] - xs[i]) * k) / 8, y + ((y2 - y) * k) / 8]);
+    }
+  }
+  if (!pts.length) return events.map(() => null);
+  const xr = opts.xRange ?? [Math.min(...pts.map((p) => p[0])), Math.max(...pts.map((p) => p[0]))];
+  const yr = opts.yRange ?? (() => { const lo = Math.min(...pts.map((p) => p[1])), hi = Math.max(...pts.map((p) => p[1])); return [lo, hi + 0.24 * (hi - lo || 1)] as [number, number]; })();
+  const xs = xr[1] - xr[0] || 1, ys = yr[1] - yr[0] || 1;
+  // a little larger than the text itself, so a curve passing just outside the estimate still clears the label
+  const W = (opts.wFrac ?? 0.2) * xs * 1.15, H = (opts.hFrac ?? 0.13) * ys * 1.2;
+  const placed: [number, number, number, number][] = [];
+  return events.map((e) => {
+    const px = toNum(e.x), py = e.y;
+    let best: { cx: number; cy: number; cost: number } | null = null;
+    for (const fy of [1.4, 2.2, -1.4, -2.2, 3, -3, 4, -4, 0]) for (const fx of [0, 0.8, -0.8, 1.5, -1.5, 2.2, -2.2]) {
+      if (fy === 0 && fx === 0) continue;
+      const cx = px + fx * W, cy = py + fy * H;
+      const x0 = cx - W / 2, x1 = cx + W / 2, y0 = cy - H / 2, y1 = cy + H / 2;
+      if (x0 < xr[0] - 0.02 * xs || x1 > xr[1] + 0.02 * xs || y0 < yr[0] || y1 > yr[1]) continue;
+      let hits = 0;
+      for (const [x, y] of pts) if (x >= x0 && x <= x1 && y >= y0 && y <= y1) hits++;
+      const clash = placed.filter(([a0, a1, b0, b1]) => x0 < a1 && x1 > a0 && y0 < b1 && y1 > b0).length;
+      // also keep the label clear of the point itself and of the other events' points
+      const own = events.some((q) => { const qx = toNum(q.x); return qx >= x0 && qx <= x1 && q.y >= y0 && q.y <= y1; }) ? 1 : 0;
+      const cost = hits * 10 + clash * 100 + own * 20 + Math.hypot(fx, fy);
+      if (!best || cost < best.cost) best = { cx, cy, cost };
+    }
+    if (!best) return null;
+    placed.push([best.cx - W / 2, best.cx + W / 2, best.cy - H / 2, best.cy + H / 2]);
+    return { ax: typeof e.x === "string" ? new Date(best.cx).toISOString() : best.cx, ay: best.cy };
+  });
+}
+
+/** Plotly annotations + a marker trace for a list of events. Labels sit on the page colour; with `series` given they
+ *  are placed where they cover no data (see placeCallouts), otherwise they use fixed pixel offsets. */
+export function eventLayer(events: SeasonEvent[], opts: { units?: string; xaxis?: string; yaxis?: string; digits?: number; color?: string; series?: PlaceSeries[]; xRange?: [number, number]; yRange?: [number, number]; wFrac?: number; hFrac?: number } = {}) {
   const glow = opts.color ?? cssVar("--glow");
   const u = prettyUnit(opts.units);
   const xref = opts.xaxis ?? "x", yref = opts.yaxis ?? "y";
-  // stagger callouts whose points are close together so their labels never sit on top of each other
+  const spots = opts.series ? placeCallouts(events, opts.series, opts) : events.map(() => null);
+  // fallback: stagger callouts whose points are close together so their labels never sit on top of each other
   const num = (x: number | string) => (typeof x === "number" ? x : Date.parse(x));
   const xs = events.map((e) => num(e.x)), span = (Math.max(...xs) - Math.min(...xs)) || 1;
   const place = events.map(() => ({ ax: 0, ay: -34 }));
@@ -81,9 +134,9 @@ export function eventLayer(events: SeasonEvent[], opts: { units?: string; xaxis?
     if (near) place[i] = { ax: xs[i] >= xs[i - 1] ? 70 : -70, ay: -34 - 26 * (i % 3) };
   });
   const annotations = events.map((e, i) => ({
-    x: e.x, y: e.y, xref, yref, showarrow: true, arrowhead: 0, arrowwidth: 1, arrowcolor: glow,
-    ax: place[i].ax, ay: place[i].ay, borderpad: 3,
-    text: `<b>${e.title}</b><br><span style="font-size:10.5px;color:${cssVar("--fg-soft")}">${e.detail ?? `${e.sub ? `${e.sub} · ` : ""}${fmt(e.y, opts.digits ?? 3)}${u ? ` ${u}` : ""}`}</span>`,
+    x: e.x, y: e.y, xref, yref, showarrow: true, arrowhead: 0, arrowwidth: 1, arrowcolor: glow, standoff: 4, borderpad: 3,
+    ...(spots[i] ? { axref: xref, ayref: yref, ax: spots[i]!.ax, ay: spots[i]!.ay, xanchor: "center", yanchor: "middle" } : { ax: place[i].ax, ay: place[i].ay }),
+    text: (() => { const second = e.detail ?? `${e.sub ? `${e.sub} · ` : ""}${fmt(e.y, opts.digits ?? 3)}${u ? ` ${u}` : ""}`; return `<b>${e.title}</b>${second ? `<br><span style="font-size:10.5px;color:${cssVar("--fg-soft")}">${second}</span>` : ""}`; })(),
     align: "center", font: { size: 11.5, color: cssVar("--fg-strong") }, bgcolor: cssVar("--bg"),
   }));
   const marker = events.length ? {

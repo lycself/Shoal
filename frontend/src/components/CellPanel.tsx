@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useApp } from "../store";
 import { Plot, seriesColor } from "./Plot";
+import { eventLayer, headroom } from "./annotate";
 import { regionerFor } from "./ShelfExplain";
 import { Btn, IconBtn, Seg, fmt, fmtLatLon } from "./ui";
 
@@ -61,8 +62,20 @@ export function CellPanel({ at, point, results, ci, cj, metric, boxes, onClose }
       {monthly.length > 0 && <>
         <div className="row" style={{ marginTop: 10, gap: 6 }}><span className="small soft">季节循环</span><span className="grow" />
           <Seg size="sm" value={mv} onChange={setMv} options={monthly.slice(0, 4).map((k) => [k, MONTHLY_LABEL[k] ?? k] as [string, string])} /></div>
-        <Plot height={170} data={[A, B].filter(Boolean).map((p: any, i: number) => ({ x: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], y: p.monthly?.[mv], type: "scatter", mode: "lines+markers", name: short(results[i ? cj! : ci].config_name), line: { color: seriesColor(i, dark), width: 2 }, marker: { size: 4 } }))}
-          layout={{ margin: { l: 44, r: 8, t: 6, b: 26 }, xaxis: { tickvals: [1, 4, 7, 10], ticktext: ["1月", "4月", "7月", "10月"] }, showlegend: !!B, legend: { orientation: "h", y: 1.15, font: { size: 10 } } }} />
+        {(() => {
+          // the peak month of each configuration, labelled where it covers neither curve
+          const M = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+          const ps = [A, B].filter(Boolean) as any[];
+          const evs = ps.map((p, i) => { const ys = (p.monthly?.[mv] ?? []) as (number | null)[]; const v = ys.map((y) => (y === null ? -Infinity : y)); const k = v.indexOf(Math.max(...v)); return k < 0 || !isFinite(v[k]) ? null : { x: M[k], y: v[k], title: `${ps.length > 1 ? (i ? "比较 " : "基准 ") : ""}${k + 1}月最高 ${fmt(v[k], 3)}`, detail: "", i }; }).filter(Boolean) as any[];
+          // both configurations peaking in the same month at the same value: one label, not two on top of each other
+          if (evs.length === 2 && evs[0].x === evs[1].x && Math.abs(evs[0].y - evs[1].y) <= 1e-3 * Math.max(1, Math.abs(evs[0].y))) evs.splice(0, 2, { ...evs[0], title: `两个配置都在 ${evs[0].x} 月最高 ${fmt(evs[0].y, 3)}` });
+          const all = ps.flatMap((p) => (p.monthly?.[mv] ?? []) as (number | null)[]);
+          const yr = headroom(all, 0.9, 0.1);
+          const ev = eventLayer(evs, { series: ps.map((p) => ({ x: M, y: p.monthly?.[mv] ?? [] })), xRange: [1, 12], yRange: yr, wFrac: 0.28, hFrac: 0.26 });
+          ev.annotations.forEach((an: any, j: number) => { an.arrowcolor = seriesColor(evs[j].i, dark); an.font = { ...an.font, size: 10.5 }; });
+          return <Plot height={180} data={[...ps.map((p: any, i: number) => ({ x: M, y: p.monthly?.[mv], type: "scatter", mode: "lines+markers", name: short(results[i ? cj! : ci].config_name), line: { color: seriesColor(i, dark), width: 2 }, marker: { size: 4 } })), ...(ev.marker ? [ev.marker] : [])]}
+            layout={{ margin: { l: 44, r: 8, t: 6, b: 26 }, xaxis: { tickvals: [1, 4, 7, 10], ticktext: ["1月", "4月", "7月", "10月"] }, yaxis: { range: yr }, showlegend: !!B, legend: { orientation: "h", y: 1.15, font: { size: 10 } }, annotations: ev.annotations }} />;
+        })()}
       </>}
       <div className="row" style={{ marginTop: 8, gap: 8 }}>
         <Btn size="sm" icon="new-folder" onClick={() => { onClose(); setPage("home"); setTimeout(() => window.dispatchEvent(new CustomEvent("new-project", { detail: { lat: A.lat, lon: A.lon, name: `${fmtLatLon(A.lat, A.lon, 1)} 水柱` } })), 60); }}>以此格点新建项目</Btn>

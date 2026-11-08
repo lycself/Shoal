@@ -1,6 +1,7 @@
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { create } from "zustand";
 import { useApp } from "../store";
+import { useDialog } from "../dialog";
 
 /** Codicon glyph (VS Code icon font). */
 export function Icon({ name, className = "", spin, style }: { name: string; className?: string; spin?: boolean; style?: React.CSSProperties }) {
@@ -197,6 +198,33 @@ export function Popover({ anchor, onClose, children, width }: { anchor: HTMLElem
   return <div ref={ref} className="popover" style={{ left: pos.left, top: pos.top, width }}>{children}</div>;
 }
 
+/** Host for ask(): one confirmation dialog at a time, Enter confirms, Esc cancels. */
+export function ConfirmHost() {
+  const p = useDialog((s) => s.pending), close = useDialog((s) => s.close);
+  useEffect(() => {
+    if (!p) return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Escape") close(false); if (e.key === "Enter") { e.preventDefault(); close(true); } };
+    window.addEventListener("keydown", h, true);
+    return () => window.removeEventListener("keydown", h, true);
+  }, [p]);
+  if (!p) return null;
+  return (
+    <div className="modal-back" onMouseDown={(e) => e.target === e.currentTarget && close(false)}>
+      <div className="modal confirm" role="alertdialog" aria-modal="true">
+        <div className="modal-head">
+          <Icon name={p.danger ? "warning" : "question"} className="lead" style={{ color: p.danger ? "var(--danger)" : "var(--accent)" }} />
+          <h2>{p.title ?? (p.danger ? "请确认" : "确认")}</h2>
+        </div>
+        <div className="modal-body"><p style={{ lineHeight: 1.7 }}>{p.message}</p></div>
+        <div className="modal-foot">
+          <Btn onClick={() => close(false)}>{p.cancel ?? "取消"}</Btn>
+          <Btn variant={p.danger ? undefined : "primary"} className={p.danger ? "danger-fill" : ""} autoFocus onClick={() => close(true)}>{p.ok ?? "确定"}</Btn>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function Toasts() {
   const toasts = useApp((s) => s.toasts);
   return (
@@ -220,29 +248,38 @@ export function Toasts() {
  * text after a short delay, kept inside the window.
  */
 export function TooltipLayer() {
-  const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean } | null>(null);
+  type Side = "top" | "bottom" | "right" | "left";
+  const [tip, setTip] = useState<{ text: string; x: number; y: number; side: Side } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
-  const [dx, setDx] = useState(0);
+  const [shift, setShift] = useState({ dx: 0, dy: 0 });
   useEffect(() => {
     let timer = 0;
     let current: Element | null = null;
+    let lastHidden = 0; // moving from one tip to the next shows the next one at once
+    const show = (el: Element) => {
+      const text = el.getAttribute("data-tip");
+      if (!text || !document.contains(el)) return;
+      const r = el.getBoundingClientRect();
+      // the icon strip and anything hugging a window edge get their tip beside them, never cut off
+      const side: Side = el.closest(".activity") || r.left < 90 ? "right" : r.right > window.innerWidth - 90 ? "left" : r.top < 70 ? "bottom" : "top";
+      const x = side === "right" ? r.right + 8 : side === "left" ? r.left - 8 : r.left + r.width / 2;
+      const y = side === "top" ? r.top - 6 : side === "bottom" ? r.bottom + 6 : r.top + r.height / 2;
+      setShift({ dx: 0, dy: 0 });
+      setTip({ text, x, y, side });
+    };
     const over = (e: MouseEvent) => {
       const t = e.target as Element;
       const titled = t.closest?.("[title]");
       if (titled && titled.getAttribute("title")) { titled.setAttribute("data-tip", titled.getAttribute("title")!); titled.removeAttribute("title"); }
       const el = t.closest?.("[data-tip]");
       if (el === current) return;
+      if (current) lastHidden = Date.now();
       current = el;
       window.clearTimeout(timer);
       setTip(null);
       if (!el) return;
-      timer = window.setTimeout(() => {
-        const text = el.getAttribute("data-tip");
-        if (!text || !document.contains(el)) return;
-        const r = el.getBoundingClientRect();
-        const below = r.top < 70;
-        setTip({ text, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below });
-      }, 450);
+      const warm = Date.now() - lastHidden < 500;
+      timer = window.setTimeout(() => show(el), warm ? 0 : 150);
     };
     const hide = () => { window.clearTimeout(timer); current = null; setTip(null); };
     document.addEventListener("mouseover", over);
@@ -253,11 +290,14 @@ export function TooltipLayer() {
   }, []);
   useLayoutEffect(() => {
     if (!tip || !ref.current) return;
-    const r = ref.current.getBoundingClientRect();
-    setDx(r.left < 6 ? 6 - r.left : r.right > window.innerWidth - 6 ? window.innerWidth - 6 - r.right : 0);
+    const r = ref.current.getBoundingClientRect(), m = 6;
+    const dx = r.left < m ? m - r.left : r.right > window.innerWidth - m ? window.innerWidth - m - r.right : 0;
+    const dy = r.top < m ? m - r.top : r.bottom > window.innerHeight - m ? window.innerHeight - m - r.bottom : 0;
+    if (dx || dy) setShift({ dx, dy });
   }, [tip]);
   if (!tip) return null;
-  return <div ref={ref} className="tooltip" role="tooltip" style={{ left: tip.x + dx, top: tip.y, transform: `translate(-50%, ${tip.below ? "0" : "-100%"})` }}>{tip.text}</div>;
+  const tf = { top: "translate(-50%, -100%)", bottom: "translate(-50%, 0)", right: "translate(0, -50%)", left: "translate(-100%, -50%)" }[tip.side];
+  return <div ref={ref} className="tooltip" role="tooltip" style={{ left: tip.x + shift.dx, top: tip.y + shift.dy, transform: tf }}>{tip.text}</div>;
 }
 
 /* Side panels of the workbench pages (AVAS style). Width and open/closed state live in a small store so

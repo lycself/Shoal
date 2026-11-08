@@ -264,29 +264,27 @@ function HovTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; v: 
         showscale: i === 0, colorbar: { title: { text: d.units, side: "right" }, thickness: 12, len: Math.min(1, 0.95), y: 0.5 }, zsmooth: contour ? undefined : "best",
         contours: contour ? { coloring: "heatmap", showlines: true } : undefined, line: contour ? { width: 0.4, color: "rgba(0,0,0,.25)" } : undefined,
         hovertemplate: `%{x}<br>%{y:.1f} m<br>%{z:.4g} ${d.units}<extra>${d.label}</extra>` });
+      let maxNote = "";
       const ms = data.data!.mld[i];
       if (ms && !ms.missing) {
         // hourly mixed-layer depth flickers with every gust; a 7-day running mean shows the seasonal shape
         const sm = smoothDays(ms.time, ms.values, 7);
         traces.push({ type: "scatter", mode: "lines", x: ms.time, y: sm, xaxis: "x", yaxis: ya, line: { color: dark ? "#ffffff" : "#111111", width: 1.4, dash: "dot" }, hovertemplate: "混合层深度（7 天平均）%{y:.1f} m<extra></extra>" });
-        const k = sm.length - 1;
-        if (k > 0 && sm[k] != null) layout.annotations.push({ x: ms.time[k], y: sm[k], xref: "x", yref: ya, text: "混合层底", showarrow: false, xanchor: "right", yanchor: "bottom", font: { size: 10.5, color: cssVar("--fg-strong") }, bgcolor: cssVar("--bg"), borderpad: 2 });
       }
       // the strongest cell of the panel: where and when the variable peaks (or changes most, for differences)
       let best = { v: -Infinity, j: 0, k: 0 };
       d.values.forEach((row: (number | null)[], k: number) => row.forEach((x, j) => { if (x !== null && (diff ? Math.abs(x) : x) > best.v) best = { v: diff ? Math.abs(x) : x, j, k }; }));
       if (isFinite(best.v)) {
         const val = d.values[best.k][best.j];
-        const ev = eventLayer([{ x: d.time[best.j], y: d.depth[best.k], title: diff ? (val >= 0 ? "增加最多" : "减少最多") : "最大值",
-          detail: `${String(d.time[best.j]).slice(0, 10)} · ${d.depth[best.k].toFixed(0)} m · ${fmt(val, 3)} ${d.units ?? ""}` }], { yaxis: ya });
-        ev.annotations[0].ay = 36;
-        layout.annotations.push(...ev.annotations);
-        if (ev.marker) traces.push(ev.marker);
+        // on a heatmap any label box hides colour, so the point gets a ring and the words go into the panel title
+        traces.push({ type: "scatter", mode: "markers", x: [d.time[best.j]], y: [d.depth[best.k]], xaxis: "x", yaxis: ya, hoverinfo: "skip", showlegend: false,
+          marker: { size: 13, color: "rgba(0,0,0,0)", line: { width: 2, color: dark ? "#ffffff" : "#111111" } } });
+        maxNote = `　<span style="color:${cssVar("--fg-muted")}">○ ${diff ? (val >= 0 ? "增加最多" : "减少最多") : "最大值"}：${String(d.time[best.j]).slice(0, 10)} · ${d.depth[best.k].toFixed(0)} m · ${fmt(val, 3)} ${d.units ?? ""}</span>`;
       }
       const y0 = 1 - (i + 1) * h - i * gap, y1 = y0 + h;
       // all panels share one depth range, so runs on different grids line up and labels stay inside their panel
       layout[i ? `yaxis${i + 1}` : "yaxis"] = { domain: [y0, y1], title: { text: "深度 (m)" }, range: [Math.max(...ps.map((q: any) => Math.max(...q.depth))), 0] };
-      layout.annotations.push({ text: `<b>${d.label}</b>`, xref: "paper", yref: "paper", x: 0, y: y1 + 0.005, xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 12 } });
+      layout.annotations.push({ text: `<b>${d.label}</b>${maxNote}`, xref: "paper", yref: "paper", x: 0, y: y1 + 0.005, xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 12 } });
     });
     layout.xaxis = { anchor: n > 1 ? `y${n}` : "y" };
     if (probe) layout.shapes = [{ type: "line", xref: "x", yref: "paper", x0: probe.t, x1: probe.t, y0: 0, y1: 1, line: { color: dark ? "#fff" : "#111", width: 1, dash: "dash" } }];
@@ -549,9 +547,10 @@ function SeriesTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; 
   // the first (reference) run carries the callouts: seasonal events on the annual cycle, extremes on the full record
   const events = !first ? [] : kind === "annual" ? annualEvents(v, first.doy, first.mean, lat)
     : extremeEvents(first.time, first.values, "整段最高", "整段最低", (t: string) => String(t).slice(0, 10));
-  const ev = eventLayer(events, { units });
-  if (ev.marker) traces.push(ev.marker);
   const ys = live.flatMap((x: any) => kind === "annual" ? [...x.mean, ...(x.years > 1 ? [...x.min, ...x.max] : [])] : x.values);
+  // callouts go where they cover no curve: every plotted series counts as an obstacle
+  const ev = eventLayer(events, { units, series: live.map((x: any) => (kind === "annual" ? { x: x.doy, y: x.mean } : { x: x.time, y: x.values })), yRange: headroom(ys), xRange: kind === "annual" ? [1, 365] : undefined });
+  if (ev.marker) traces.push(ev.marker);
   const annotations = ev.annotations;
   return (
     <>
@@ -603,8 +602,9 @@ function ProfileTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[];
 
 /** Profiles fill the pane; each profile's maximum is marked with its depth (subsurface maxima are the story). */
 function ProfilePlot({ profiles, units, runs, months, dashes, dark }: { profiles: any[]; units?: string; runs: any[]; months: number[]; dashes: string[]; dark: boolean }) {
-  const traces: any[] = [], annotations: any[] = [];
-  profiles.forEach((pr: any, i: number) => {
+  const traces: any[] = [];
+  const events: { x: number; y: number; title: string; detail: string; c: string }[] = [];
+  profiles.forEach((pr: any) => {
     const ri = runs.findIndex((r) => r.label === pr.label);
     const c = seriesColor(Math.max(0, ri), dark);
     traces.push({ x: pr.values, y: pr.depth, type: "scatter", mode: "lines", name: runs.length > 1 ? `${pr.label} · ${pr.month}月` : `${pr.month}月`, line: { color: c, dash: dashes[months.indexOf(pr.month) % dashes.length], width: 2 } });
@@ -614,11 +614,17 @@ function ProfilePlot({ profiles, units, runs, months, dashes, dark }: { profiles
     // same rule as the reading beside the figure: a well-mixed profile has no maximum worth pointing at
     const fin = vals.filter(isFinite), mean = fin.reduce((x, y) => x + y, 0) / fin.length;
     if ((Math.max(...fin) - Math.min(...fin)) / Math.max(Math.abs(mean), 1e-12) < 0.1) return;
-    traces.push({ x: [pr.values[k]], y: [pr.depth[k]], type: "scatter", mode: "markers", marker: { size: 7, color: c, line: { width: 1.5, color: cssVar("--bg") } }, showlegend: false, hoverinfo: "skip" });
-    annotations.push({ x: pr.values[k], y: pr.depth[k], xref: "x", yref: "y", showarrow: true, arrowhead: 0, arrowwidth: 1, arrowcolor: c, ax: 34, ay: -14 - (i % 3) * 14, borderpad: 2, bgcolor: cssVar("--bg"), xanchor: "left",
-      text: `<b>${pr.month}月最大</b> <span style="color:${cssVar("--fg-soft")}">${pr.depth[k] < 2 ? "表层" : `${pr.depth[k].toFixed(0)} m`}</span>`, font: { size: 11, color: cssVar("--fg-strong") } });
+    events.push({ x: pr.values[k], y: pr.depth[k], title: `${pr.month}月最大`, detail: pr.depth[k] < 2 ? "表层" : `${pr.depth[k].toFixed(0)} m`, c });
   });
-  return <Plot fill data={traces} layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" } }, xaxis: { title: { text: units } }, legend: { orientation: "h", x: 0, y: -0.1, yanchor: "top" }, margin: { r: 30, t: 14, b: 70 }, annotations }} />;
+  // the x range gets a margin on the right so labels have empty room next to the curves
+  const allX = profiles.flatMap((p: any) => p.values).filter((v: any) => v !== null && isFinite(v)) as number[];
+  const allD = profiles.flatMap((p: any) => p.depth) as number[];
+  const xr: [number, number] = allX.length ? [Math.min(0, ...allX), Math.max(...allX) * 1.3] : [0, 1];
+  const dr: [number, number] = allD.length ? [Math.min(...allD) - 1, Math.max(...allD) + 1] : [0, 1];
+  const ev = eventLayer(events, { series: profiles.map((p: any) => ({ x: p.values, y: p.depth })), xRange: xr, yRange: dr, wFrac: 0.2, hFrac: 0.07 });
+  ev.annotations.forEach((a: any, i: number) => { a.arrowcolor = events[i].c; });
+  events.forEach((e) => traces.push({ x: [e.x], y: [e.y], type: "scatter", mode: "markers", marker: { size: 7, color: e.c, line: { width: 1.5, color: cssVar("--bg") } }, showlegend: false, hoverinfo: "skip" }));
+  return <Plot fill data={traces} layout={{ yaxis: { range: [dr[1], dr[0]], title: { text: "深度 (m)" } }, xaxis: { title: { text: units }, range: xr }, legend: { orientation: "h", x: 0, y: -0.1, yanchor: "top" }, margin: { r: 30, t: 14, b: 70 }, annotations: ev.annotations }} />;
 }
 
 /** Least-squares slope of log10 density against log10 weight over the fished-and-forage range. */

@@ -276,12 +276,19 @@ def summary(run_dir: Path, run: dict) -> dict:
         if v:
             add(f"zoo_{z}", f"  {zoo_names.get(z, z)}", *as_carbon(*v))
     v, u = isum(host.chlorophyll)
-    add("chl", "叶绿素（深度积分）", v, "mg Chl m⁻²" if re.sub(r"[\s^*]", "", u).lower() in ("mg/m2", "mgchl/m2") else u)
+    add("chl", "叶绿素（深度积分）", v, "mg Chl m⁻²" if re.sub(r"[\s^*]", "", u).lower() in ("mg/m2", "mgchl/m2", "mgchla/m2") else u)
     if host.npp:
         v, u = isum(host.npp)
         if v is not None:
             add("npp", "净初级生产（深度积分）", v * (365.0 if "d" in u else 365.0 * 86400 if "s" in u else 1.0) / 1000.0,
                 "g C m⁻² yr⁻¹")
+    # ERGOM reports net COMMUNITY production (primary production minus all respiration), in nitrogen per day.
+    # It is not net primary production, so it gets its own row, converted to carbon with the Redfield factor.
+    if host.id == "ergom" and "ergom_NPR" in ds:
+        v = _annual_mean(ds, "ergom_NPR")
+        if v and re.sub(r"[\s^*]", "", v[1]).lower().startswith("mmol/m2/d"):
+            add("ncp", "净群落生产（以碳计，深度积分）", v[0] * MGC_PER_MMOLN * 365.0 / 1000.0, "g C m⁻² yr⁻¹",
+                "ERGOM 输出的是净群落生产：初级生产减去所有生物（含浮游动物、细菌）的呼吸，不是净初级生产")
     # HTL
     for inst, label in (("F1", "鱼 1（浮游食性）"), ("F2", "鱼 2（底栖/鱼食性）"), ("MB", "大型底栖动物")):
         if f"{inst}_c" in ds:
@@ -416,7 +423,12 @@ def foodweb_state(run_dir: Path, run: dict) -> dict:
             continue
         if re.search(r"(_c|^ECO_[a-z]+|^ergom_[a-z]+)$", name) and not name.endswith("_sms"):
             da, units = _column(ds, name, "integral")
-            out[name] = {"value": float(da.mean()), "units": units}
+            val = float(da.mean())
+            # ERGOM plankton and detritus are in nitrogen; the food-web view weighs links by prey biomass,
+            # so every node must be in the same currency as the fish (carbon)
+            if name in ("ergom_pp", "ergom_ff", "ergom_bb", "ergom_zz", "ergom_dd", "ergom_fl") and re.sub(r"[\s^*]", "", units).lower().startswith("mmol"):
+                val, units = val * MGC_PER_MMOLN, "mg C m⁻²"
+            out[name] = {"value": val, "units": units}
     if "fish_c_tot" in ds:
         # the MIZER food-web node reads "fish_c"; the size classes fish_c1..N (mmol C m-2) do not match the
         # pattern above, so give the community total in carbon (fish_c_tot is g wet mass m-2, 0.12 g WM per mmol C)

@@ -1,4 +1,5 @@
 import { Term } from "../components/Term";
+import { ask } from "../dialog";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { FoodWebGraph } from "../components/FoodWebGraph";
@@ -23,7 +24,7 @@ export default function FoodWebPage() {
     return g;
   }, [configs.data]);
   const add = async () => {
-    if (!useApp.getState().confirmLeave()) return;
+    if (!(await useApp.getState().confirmLeave())) return;
     const c = await api.post(`/projects/${p.id}/configs`, { name: "新配置", description: "", spec: { host: "ersem", htl: { kind: "none" } } });
     configs.reload(); setSel(c.id);
   };
@@ -45,7 +46,7 @@ export default function FoodWebPage() {
                   <Icon name={open[h] === false ? "chevron-right" : "chevron-down"} />{HOST_LABEL[h]}<span className="soft" style={{ marginLeft: "auto", fontWeight: 500 }}>{cs.length}</span>
                 </div>
                 {open[h] !== false && cs.map((c) => (
-                  <div key={c.id} className={`tree-item ${c.id === sel ? "active" : ""}`} onClick={() => { if (c.id !== sel && useApp.getState().confirmLeave()) setSel(c.id); }} title={c.description}>
+                  <div key={c.id} className={`tree-item ${c.id === sel ? "active" : ""}`} onClick={async () => { if (c.id !== sel && await useApp.getState().confirmLeave()) setSel(c.id); }} title={c.description}>
                     <Icon name={HTL_ICON[c.spec.htl.kind]} />
                     <div className="grow">
                       <div className="ellipsis">{c.name}</div>
@@ -116,7 +117,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
         <IconBtn icon="trash" title="删除配置" danger onClick={async () => {
           const exps = await api.get<any[]>(`/projects/${p.id}/experiments`).catch(() => []);
           const used = exps.filter((e: any) => e.items?.some((it: any) => it.config_id === c.id)).map((e: any) => `“${e.name}”`);
-          if (!confirm(used.length ? `配置“${c.name}”被实验 ${used.join("、")} 使用。删除后这些实验里会少一项（已有运行结果保留）。确定删除吗？` : `删除配置“${c.name}”？已有运行结果保留。`)) return;
+          if (!(await ask(used.length ? `配置“${c.name}”被实验 ${used.join("、")} 使用。删除后这些实验里会少一项（已有运行结果保留）。确定删除吗？` : `删除配置“${c.name}”？已有运行结果保留。`, { danger: true, ok: "删除" }))) return;
           try { await api.del(`/projects/${p.id}/configs/${c.id}`); setDirty(false); toast("已删除配置", "ok"); onDeleted(); } catch (e: any) { toast(`删除失败：${e.message}`, "bad"); }
         }} />
       </div>
