@@ -164,7 +164,7 @@ MB 把海底和水体连了起来：它吃掉沉下来的碎屑和沉积物，�
 
 本软件里有两份 E2E 代码，在 [食物网页](app:foodweb) 的“计算代码”一栏切换：
 
-- **官方代码（默认）**：ECOSMO E2E v2.0 作者发布的 Fortran 代码（Zenodo 10.5281/zenodo.20413770），参数取自它发布的 ERSEM、ECOSMO、ERGOM 三个算例。内核编译时把它放在 `kernel/src/ecosmo-e2e`。
+- **官方代码（默认）**：ECOSMO E2E v2.0 作者发布的 Fortran 代码（Zenodo 10.5281/zenodo.20413770），参数取自它发布的 ERSEM、ECOSMO、ERGOM 三个算例。源码按 CC BY 4.0 许可随软件提供（`kernel/vendor/ecosmo-e2e`），未作改动。
 - **按论文方程重写的版本（对照用）**：在拿到官方代码之前，本软件照论文 Eqs. 1–19 自己写的版本（`kernel/e2e`）。保留它是为了对照，下面单独说明。
 
 ### 官方代码是怎么算的

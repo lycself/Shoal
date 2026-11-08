@@ -143,7 +143,7 @@ def build_fabm_yaml(spec: dict) -> Any:
         e2e = spec["htl"]["e2e"]
         if e2e.get("engine", default_e2e_engine()) == "official":
             if not official_e2e_available():
-                raise ValueError("内核里没有编译官方 ECOSMO E2E 代码：把官方压缩包里的文件夹放到 kernel/src/ecosmo-e2e 后重新运行 pnpm kernel，或把 E2E 引擎改为“按论文方程重写”。")
+                raise ValueError("内核里没有编译官方 ECOSMO E2E 代码：重新运行 pnpm kernel（官方源码在 kernel/vendor/ecosmo-e2e），或把 E2E 引擎改为“按论文方程重写”。")
             _add_e2e_official(inst, host, e2e)
         else:
             _add_e2e(inst, host, e2e)

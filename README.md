@@ -100,7 +100,8 @@ backend/shoal/        FastAPI 后端
 frontend/src/             React 前端（pages/、components/、primer/ 教程内容与交互实验）
 kernel/                   计算内核
   build.py                获取源码并编译 GOTM 与 pyfabm（pnpm kernel）
-  e2e/                    按论文方程重写的 E2E 鱼类与大型底栖 FABM 模块（对照用；官方代码放在 src/ecosmo-e2e）
+  e2e/                    按论文方程重写的 E2E 鱼类与大型底栖 FABM 模块（对照用）
+  vendor/ecosmo-e2e/      官方 ECOSMO E2E v2.0 源码与算例（CC BY 4.0，未改动，见 NOTICE.md）
   src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.py 按锁定的版本下载，不进仓库）
   install/                编译结果（bin/gotm 或 Windows 上的 bin/gotm.exe、kernel.json）
 workspace/                项目、数据缓存、设置（源码运行时生成；安装版放在用户目录）
@@ -129,10 +130,10 @@ git push origin v1.0.1
 
 ## ECOSMO E2E 官方代码
 
-鱼类与大型底栖功能群默认用 ECOSMO E2E v2.0 的官方 Fortran 代码（Vijayakumaran et al. 2026，Zenodo doi:10.5281/zenodo.20413770，GPL）。它不进本仓库，放在 `kernel/src/ecosmo-e2e/`：
+鱼类与大型底栖功能群默认用 ECOSMO E2E v2.0 的官方 Fortran 代码（Vijayakumaran et al. 2026，Zenodo doi:10.5281/zenodo.20413770，CC BY 4.0）。它的源码和算例随本仓库提供，未作改动，放在 `kernel/vendor/ecosmo-e2e/`（来源、许可证和校验和见其中的 `NOTICE.md`）：
 
-1. 从 Zenodo 下载 `ecosmoe2e_gmd.tar.gz`，把解压出的 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`（`model_output/` 有 5.9 GB 参考结果，不必复制）。
-2. 重新编译：`pnpm kernel`。脚本检测到 `kernel/src/ecosmo-e2e/src/CMakeLists.txt` 后，把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核。
+1. `pnpm kernel` 把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核，安装包里也是两份都有。
+2. 要重跑下面的验证，需要完整的官方压缩包（`ecosmoe2e_gmd.zip`，4.2 GB，含驱动数据和 5.9 GB 参考结果）：从 Zenodo 下载后把 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`。这里有源码时编译优先用它（也可以用来换成更新的官方版本）。
 3. 在“食物网配置”的“计算代码”里选择用哪一份；默认是官方代码，参数取自官方的 ERSEM / ECOSMO / ERGOM 算例。
 4. 官方代码里有 5 处物质不守恒或符号错误（鱼的 DOM 部分丢失、鱼呼吸产生氧气、硅按 Redfield 比例被扣掉、呼吸的碳丢失、底栖动物温度项常数）。`kernel/build.py` 在官方源码的副本上打 `kernel/patches/ecosmo-e2e-corrections.patch`，把修正做成默认关闭的 FABM 参数；“食物网 → 物质收支”选“修正版”（新建配置的默认）时打开。关闭时与原代码逐位相同。说明与验证见 [kernel/patches/README.md](kernel/patches/README.md)。
 

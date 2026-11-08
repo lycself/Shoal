@@ -1,0 +1,163 @@
+log: true
+instances:
+  ergom:
+    model: bsh/ergom_neccton
+    parameters:
+      gamma0: 0.027
+      gamma1: 58.0
+      gamma2: 53.2
+      gamma3: 12.6
+      r_lpp_assim: 0.90 #1.10 #0.90 #0.80 
+      r_spp_assim: 0.40 #0.50 #0.40 #0.35 #0.40 
+      light_opt_spp: 50 #35.0
+      temp_min_spp: 6.0
+      food_min_zoo: 2.0E-6 #2.2E-6
+      r_zoo_graz: 0.50
+      r_zoo_mort: 0.024
+      r_zoo_resp: 0.012
+      zoo_cl: 9.0E-9 #1.5E-8
+    initialization:    
+      t_n2: 0.000876379141118377
+      t_o2: 0.000363177998          
+      t_dic: 0.00239279260858893          
+      t_nh4: 1.81354877781814E-8          
+      t_no3: 4.1879E-6          
+      t_po4: 3.0079121415838E-7
+      t_spp: 6.93764263814955E-8
+      t_zoo: 2.19068265749911E-8          
+      t_h2s: 2.58994659655635E-15          
+      t_sul: 2.32256460606909E-16           
+      t_alk: 0.001502798          
+      t_ipw: 2.19066098594567E-9          
+      t_lpp: 9.10495501216246E-8          
+      t_cya: 1.61379898333536E-9          
+      t_det: 4.39991616474344E-8          
+      t_sed: 0.2365          
+      t_ips: 1.78E-5		# al
+      t_cdom: 5.85E-6		# al
+      t_poc: 2.3E-6		# al
+      t_pocn: 3.7E-9		# al
+      t_pocp: 1.7E-10		# al
+      t_doc: 3.0E-8		#al
+      t_dop: 4.0E-8		# al
+      t_don: 2.4E-8		# al
+      t_sed_poc: 11.12E-2	# al
+      t_sed_pocn: 0.0051	# al
+      t_sed_pocp: 0.00015	# al
+  MB:
+    model: ecosmoe2e_mb
+    parameters:
+      frr        : 0.4      # fraction of dissolved from det. (-),                          default=0.4
+      gammaZd    : 0.7 #0.35 #0.75 #0.3 #0.75 #0.5 #0.4 #0.5 #0.75     # Zl & Zs assim. eff. on det      (-),                          default=0.75
+      sinkDet    : 5.00     # Detritus sinking rate           (m/d),                        default=5.00
+      sinkDia    : 0.00     # Diatom sinking rate             (m/d),                        default=0.00
+      mMB1       : 0.001    # Macrobenthos mortality rate     (1/day)                       default=0.001
+      excMB1     : 0.025    # Macrobenthos excretion rate     (1/day)                       default=0.025
+      rMB1       : 0.20 #0.175 #0.95 #0.5 #0.4      # Macrobenthos grazing half saturation (mmolN/m**3)              default=0.50
+      GrMB1Det   : 0.1      # Grazingrate MB1 on Detritus     (1/day)                       default=0.1
+      GrMB1Sed   : 0.1      # Grazingrate MB1 on Sediment     (1/day)                       default=0.1
+      tempcMB1   : 0.0        # MB1 temperature control excr.   (-)                           default=0.
+      prefMB1Det : 0.1      # Grazing preference MB1 on Det   (-)                           default=0.10
+      prefMB1Sed : 0.1      # Grazing preference MB1 on Sed   (-)                           default=0.10
+      prefMB1Dom : 0.1      # Grazing preference MB1 on Dom   (-)                           default=0.10
+      nprey     : 3
+      Gr1     : 0.1      # Grazingrate MB1 on fla Phytoplankton (1/day)                       default=0.1
+      Gr2     : 0.1      # Grazingrate MB1 on dia Phytoplankton (1/day)                       default=0.1
+      Gr3     : 0.1 #0.2      # Grazingrate MB1 on micro Zooplankton  (1/day)                         default=0.1
+      pref1   : 0.15      # Grazing preference MB1 on fla P     (-)                           default=0.20
+      pref2   : 0.2      # Grazing preference MB1 on dia  P     (-)                           default=0.20
+      pref3  : 0.2      # Grazing preference MB1 on Zs    (-)                           default=0.20
+      scalenh4 : 8.235E+07   # Convertion from mol N/kg to mgC/m3
+      scalepho : 1.317617E+09    # Convertion from mol P/kg to mgC/m3
+      scaleo2 : 1.035E+06    # Convertion from mol O2/kg to mmol/m3
+      scaleprey1 : 8.235E+07    # Convertion from mol N/kg to mgC/m3
+      scaleprey2 : 8.235E+07    # Convertion from mol N/kg to mgC/m3
+      scaleprey3 : 8.235E+07    # Convertion from mol N/kg to mgC/m3
+      scaledet : 8.235E+07   # Convertion from mol N/m3 to mgC/m3
+      scalesed : 79566.25 # Convertion from mol N/m2 to mgC/m2
+      scaledom : 1.243E+07   # Convertion from mol C/kg to mgC/m3
+    initialization:
+      c       : 1.0    # macrobenthos (mgC/m**3)
+    coupling:
+      nh4     : ergom/t_nh4
+      pho     : ergom/t_po4
+      oxy     : ergom/t_o2
+      prey1     : ergom/t_spp
+      prey2     : ergom/t_lpp
+      prey3     : ergom/t_zoo
+      det     : ergom/t_det
+      dom     : ergom/t_doc
+      sed1    : ergom/t_sed
+  FISH1:
+    model: ecosmoe2e_fish
+    parameters:
+      frr        : 0.4      # fraction of dissolved from det. (-),                          default=0.4 ! fraction of dom from det
+      sinkDet    : 5.00     # Detritus sinking rate           (m/d),                        default=5.00
+      sinkDia    : 0.00     # Diatom sinking rate             (m/d),                        default=0.00
+      mF1        : 0.00113 #0.0017 #0.0015 #0.0015    # fish1 mortality rate             (1/day)                       default=0.001
+      excF1      : 0.00113   # fish1 excretion rate    (1/day)     default=0.002
+      rF1        : 0.7 #0.7 #0.7 #0.7      # fish1 grazing half saturation   (mmolN/m**3)                  default=0.70
+      rF1MB      : 0.9 #0.9 #0.9 #0.9 #0.9      # fish1 grazing on MB half saturation (mmolN/m**3)              default=0.90
+      tempcF1     : 0.5     # fish1 temperature control excr.  (1/day)                      default=0.5
+      asefF1      : 0.70 #0.55 #0.65  # fish1 assimilation efficiency    (-)                          default=0.7
+      GrF1Det     : 0.0001    # Grazingrate fish1 on Detritus (1/day)          default=0.05
+      GrF1MB1     : 0.005 #0.005 #0.009 #0.01 #0.01    # Grazingrate fish1 on macrobenthos1 (1/day)     default=0.01
+      prefF1Det   : 0.10    # Grazing preference fish1 on Det(-)    default=0.05
+      prefF1MB1   : 0.10    # Grazing preference fish1 on MB1  (-)   default=0.25
+      nprey     : 1
+      Gr1      : 0.033 #0.033 #0.0165 #0.033 #0.009 #0.01 #0.03 #0.02 #0.03    # Grazingrate fish1 on prey1 (1/day)          default=0.01
+      pref1    : 0.4     # Grazing preference fish1 on prey1 (-)    default=0.25
+      scalenh4 : 8.235E+07   # Convertion from mol N/kg to mgC/m3
+      scalepho : 1.317617E+09    # Convertion from mol P/kg to mgC/m3
+      scaleo2 : 1.035E+06    # Convertion from mol O2/kg to mol/m3
+      scaleprey1 : 8.235E+07    # Convertion from mol N/kg to mol/m3
+      scaledet : 8.235E+07   # Convertion from mol N/kg to mgC/m3
+      scaledom : 1.243E+07   # Convertion from mol C/kg to mgC/m3
+    initialization:
+      c      : 5.0 #20.0    # fish functional group mgC/m3
+    coupling:
+      prey1: ergom/t_zoo
+      det     : ergom/t_det
+      mb      : MB/c
+      nh4     : ergom/t_nh4
+      pho     : ergom/t_po4
+      oxy     : ergom/t_o2
+      dom     : ergom/t_doc
+  FISH2:
+    model: ecosmoe2e_fish
+    parameters:
+      frr        : 0.4      # fraction of dissolved from det. (-),                          default=0.4 ! frac
+      sinkDet    : 5.00     # Detritus sinking rate           (m/d),                        default=5.00
+      sinkDia    : 0.00     # Diatom sinking rate             (m/d),                        default=0.00
+      mF1        : 0.00055 # 0.005 #0.005 # fish1 mortality rate             (1/day)                       default=0.001
+      excF1      : 0.00105    # fish1 excretion rate    (1/day)     default=0.002
+      rF1        : 0.7 #0.95      # fish1 grazing half saturation   (mmolN/m**3)                  default=0.70
+      rF1MB      : 0.9      # fish1 grazing on MB half saturation (mmolN/m**3)              default=0.90
+      tempcF1     : 0.5     # fish1 temperature control excr.  (1/day)                      default=0.5
+      asefF1      : 0.65 #0.90 #0.95     # fish1 assimilation efficiency    (-)                          default=0.7
+      GrF1Det     : 0.0001    # Grazingrate fish on Detritus (1/day)          default=0.05
+      GrF1MB1     : 0.0045 #0.005    # Grazingrate fish on macrobenthos1 (1/day)     default=0.01
+      prefF1Det   : 0.10    # Grazing preference fish on Det(-)    default=0.05
+      prefF1MB1   : 0.40   # Grazing preference fish on MB1  (-)   default=0.25
+      nprey     : 2
+      Gr1      : 0.001 #0.0035 #0.003 #0.003     # Grazingrate fish on Mesozoo (1/day)             default=0.01
+      Gr2      : 0.0045 #0.005 #0.015 #0.01377    # Grazingrate fish on fish1 (1/day)          default=0.01
+      pref1    : 0.10    # Grazing preference fish on prey1 (-)    default=0.45
+      pref2    : 0.40   # Grazing preference fish on prey2 (-)    default=0.25
+      scalenh4 : 8.235E+07   # Convertion from mol N/kg to mgC/m3
+      scalepho : 1.317617E+09    # Convertion from mol P/kg to mgC/m3
+      scaleo2 : 1.035E+06    # Convertion from mol O2/kg to mol/m3
+      scaleprey1 : 8.235E+07    # Convertion from mol N/kg to mol/m3
+      scaledet : 8.235E+07   # Convertion from mol N/kg to mgC/m3
+      scaledom : 1.243E+07   # Convertion from mol C/kg to mgC/m3
+    initialization:
+      c      : 1    # fish functional group (mgC/m**3)
+    coupling:
+      prey1: ergom/t_zoo
+      prey2: FISH1/c
+      det     : ergom/t_det
+      mb      : MB/c
+      nh4     : ergom/t_nh4
+      pho     : ergom/t_po4
+      oxy     : ergom/t_o2
+      dom     : ergom/t_doc

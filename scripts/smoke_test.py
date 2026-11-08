@@ -89,6 +89,8 @@ def main() -> None:
         print(">> kernel: gotm", kernel["gotm_available"], "pyfabm", kernel["pyfabm_available"], flush=True)
         if not (kernel["gotm_available"] and kernel["pyfabm_available"]):
             raise SystemExit("!! kernel incomplete")
+        if "ecosmoe2e" not in (kernel.get("institutes_extra") or []):
+            raise SystemExit("!! the official ECOSMO E2E code (kernel/vendor/ecosmo-e2e) is not compiled in")
 
         def demo():
             for p in api.call("/projects"):
@@ -101,24 +103,25 @@ def main() -> None:
         pid = project["id"]
         configs = api.call(f"/projects/{pid}/configs")
         configs = configs if isinstance(configs, list) else configs.get("configs", [])
-        # LTL only: needs neither the official ECOSMO E2E code nor network access
-        cfg = next(c for c in configs if "仅低营养级" in c["name"])
-        run = api.call(f"/projects/{pid}/runs", {"items": [{"config_id": cfg["id"], "label": "smoke"}],
-                                                 "simulation": {"spinup_years": 0, "years": 1}})[0]
-        rid = run["id"]
-        print(f">> running {cfg['name']} ({rid})", flush=True)
+        # lower trophic levels only, then with the official ECOSMO E2E fish (the demo's default fish code)
+        for key in ("仅低营养级", "ERSEM + 鱼类"):
+            cfg = next(c for c in configs if c["name"].endswith(key) or key in c["name"])
+            run = api.call(f"/projects/{pid}/runs", {"items": [{"config_id": cfg["id"], "label": "smoke"}],
+                                                     "simulation": {"spinup_years": 0, "years": 1}})[0]
+            rid = run["id"]
+            print(f">> running {cfg['name']} ({rid})", flush=True)
 
-        def finished():
-            r = api.call(f"/projects/{pid}/runs/{rid}")
-            r = r.get("run", r)
-            if r["status"] in ("done", "failed", "cancelled"):
-                return r
-            return None
-        r = wait("the simulation", finished, args.timeout, proc, every=3)
-        if r["status"] != "done":
-            raise SystemExit(f"!! simulation {r['status']}: {r.get('error')}")
-        variables = api.call(f"/projects/{pid}/runs/{rid}/variables")
-        print(f">> simulation done in {r.get('elapsed')} s, {len(variables)} output variables", flush=True)
+            def finished():
+                r = api.call(f"/projects/{pid}/runs/{rid}")
+                r = r.get("run", r)
+                if r["status"] in ("done", "failed", "cancelled"):
+                    return r
+                return None
+            r = wait("the simulation", finished, args.timeout, proc, every=3)
+            if r["status"] != "done":
+                raise SystemExit(f"!! simulation {r['status']}: {r.get('error')}")
+            variables = api.call(f"/projects/{pid}/runs/{rid}/variables")
+            print(f">> {cfg['name']}: done in {r.get('elapsed')} s, {len(variables)} output variables", flush=True)
         if proc.poll() is not None:
             raise SystemExit("!! Shoal exited after the run")
         print(">> smoke test passed", flush=True)
