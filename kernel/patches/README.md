@@ -1,7 +1,7 @@
 # 对官方 ECOSMO E2E 代码的修正补丁
 
-`ecosmo-e2e-corrections.patch` 由 `kernel/build.sh` 打到官方源码的一份副本上（`kernel/build/ecosmo-e2e-src`），
-`kernel/src/ecosmo-e2e` 里的官方文件本身不会被改动。
+`ecosmo-e2e-corrections.patch` 由 `kernel/build.py` 打到官方源码的一份副本上（`kernel/build/ecosmo-e2e-src`），
+`kernel/vendor/ecosmo-e2e`（或 `kernel/src/ecosmo-e2e`）里的官方文件本身不会被改动。
 
 补丁只新增 FABM 参数，全部默认关闭。关闭时走的是原来的代码路径：同一个 ERSEM 配置跑 3 年，
 599 个输出变量与未打补丁的程序逐位相同。Shoal 里在"食物网 → 物质收支"选"修正版"时，生成的

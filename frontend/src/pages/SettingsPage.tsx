@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { api } from "../api";
 import { Btn, Check, Icon, Loading, Notice, Seg, useAsync } from "../components/ui";
 import { useApp } from "../store";
+import { UpdateSection } from "../components/AppUpdate";
 
 export default function SettingsPage() {
   const { toast, kernel, theme, setTheme } = useApp();
@@ -18,7 +19,7 @@ export default function SettingsPage() {
   return (
     <div className="page" style={{ maxWidth: 960 }}>
       <div className="page-header">
-        <div><div className="page-title">设置</div><div className="page-hint">保存在 workspace/settings.json。</div></div>
+        <div><div className="page-title">设置</div><div className="page-hint">保存在工作区的 settings.json。</div></div>
         <div className="page-actions"><Btn variant="primary" icon="save" onClick={save}>保存</Btn></div>
       </div>
 
@@ -59,6 +60,8 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      <UpdateSection />
+
       <div className="section">
         <div className="section-header"><Icon name="package" /><h3>计算内核</h3></div>
         {k && (
@@ -70,7 +73,7 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-        <div className="hint" style={{ marginTop: 8 }}>重新编译：<code>bash kernel/build.sh</code>。官方 ECOSMO E2E 压缩包里的文件夹（含 <code>src/</code> 与 <code>testcases/</code>）放到 <code>kernel/src/ecosmo-e2e</code> 后重新编译，就会和按论文方程重写的版本一起编进内核。</div>
+        <div className="hint" style={{ marginTop: 8 }}>重新编译：<code>pnpm kernel</code>。官方 ECOSMO E2E v2.0 源码随软件提供（<code>kernel/vendor/ecosmo-e2e</code>，CC BY 4.0），和按论文方程重写的版本一起编进内核。</div>
       </div>
     </div>
   );

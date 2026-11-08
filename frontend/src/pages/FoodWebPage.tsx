@@ -157,7 +157,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                       ? "ECOSMO E2E v2.0 作者发布的 Fortran 代码，参数取自其发布的算例。鱼是随深度分布的浓度，跟着饵料走。"
                       : hosts?.e2e_engines?.official_available
                         ? "本软件按论文方程自己写的版本，只用于和官方代码对照：结果与官方代码有明显差别（见教程第 12 章）。"
-                        : "内核里没有官方代码，只能用本软件按论文方程重写的版本。把官方压缩包放到 kernel/src/ecosmo-e2e 并重新编译内核即可启用官方代码。"}</span>
+                        : "内核里没有官方代码，只能用本软件按论文方程重写的版本。重新编译内核（pnpm kernel）就会把官方代码一起编进去。"}</span>
                     {engine === "official" && (
                       <>
                         <span className="label">物质收支</span>
@@ -165,7 +165,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                           {hosts?.e2e_engines?.corrections_available
                             ? <Seg value={spec.htl.e2e.corrected ? "fixed" : "orig"} onChange={(v: string) => upd((s) => { s.htl.e2e.corrected = v === "fixed"; })}
                                 options={[["orig", "原样（论文所用代码）"], ["fixed", "修正版（收支闭合）", "check"]] as any} />
-                            : <span className="soft">内核编译于修正补丁之前，重新运行 kernel/build.sh 后可选修正版</span>}
+                            : <span className="soft">内核编译于修正补丁之前，重新运行 pnpm kernel 后可选修正版</span>}
                         </span>
                         <span /><span className="hint">{spec.htl.e2e.corrected
                           ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程第 7 章），其余公式和参数不变。鱼和底栖动物不再让宿主里的元素凭空增减，鱼呼吸消耗氧气。第一年结果与论文几乎相同，多年后硅酸盐和硅藻明显更多。"

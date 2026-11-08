@@ -11,17 +11,42 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
+import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+# Packaged app (PyInstaller): the bundle mirrors the repository layout for the files the backend reads
+# (frontend/dist, frontend/src/primer/content, kernel/install, kernel/src/gotm-cases/nns_annual), so REPO
+# simply points at the bundle. User data cannot live inside it (read-only, replaced by updates).
+FROZEN = bool(getattr(sys, "frozen", False))
+REPO = Path(getattr(sys, "_MEIPASS", "")) if FROZEN else Path(__file__).resolve().parents[2]
 KERNEL_DIR = REPO / "kernel"
 KERNEL_SRC = KERNEL_DIR / "src"
 
 
+def user_data_dir() -> Path:
+    """Per-user folder of the packaged app: workspace, logs, downloaded updates."""
+    if os.environ.get("SHOAL_USER_DATA"):
+        return Path(os.environ["SHOAL_USER_DATA"]).expanduser()
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Shoal"
+    if os.name == "nt":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Shoal"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "shoal"
+
+
 def workspace() -> Path:
-    p = Path(os.environ.get("SHOAL_WORKSPACE", REPO / "workspace")).expanduser()
+    default = user_data_dir() / "workspace" if FROZEN else REPO / "workspace"
+    p = Path(os.environ.get("SHOAL_WORKSPACE", default)).expanduser()
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def python_module_command(module: str) -> list[str]:
+    """Command that runs `python -m <module>`; a packaged app has no interpreter, so its launcher does it."""
+    if FROZEN:
+        return [sys.executable, "--shoal-module", module]
+    return [sys.executable, "-m", module]
 
 
 def projects_dir() -> Path:
@@ -41,22 +66,58 @@ def kernel_prefix() -> Path:
 
 
 def gotm_executable() -> Path | None:
-    exe = kernel_prefix() / "bin" / "gotm"
+    exe = kernel_prefix() / "bin" / ("gotm.exe" if os.name == "nt" else "gotm")
     if exe.exists():
         return exe
     found = shutil.which("gotm")
     return Path(found) if found else None
 
 
-def kernel_info() -> dict:
-    """What the kernel build reported (kernel/build.sh writes kernel.json)."""
+def _read_kernel_json() -> dict:
     info_file = kernel_prefix() / "kernel.json"
-    info: dict = {}
     if info_file.exists():
         try:
-            info = json.loads(info_file.read_text())
-        except json.JSONDecodeError:
-            info = {}
+            return json.loads(info_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def runtime_dll_dirs() -> list[str]:
+    """Windows: folders holding the MinGW runtime DLLs (libgfortran, NetCDF) that gotm.exe and pyfabm load.
+
+    kernel/build.py records the gfortran folder it compiled with; SHOAL_DLL_DIRS (os.pathsep-separated) adds more.
+    """
+    if os.name != "nt":
+        return []
+    dirs = [str(REPO)] if FROZEN else []  # the packaged app keeps the MinGW DLLs next to its own
+    dirs += list(_read_kernel_json().get("runtime_dll_dirs") or [])
+    dirs += [d for d in os.environ.get("SHOAL_DLL_DIRS", "").split(os.pathsep) if d]
+    return [d for d in dict.fromkeys(dirs) if Path(d).is_dir()]
+
+
+def kernel_env() -> dict:
+    """Environment for running gotm: on Windows its runtime DLL folders go in front of PATH."""
+    env = dict(os.environ)
+    dirs = runtime_dll_dirs()
+    if dirs:
+        env["PATH"] = os.pathsep.join(dirs + [env.get("PATH", "")])
+    if FROZEN and sys.platform.startswith("linux"):
+        # gotm also carries an RPATH to the bundled libraries (packaging/build_app.py); this is the fallback
+        env["LD_LIBRARY_PATH"] = os.pathsep.join([str(REPO), env.get("LD_LIBRARY_PATH", "")]).rstrip(os.pathsep)
+    return env
+
+
+def gotm_popen_kwargs() -> dict:
+    """Start gotm in its own process group, so cancelling it never signals the backend itself."""
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP, "env": kernel_env()}
+    return {"start_new_session": True}
+
+
+def kernel_info() -> dict:
+    """What the kernel build reported (kernel/build.py writes kernel.json)."""
+    info = _read_kernel_json()
     exe = gotm_executable()
     info["gotm_path"] = str(exe) if exe else None
     info["gotm_available"] = exe is not None
@@ -72,8 +133,9 @@ def kernel_info() -> dict:
         info["pygetm_available"] = True
     except Exception:
         info["pygetm_available"] = False
-    official = KERNEL_SRC / "ecosmo-e2e"
-    info["e2e_official_present"] = (official / "src" / "CMakeLists.txt").exists()
+    # sources of the official ECOSMO E2E code: vendored copy, or a full archive in kernel/src (kernel/build.py)
+    info["e2e_official_present"] = any((d / "src" / "CMakeLists.txt").exists()
+                                       for d in (KERNEL_SRC / "ecosmo-e2e", KERNEL_DIR / "vendor" / "ecosmo-e2e"))
     return info
 
 

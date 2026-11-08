@@ -1,0 +1,46 @@
+# Publish a release: push an annotated tag v<version> (matching backend/shoal/version.py), e.g.
+#   git tag -a v1.0.1 -m "这一版的更新内容（会显示在软件的更新窗口里）"
+#   git push origin v1.0.1
+# Builds and tests the installers on every platform, then creates the GitHub release with them and
+# update.json, which installed copies of Shoal read to offer the update.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      package: true
+
+  publish:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/download-artifact@v4
+        with:
+          path: assets
+          pattern: shoal-*
+          merge-multiple: true
+      - name: Release notes from the tag message
+        run: |
+          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          git for-each-ref "refs/tags/${GITHUB_REF_NAME}" --format='%(contents)' | sed '/-----BEGIN PGP SIGNATURE-----/,$d' > notes.md
+          cat notes.md
+      - name: update.json
+        run: python packaging/make_manifest.py --tag "$GITHUB_REF_NAME" --assets assets --notes notes.md --body body.md
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" assets/* --title "Shoal ${GITHUB_REF_NAME#v}" --notes-file body.md

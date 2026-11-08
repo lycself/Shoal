@@ -9,6 +9,7 @@ import ExperimentsPage from "./pages/ExperimentsPage";
 import ResultsPage from "./pages/ResultsPage";
 import ShelfPage from "./pages/ShelfPage";
 import PrimerPage from "./pages/PrimerPage";
+import { UpdateBanner, useAppInfo, useUpdateHash } from "./components/AppUpdate";
 import SettingsPage from "./pages/SettingsPage";
 import AssistantPanel from "./components/AssistantPanel";
 
@@ -93,6 +94,8 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => { document.title = project ? `${project.name} — Shoal` : "Shoal"; }, [project?.name]);
+  useUpdateHash();
+  const appInfo = useAppInfo();
 
   const active = Object.values(jobs).filter((j) => j.status === "running" || j.status === "queued");
   const runningRuns = active.filter((j) => j.kind === "run").length;
@@ -152,9 +155,10 @@ export default function App() {
         <IconBtn icon="sparkle" title="AI 助手（Ctrl+Shift+A）" active={assistantOpen} onClick={s.toggleAssistant} />
       </MenuBar>
 
+      <UpdateBanner />
       <div className="shell-body">
         <nav className={`activity ${liveSide == null ? "animate" : ""}`} style={{ width: sideW }}>
-          <div className="side-head">Shoal 1.0 · 内核 {k?.gotm?.split(" ")[0] ?? "…"}</div>
+          <div className="side-head">Shoal {appInfo?.version ?? "…"} · 内核 {k?.gotm?.split(" ")[0] ?? "…"}</div>
           {PAGES.map((it) => (
             <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""} ${it.project && !project ? "disabled" : ""}`} data-tip={collapsed ? it.label : undefined} onClick={() => navTo(it.id)}>
               <span className="nav-icon"><Icon name={it.icon} /></span>
@@ -209,11 +213,13 @@ export default function App() {
         <Modal title="关于 Shoal" icon="info" onClose={() => setDialog(null)} width={560}>
           <div className="col" style={{ gap: 12 }}>
             <div>浅海生态模拟工作台：把海水物理、营养盐、浮游生物和鱼放进同一个模型里一起算。计算内核为 GOTM–FABM，耦合 ERSEM / ECOSMO / ERGOM 低营养级模型与 FABM-MIZER / E2E 高营养级模块。</div>
+            <div className="small mono">Shoal {appInfo?.version ?? "…"}{appInfo?.desktop ? "（安装版）" : "（源码版）"} · {appInfo?.platform}</div>
             <div className="small muted">名字的由来：shoal 在英语里既是“浅海、浅滩”，也是“鱼群”，正好是本软件模拟的地方和对象。</div>
             {k && <div className="kv small">{[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E", k.e2e?.source === "official" ? "官方 ECOSMO E2E v2.0" : "按论文方程重写"], ["编译", k.built]].map(([a, b]) => <Fragment key={String(a)}><span className="k" key={a}>{a}</span><span className="v mono" key={a + "v"}>{b ?? "–"}</span></Fragment>)}</div>}
             <div className="small muted" style={{ lineHeight: 1.7 }}>
               参考文献：Powley et al. (2026) Prog. Oceanogr. 243, 103701 · Vijayakumaran et al. (2026) EGUsphere-2026-3078 · Burchard et al. (1999) GOTM · Bruggeman &amp; Bolding (2014) FABM · Butenschön et al. (2016) ERSEM。<br />
-              数据：ERA5（Copernicus C3S，经 Open-Meteo）· World Ocean Atlas 2023（NOAA NCEI）· ETOPO 2022（NOAA）。
+              数据：ERA5（Copernicus C3S，经 Open-Meteo）· World Ocean Atlas 2023（NOAA NCEI）· ETOPO 2022（NOAA）。<br />
+              许可证：GNU GPL 第 3 版或更高版本；第三方组件的许可证见 <a href="https://github.com/lycself/Shoal/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">THIRD_PARTY_NOTICES</a>。
             </div>
           </div>
         </Modal>

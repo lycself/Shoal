@@ -9,23 +9,66 @@ shoal 在英语里既是“浅海、浅滩”，也是“鱼群”：这正是�
 
 前后端分离：React + TypeScript + Vite 前端，FastAPI 后端，计算内核是开源的 **GOTM + FABM + ERSEM + FABM-MIZER + E2E**（自己编译的 Fortran 程序）。
 
-## 快速开始
+## 下载安装
+
+从 [Releases](https://github.com/lycself/Shoal/releases/latest) 下载对应系统的安装包，不需要装 Python 或编译器：
+
+| 系统 | 安装包 |
+| --- | --- |
+| macOS（Apple 芯片 / Intel） | `Shoal-<版本>-macos-arm64.dmg` / `…-macos-x64.dmg`：打开后把 Shoal 拖进“应用程序” |
+| Windows 10/11 | `Shoal-<版本>-windows-x64-setup.exe`：双击安装，不需要管理员权限 |
+| Linux（Ubuntu 22.04 及以上） | `Shoal-<版本>-linux-x64.tar.gz`：解压后运行 `Shoal/Shoal`，`./install-desktop-entry.sh` 可加到应用菜单 |
+
+安装包没有付费签名，第一次打开会被系统拦一下：macOS 在“系统设置 → 隐私与安全性”里点“仍要打开”（或运行 `xattr -dr com.apple.quarantine /Applications/Shoal.app`）；Windows 点“更多信息 → 仍要运行”。
+
+**用法**：双击 Shoal，它在后台启动并打开浏览器；任务栏右下角（macOS 是屏幕顶部菜单栏）出现 Shoal 图标。关掉浏览器页面不会结束 Shoal，计算继续进行；点图标里的“打开 Shoal”（或再双击一次 Shoal）就能回到页面。只有图标菜单里的“退出 Shoal”（或设置页的“退出 Shoal”按钮）才会真正关闭它。
+
+**更新**：Shoal 每隔几小时查一次有没有新版本，有的话页面顶部会提示，在“设置 → 软件版本与更新”里一键下载、校验并自动重启到新版本。查不到（比如没联网）只会在设置页显示一行提示，不影响使用。项目和数据保存在用户目录（macOS `~/Library/Application Support/Shoal`，Windows `%LOCALAPPDATA%\Shoal`，Linux `~/.local/share/shoal`），更新或卸载都不会删除。
+
+## 从源码运行（开发）
+
+支持 macOS、Linux（Ubuntu 等）和原生 Windows。需要：Python 3.11、Node.js + pnpm，以及编译内核用的 gfortran、NetCDF-Fortran、CMake、Git。
+
+**1. 建 Python 环境**：在仓库根目录、用 Python 3.11（例如先激活你的 3.11 环境）运行：
 
 ```bash
-# 1. 创建 conda 环境（编译器、NetCDF、Python 依赖），默认位置 ~/opt/anaconda3/envs/coastal
-pnpm setup:env          # 或 bash scripts/setup-env.sh；可用 COASTAL_ENV=/path 指定位置
+python -m venv .venv
+```
 
-# 2. 编译计算内核（GOTM + pyfabm，含 ERSEM、MIZER、E2E；首次约 5–10 分钟）
-pnpm kernel             # 或 bash kernel/build.sh
+然后安装后端依赖（macOS / Linux）：
 
-# 3. 安装前端依赖并启动（同时启动后端 :8765 和前端 :5173）
+```bash
+.venv/bin/python -m pip install -r backend/requirements.txt
+```
+
+Windows：
+
+```bat
+.venv\Scripts\python -m pip install -r backend\requirements.txt
+```
+
+国内可加 `-i https://pypi.tuna.tsinghua.edu.cn/simple` 换镜像。
+
+**2. 装编译工具**（只需一次）：
+
+| 系统 | 命令 |
+| --- | --- |
+| macOS | `brew install gcc netcdf-fortran cmake git`（gcc 里带 gfortran） |
+| Ubuntu / Debian | `sudo apt install gfortran libnetcdff-dev cmake git` |
+| Windows | 装 [MSYS2](https://www.msys2.org/)，在 “MSYS2 UCRT64” 终端运行 `pacman -S --needed mingw-w64-ucrt-x86_64-gcc-fortran mingw-w64-ucrt-x86_64-netcdf-fortran mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make git`，再把 `C:\msys64\ucrt64\bin` 加进 Windows 的 PATH |
+
+**3. 检查环境、编译内核、启动：**
+
+```bash
 pnpm install
-pnpm dev
+pnpm check:env      # 检查 .venv、Python 版本、依赖和编译工具，缺什么就给出本系统的安装命令
+pnpm kernel         # 编译 GOTM + pyfabm（含 ERSEM、MIZER、E2E），首次约 5–10 分钟；等于 .venv 的 python kernel/build.py
+pnpm dev            # 同时启动后端 :8765 和前端 :5173
 ```
 
 浏览器打开 <http://localhost:5173>。首次启动会自动创建一个**离线演示项目**（GOTM 官方北海北部算例，不需要联网）。
 
-如果 Python 不在默认位置，设置 `SHOAL_PYTHON=/path/to/python` 后再 `pnpm dev`。
+`pnpm kernel` 和 `pnpm dev` 都用仓库根目录 `.venv` 里的 Python；要换别的解释器，设置 `SHOAL_PYTHON=/path/to/python`。
 
 ## 功能
 
@@ -56,21 +99,43 @@ backend/shoal/        FastAPI 后端
   assistant/agent.py      AI 助手（工具调用）
 frontend/src/             React 前端（pages/、components/、primer/ 教程内容与交互实验）
 kernel/                   计算内核
-  build.sh                获取源码并编译 GOTM 与 pyfabm
-  e2e/                    按论文方程重写的 E2E 鱼类与大型底栖 FABM 模块（对照用；官方代码放在 src/ecosmo-e2e）
-  src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.sh 按锁定的版本下载，不进仓库）
-  install/                编译结果（bin/gotm、kernel.json）
-workspace/                项目、数据缓存、设置（运行时生成）
+  build.py                获取源码并编译 GOTM 与 pyfabm（pnpm kernel）
+  e2e/                    按论文方程重写的 E2E 鱼类与大型底栖 FABM 模块（对照用）
+  vendor/ecosmo-e2e/      官方 ECOSMO E2E v2.0 源码与算例（CC BY 4.0，未改动，见 NOTICE.md）
+  src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.py 按锁定的版本下载，不进仓库）
+  install/                编译结果（bin/gotm 或 Windows 上的 bin/gotm.exe、kernel.json）
+workspace/                项目、数据缓存、设置（源码运行时生成；安装版放在用户目录）
+backend/shoal/desktop/    安装版的启动器（托盘图标、单实例、浏览器）与自动更新（updater.py）
+packaging/                打包：PyInstaller 配置、Windows 安装器（Inno Setup）、图标、update.json 生成
+.github/workflows/        CI（三个平台编译内核并测试）与发布
 ```
+
+## 打包与发布
+
+本地打当前系统的安装包（需要先 `pnpm kernel` 和 `pnpm build`）：
+
+```bash
+.venv/bin/python -m pip install -r packaging/requirements.txt
+node scripts/venv.mjs packaging/build_app.py      # → dist/release/
+```
+
+发布新版本：把 `backend/shoal/version.py` 改成新版本号并提交，然后推送带说明的标签。GitHub Actions 会在 macOS（Apple 芯片、Intel）、Windows、Linux 上编译、测试、打包，并创建 Release 和 `update.json`，已安装的 Shoal 随后就会提示更新。标签说明就是软件里显示的“更新内容”。
+
+```bash
+git tag -a v1.0.1 -m "这一版的更新内容"
+git push origin v1.0.1
+```
+
+每次推送都会跑 CI；在 Actions 页面手动运行 CI 可以只打安装包、不发布（下载 artifact 自测）。
 
 ## ECOSMO E2E 官方代码
 
-鱼类与大型底栖功能群默认用 ECOSMO E2E v2.0 的官方 Fortran 代码（Vijayakumaran et al. 2026，Zenodo doi:10.5281/zenodo.20413770，GPL）。它不进本仓库，放在 `kernel/src/ecosmo-e2e/`：
+鱼类与大型底栖功能群默认用 ECOSMO E2E v2.0 的官方 Fortran 代码（Vijayakumaran et al. 2026，Zenodo doi:10.5281/zenodo.20413770，CC BY 4.0）。它的源码和算例随本仓库提供，未作改动，放在 `kernel/vendor/ecosmo-e2e/`（来源、许可证和校验和见其中的 `NOTICE.md`）：
 
-1. 从 Zenodo 下载 `ecosmoe2e_gmd.tar.gz`，把解压出的 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`（`model_output/` 有 5.9 GB 参考结果，不必复制）。
-2. 重新编译：`bash kernel/build.sh`。脚本检测到 `kernel/src/ecosmo-e2e/src/CMakeLists.txt` 后，把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核。
+1. `pnpm kernel` 把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核，安装包里也是两份都有。
+2. 要重跑下面的验证，需要完整的官方压缩包（`ecosmoe2e_gmd.zip`，4.2 GB，含驱动数据和 5.9 GB 参考结果）：从 Zenodo 下载后把 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`。这里有源码时编译优先用它（也可以用来换成更新的官方版本）。
 3. 在“食物网配置”的“计算代码”里选择用哪一份；默认是官方代码，参数取自官方的 ERSEM / ECOSMO / ERGOM 算例。
-4. 官方代码里有 5 处物质不守恒或符号错误（鱼的 DOM 部分丢失、鱼呼吸产生氧气、硅按 Redfield 比例被扣掉、呼吸的碳丢失、底栖动物温度项常数）。`kernel/build.sh` 在官方源码的副本上打 `kernel/patches/ecosmo-e2e-corrections.patch`，把修正做成默认关闭的 FABM 参数；“食物网 → 物质收支”选“修正版”（新建配置的默认）时打开。关闭时与原代码逐位相同。说明与验证见 [kernel/patches/README.md](kernel/patches/README.md)。
+4. 官方代码里有 5 处物质不守恒或符号错误（鱼的 DOM 部分丢失、鱼呼吸产生氧气、硅按 Redfield 比例被扣掉、呼吸的碳丢失、底栖动物温度项常数）。`kernel/build.py` 在官方源码的副本上打 `kernel/patches/ecosmo-e2e-corrections.patch`，把修正做成默认关闭的 FABM 参数；“食物网 → 物质收支”选“修正版”（新建配置的默认）时打开。关闭时与原代码逐位相同。说明与验证见 [kernel/patches/README.md](kernel/patches/README.md)。
 
 验证（ERSEM 宿主，北海中部 56°N 3°E，2020–2039 年，官方驱动与配置，“原样”设置）：第一年与官方参考结果相差 1–4%；官方算例里鱼 2 的两个摄食率写作 0.004，而参考结果用的是 0.0045，改成 0.0045 后高营养级第一年在 1% 以内。20 年后的剩余偏差来自 ERSEM 版本（官方未记录），验证时用的是 ERSEM 8510fbf（2024-11-12）。本软件自动生成的鱼类配置与官方配置在同一内核上相差不到 1%。官方算例里的 ECOSMO、ERGOM 是 NECCTON 项目版本（未公开），本软件用 FABM 自带的 nersc/ecosmo 与 msi/ergom1。详见入门教程第 7、12 章。
 
@@ -89,3 +154,7 @@ workspace/                项目、数据缓存、设置（运行时生成）
 - WOA23 气候态同时被用作松弛目标，因此“验证与稳态”里的 WOA 比较只是一致性检查，不是独立验证；独立验证需要现场观测。
 - E2E 默认用官方代码加修正补丁，论文的图对应“原样”设置；MIZER 初始鱼类为小量种子，需要足够预热年数；参数未在本站点重新标定。
 - 教程内容由 AI 撰写，每章标注“待审核”，使用前请对照原文核对公式与数值。
+
+## 许可证
+
+Shoal 以 [GNU GPL 第 3 版或更高版本](LICENSE)（GPL-3.0-or-later）发布：可以自由使用、修改和转发，转发时须同样以 GPL 提供源码。用 Shoal 算出的结果、图和论文不受许可证约束。安装包里的第三方组件（GOTM、FABM、ERSEM、FABM-MIZER、ECOSMO E2E、NetCDF 及 Python 库等）各有自己的许可证，见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

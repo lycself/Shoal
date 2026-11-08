@@ -1,0 +1,27 @@
+# Every push and pull request: build the kernel and run the tests on macOS, Linux and Windows.
+# Run it by hand (Actions → CI → Run workflow), or push a release-* branch, to also get the installers
+# as downloadable artifacts.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["**"]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: also build the installers
+        type: boolean
+        default: true
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+    with:
+      # installers too when asked for, and on release-* branches (release preparation)
+      package: ${{ (github.event_name == 'workflow_dispatch' && inputs.package) || startsWith(github.ref_name, 'release-') }}
