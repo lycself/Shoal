@@ -24,12 +24,25 @@ console.log(`[api] ${python}  →  http://127.0.0.1:${port}`);
 const child = spawn(
   python,
   ["-m", "uvicorn", "shoal.server:app", "--host", "127.0.0.1", "--port", port, "--reload", "--reload-dir", "shoal", "--timeout-graceful-shutdown", "2"],
-  { cwd: join(root, "backend"), stdio: "inherit", env: pythonEnv },
+  // own process group (macOS/Linux), so the reloader and its worker can be stopped together
+  { cwd: join(root, "backend"), stdio: "inherit", env: pythonEnv, detached: process.platform !== "win32" },
 );
 // Windows has no SIGTERM: kill the whole tree (uvicorn's reloader plus its worker), or the worker keeps the port.
-const stop = () => process.platform === "win32"
-  ? spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" })
-  : child.kill("SIGTERM");
+// Elsewhere: SIGTERM to the group, then SIGKILL after 5 s. uvicorn's --reload supervisor can hang in waitpid on
+// shutdown and ignore SIGTERM, which used to leave a backend holding the port after `pnpm dev` was closed.
+let stopping = false;
+const stop = () => {
+  if (process.platform === "win32") {
+    spawn("taskkill", ["/PID", String(child.pid), "/T", "/F"], { stdio: "ignore" });
+    return;
+  }
+  const signal = (sig) => { try { process.kill(-child.pid, sig); } catch { /* already gone */ } };
+  if (!stopping) {
+    stopping = true;
+    signal("SIGTERM");
+    setTimeout(() => signal("SIGKILL"), 5000).unref();
+  }
+};
 for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, stop);
 // If whatever started us is killed outright we never get a signal; take the backend down with us rather than
 // leaving it holding the port. (Checking that the parent still exists works on every OS; on Windows a dead
@@ -37,4 +50,7 @@ for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"]) process.on(sig, stop);
 const parent = process.ppid;
 const alive = (pid) => { try { process.kill(pid, 0); return true; } catch (e) { return e.code === "EPERM"; } };
 setInterval(() => { if (!alive(parent)) stop(); }, 2000).unref();
-child.on("exit", (code) => process.exit(code ?? 0));
+child.on("exit", (code) => {
+  if (process.platform !== "win32") { try { process.kill(-child.pid, "SIGKILL"); } catch { /* group already gone */ } }
+  process.exit(code ?? 0);
+});

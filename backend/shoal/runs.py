@@ -49,8 +49,11 @@ def describe_fabm(fabm_yaml: Path) -> dict:
     import json
     import subprocess
 
-    proc = subprocess.run([sys.executable, "-m", "shoal.describe", str(fabm_yaml)],
-                          capture_output=True, text=True, cwd=str(Path(__file__).resolve().parents[1]), timeout=120)
+    from .config import kernel_env, python_module_command
+
+    proc = subprocess.run([*python_module_command("shoal.describe"), str(fabm_yaml)],
+                          capture_output=True, text=True, encoding="utf-8", errors="replace",
+                          cwd=str(Path(__file__).resolve().parents[1]), timeout=120, env=kernel_env())
     marker = "@@JSON@@"
     if proc.returncode != 0 or marker not in proc.stdout:
         msg = (proc.stdout + proc.stderr).strip().splitlines()

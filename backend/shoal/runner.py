@@ -76,6 +76,15 @@ class Runner:
         jobs.sort(key=lambda j: j.created, reverse=True)
         return [j.to_dict() for j in jobs[:200]]
 
+    def active(self) -> list[Job]:
+        """Simulations, site builds and shelf studies that are queued or running."""
+        with self.lock:
+            return [j for j in self.jobs.values() if j.status in ("queued", "running")]
+
+    def cancel_all(self) -> None:
+        for job in self.active():
+            self.cancel(job.id)
+
     def active_for_project(self, pid: str) -> list[Job]:
         with self.lock:
             return [j for j in self.jobs.values() if j.project == pid and j.status in ("queued", "running")]
