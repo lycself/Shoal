@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from "react";
 import { api } from "../api";
 import { Btn, Check, Icon, Loading, Notice, Seg, useAsync } from "../components/ui";
 import { useApp } from "../store";
+import { UpdateSection } from "../components/AppUpdate";
 
 export default function SettingsPage() {
   const { toast, kernel, theme, setTheme } = useApp();
@@ -18,7 +19,7 @@ export default function SettingsPage() {
   return (
     <div className="page" style={{ maxWidth: 960 }}>
       <div className="page-header">
-        <div><div className="page-title">设置</div><div className="page-hint">保存在 workspace/settings.json。</div></div>
+        <div><div className="page-title">设置</div><div className="page-hint">保存在工作区的 settings.json。</div></div>
         <div className="page-actions"><Btn variant="primary" icon="save" onClick={save}>保存</Btn></div>
       </div>
 
@@ -58,6 +59,8 @@ export default function SettingsPage() {
           {test && <><span /><Notice kind={test.ok ? "info" : "danger"} icon={test.ok ? "pass" : "error"}>{test.text}</Notice></>}
         </div>
       </div>
+
+      <UpdateSection />
 
       <div className="section">
         <div className="section-header"><Icon name="package" /><h3>计算内核</h3></div>

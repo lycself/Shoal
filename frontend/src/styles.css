@@ -565,7 +565,13 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .menu-sep { height: 1px; background: var(--border); margin: 4px 6px; }
 .side-head { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 14px; font-size: 11px; color: var(--fg-soft); white-space: nowrap; overflow: hidden; }
 .shell.collapsed .side-head { opacity: 0; }
-.shell { grid-template-rows: 34px minmax(0, 1fr) auto var(--status-h); grid-template-columns: minmax(0, 1fr); }
+.shell { grid-template-rows: 34px auto minmax(0, 1fr) auto var(--status-h); grid-template-columns: minmax(0, 1fr); }
+/* explicit rows: the update line and the task panel come and go without shifting the others */
+.shell > .menubar { grid-row: 1; }
+.shell > .app-banner { grid-row: 2; }
+.shell > .shell-body { grid-row: 3; }
+.shell > .bottom-panel { grid-row: 4; }
+.shell > .statusbar { grid-row: 5; }
 
 /* ------------------------------------------------------------------ primer (layout follows the AVAS primer) */
 .learn { position: relative; display: flex; height: 100%; min-height: 0; }
@@ -671,3 +677,13 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .cell-panel .table td, .cell-panel .table th { padding: 4px 6px; }
 .figure-with-reading.closed { grid-template-columns: minmax(0, 1fr); }
 .term { border-bottom: 1px dotted var(--fg-soft); cursor: help; }
+
+/* desktop app: update / result line under the menu bar */
+.app-banner { display: flex; align-items: center; gap: 10px; padding: 6px 14px; font-size: 12.5px; background: var(--accent-soft); border-bottom: 1px solid var(--accent-line); color: var(--fg); }
+.app-banner > .codicon { color: var(--accent); }
+.app-banner.danger { background: var(--danger-soft); border-bottom-color: transparent; }
+.app-banner.danger > .codicon { color: var(--danger); }
+.app-banner .grow { flex: 1; min-width: 0; }
+.update-box { margin-top: 12px; padding: 12px 0 0; border-top: 1px solid var(--border); }
+.update-box .label { font-size: 12px; color: var(--fg-muted); margin-bottom: 4px; }
+.update-notes { white-space: pre-wrap; font-size: 12.5px; line-height: 1.6; margin-bottom: 10px; max-height: 220px; overflow: auto; }

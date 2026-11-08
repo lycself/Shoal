@@ -12,17 +12,41 @@ import json
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
+# Packaged app (PyInstaller): the bundle mirrors the repository layout for the files the backend reads
+# (frontend/dist, frontend/src/primer/content, kernel/install, kernel/src/gotm-cases/nns_annual), so REPO
+# simply points at the bundle. User data cannot live inside it (read-only, replaced by updates).
+FROZEN = bool(getattr(sys, "frozen", False))
+REPO = Path(getattr(sys, "_MEIPASS", "")) if FROZEN else Path(__file__).resolve().parents[2]
 KERNEL_DIR = REPO / "kernel"
 KERNEL_SRC = KERNEL_DIR / "src"
 
 
+def user_data_dir() -> Path:
+    """Per-user folder of the packaged app: workspace, logs, downloaded updates."""
+    if os.environ.get("SHOAL_USER_DATA"):
+        return Path(os.environ["SHOAL_USER_DATA"]).expanduser()
+    if sys.platform == "darwin":
+        return Path.home() / "Library" / "Application Support" / "Shoal"
+    if os.name == "nt":
+        return Path(os.environ.get("LOCALAPPDATA") or Path.home() / "AppData" / "Local") / "Shoal"
+    return Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local" / "share") / "shoal"
+
+
 def workspace() -> Path:
-    p = Path(os.environ.get("SHOAL_WORKSPACE", REPO / "workspace")).expanduser()
+    default = user_data_dir() / "workspace" if FROZEN else REPO / "workspace"
+    p = Path(os.environ.get("SHOAL_WORKSPACE", default)).expanduser()
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def python_module_command(module: str) -> list[str]:
+    """Command that runs `python -m <module>`; a packaged app has no interpreter, so its launcher does it."""
+    if FROZEN:
+        return [sys.executable, "--shoal-module", module]
+    return [sys.executable, "-m", module]
 
 
 def projects_dir() -> Path:
@@ -66,7 +90,8 @@ def runtime_dll_dirs() -> list[str]:
     """
     if os.name != "nt":
         return []
-    dirs = list(_read_kernel_json().get("runtime_dll_dirs") or [])
+    dirs = [str(REPO)] if FROZEN else []  # the packaged app keeps the MinGW DLLs next to its own
+    dirs += list(_read_kernel_json().get("runtime_dll_dirs") or [])
     dirs += [d for d in os.environ.get("SHOAL_DLL_DIRS", "").split(os.pathsep) if d]
     return [d for d in dict.fromkeys(dirs) if Path(d).is_dir()]
 
@@ -77,6 +102,9 @@ def kernel_env() -> dict:
     dirs = runtime_dll_dirs()
     if dirs:
         env["PATH"] = os.pathsep.join(dirs + [env.get("PATH", "")])
+    if FROZEN and sys.platform.startswith("linux"):
+        # gotm also carries an RPATH to the bundled libraries (packaging/build_app.py); this is the fallback
+        env["LD_LIBRARY_PATH"] = os.pathsep.join([str(REPO), env.get("LD_LIBRARY_PATH", "")]).rstrip(os.pathsep)
     return env
 
 

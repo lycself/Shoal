@@ -26,6 +26,8 @@ export const pythonEnv = { ...process.env, PYTHONUTF8: "1", PYTHONUNBUFFERED: "1
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [script, ...args] = process.argv.slice(2);
-  const child = spawn(venvPython(), [join(root, script), ...args], { cwd: root, stdio: "inherit", env: pythonEnv });
+  // `node scripts/venv.mjs -m unittest ...` passes options straight through; a script path is taken from the repo root
+  const first = script.startsWith("-") ? script : join(root, script);
+  const child = spawn(venvPython(), [first, ...args], { cwd: root, stdio: "inherit", env: pythonEnv });
   child.on("exit", (code) => process.exit(code ?? 1));
 }

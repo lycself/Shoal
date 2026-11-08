@@ -1,0 +1,8 @@
+# Extra packages for building the desktop app (installed into .venv only for packaging):
+#   .venv/bin/python -m pip install -r packaging/requirements.txt
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.9
+pystray==0.19.5          # tray / menu-bar icon of the launcher
+Pillow==13.0.0           # icon images (pystray, packaging/make_icons.py)
+patchelf==0.19.3.0 ; sys_platform == "linux"   # RPATH of the bundled gotm and pyfabm on Linux
+delocate==0.13.0 ; sys_platform == "darwin"    # gotm's own copies of the Homebrew libraries on macOS

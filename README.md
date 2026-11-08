@@ -9,7 +9,23 @@ shoal 在英语里既是“浅海、浅滩”，也是“鱼群”：这正是�
 
 前后端分离：React + TypeScript + Vite 前端，FastAPI 后端，计算内核是开源的 **GOTM + FABM + ERSEM + FABM-MIZER + E2E**（自己编译的 Fortran 程序）。
 
-## 快速开始
+## 下载安装
+
+从 [Releases](https://github.com/lycself/Shoal/releases/latest) 下载对应系统的安装包，不需要装 Python 或编译器：
+
+| 系统 | 安装包 |
+| --- | --- |
+| macOS（Apple 芯片 / Intel） | `Shoal-<版本>-macos-arm64.dmg` / `…-macos-x64.dmg`：打开后把 Shoal 拖进“应用程序” |
+| Windows 10/11 | `Shoal-<版本>-windows-x64-setup.exe`：双击安装，不需要管理员权限 |
+| Linux（Ubuntu 22.04 及以上） | `Shoal-<版本>-linux-x64.tar.gz`：解压后运行 `Shoal/Shoal`，`./install-desktop-entry.sh` 可加到应用菜单 |
+
+安装包没有付费签名，第一次打开会被系统拦一下：macOS 在“系统设置 → 隐私与安全性”里点“仍要打开”（或运行 `xattr -dr com.apple.quarantine /Applications/Shoal.app`）；Windows 点“更多信息 → 仍要运行”。
+
+**用法**：双击 Shoal，它在后台启动并打开浏览器；任务栏右下角（macOS 是屏幕顶部菜单栏）出现 Shoal 图标。关掉浏览器页面不会结束 Shoal，计算继续进行；点图标里的“打开 Shoal”（或再双击一次 Shoal）就能回到页面。只有图标菜单里的“退出 Shoal”（或设置页的“退出 Shoal”按钮）才会真正关闭它。
+
+**更新**：Shoal 每隔几小时查一次有没有新版本，有的话页面顶部会提示，在“设置 → 软件版本与更新”里一键下载、校验并自动重启到新版本。查不到（比如没联网）只会在设置页显示一行提示，不影响使用。项目和数据保存在用户目录（macOS `~/Library/Application Support/Shoal`，Windows `%LOCALAPPDATA%\Shoal`，Linux `~/.local/share/shoal`），更新或卸载都不会删除。
+
+## 从源码运行（开发）
 
 支持 macOS、Linux（Ubuntu 等）和原生 Windows。需要：Python 3.11、Node.js + pnpm，以及编译内核用的 gfortran、NetCDF-Fortran、CMake、Git。
 
@@ -87,8 +103,29 @@ kernel/                   计算内核
   e2e/                    按论文方程重写的 E2E 鱼类与大型底栖 FABM 模块（对照用；官方代码放在 src/ecosmo-e2e）
   src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.py 按锁定的版本下载，不进仓库）
   install/                编译结果（bin/gotm 或 Windows 上的 bin/gotm.exe、kernel.json）
-workspace/                项目、数据缓存、设置（运行时生成）
+workspace/                项目、数据缓存、设置（源码运行时生成；安装版放在用户目录）
+backend/shoal/desktop/    安装版的启动器（托盘图标、单实例、浏览器）与自动更新（updater.py）
+packaging/                打包：PyInstaller 配置、Windows 安装器（Inno Setup）、图标、update.json 生成
+.github/workflows/        CI（三个平台编译内核并测试）与发布
 ```
+
+## 打包与发布
+
+本地打当前系统的安装包（需要先 `pnpm kernel` 和 `pnpm build`）：
+
+```bash
+.venv/bin/python -m pip install -r packaging/requirements.txt
+node scripts/venv.mjs packaging/build_app.py      # → dist/release/
+```
+
+发布新版本：把 `backend/shoal/version.py` 改成新版本号并提交，然后推送带说明的标签。GitHub Actions 会在 macOS（Apple 芯片、Intel）、Windows、Linux 上编译、测试、打包，并创建 Release 和 `update.json`，已安装的 Shoal 随后就会提示更新。标签说明就是软件里显示的“更新内容”。
+
+```bash
+git tag -a v1.0.1 -m "这一版的更新内容"
+git push origin v1.0.1
+```
+
+每次推送都会跑 CI；在 Actions 页面手动运行 CI 可以只打安装包、不发布（下载 artifact 自测）。
 
 ## ECOSMO E2E 官方代码
 

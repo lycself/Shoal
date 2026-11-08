@@ -15,13 +15,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 from . import events, projects, results, yamlio
-from .config import REPO, kernel_info, load_settings, save_settings
+from .config import FROZEN, REPO, kernel_info, load_settings, save_settings
+from .version import __version__
 from .ecosystem import builder, foodweb
 from .ecosystem.hosts import HOSTS, host_summary
 from .runner import get_runner
 from .threed import resources, shelf
 
-app = FastAPI(title="Shoal", version="1.0.0")
+app = FastAPI(title="Shoal", version=__version__)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
@@ -95,6 +96,59 @@ async def _runtime_error(_, exc: RuntimeError):
 # ------------------------------------------------------------------ system
 @app.get("/api/health")
 def health() -> dict:
+    return {"ok": True, "app": "shoal", "version": __version__}
+
+
+# ------------------------------------------------------------------ desktop app: version, updates, quit
+def _active_jobs() -> int:
+    return len(get_runner().active())
+
+
+@app.get("/api/app")
+def app_info() -> dict:
+    from .desktop import state as desktop, updater
+
+    return {"version": __version__, "desktop": desktop.desktop, "frozen": FROZEN, "platform": updater.platform_key(),
+            "active_jobs": _active_jobs(), "update": updater.state()}
+
+
+@app.post("/api/app/update/check")
+def app_update_check() -> dict:
+    from .desktop import updater
+
+    return updater.check()
+
+
+@app.post("/api/app/update/install")
+def app_update_install() -> dict:
+    from .desktop import state as desktop, updater
+
+    n = _active_jobs()
+    if n:
+        raise HTTPException(409, f"还有 {n} 个计算在运行。等它们结束（或先取消）后再更新。")
+    if not desktop.desktop:
+        raise HTTPException(400, "只有安装版 Shoal 能自动更新。")
+    return updater.install(desktop.request_quit)
+
+
+@app.post("/api/app/update/dismiss")
+def app_update_dismiss() -> dict:
+    from .desktop import updater
+
+    updater.dismiss_result()
+    return updater.state()
+
+
+@app.post("/api/app/quit")
+def app_quit(data: dict = Body(default={})) -> dict:
+    from .desktop import state as desktop
+
+    if not desktop.desktop:
+        raise HTTPException(400, "从源码运行（pnpm dev）时请在终端里按 Ctrl+C 结束。")
+    n = _active_jobs()
+    if n and not data.get("force"):
+        raise HTTPException(409, f"还有 {n} 个计算在运行，退出会停止它们。")
+    desktop.request_quit()
     return {"ok": True}
 
 

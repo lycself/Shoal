@@ -14,3 +14,7 @@ __pycache__/
 *.egg-info/
 .venv/
 fort.*
+
+# desktop app packaging output (packaging/build_app.py)
+/dist/
+/build/
