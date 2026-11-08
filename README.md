@@ -11,21 +11,48 @@ shoal 在英语里既是“浅海、浅滩”，也是“鱼群”：这正是�
 
 ## 快速开始
 
+支持 macOS、Linux（Ubuntu 等）和原生 Windows。需要：Python 3.11、Node.js + pnpm，以及编译内核用的 gfortran、NetCDF-Fortran、CMake、Git。
+
+**1. 建 Python 环境**：在仓库根目录、用 Python 3.11（例如先激活你的 3.11 环境）运行：
+
 ```bash
-# 1. 创建 conda 环境（编译器、NetCDF、Python 依赖），默认位置 ~/opt/anaconda3/envs/coastal
-pnpm setup:env          # 或 bash scripts/setup-env.sh；可用 COASTAL_ENV=/path 指定位置
+python -m venv .venv
+```
 
-# 2. 编译计算内核（GOTM + pyfabm，含 ERSEM、MIZER、E2E；首次约 5–10 分钟）
-pnpm kernel             # 或 bash kernel/build.sh
+然后安装后端依赖（macOS / Linux）：
 
-# 3. 安装前端依赖并启动（同时启动后端 :8765 和前端 :5173）
+```bash
+.venv/bin/python -m pip install -r backend/requirements.txt
+```
+
+Windows：
+
+```bat
+.venv\Scripts\python -m pip install -r backend\requirements.txt
+```
+
+国内可加 `-i https://pypi.tuna.tsinghua.edu.cn/simple` 换镜像。
+
+**2. 装编译工具**（只需一次）：
+
+| 系统 | 命令 |
+| --- | --- |
+| macOS | `brew install gcc netcdf-fortran cmake git`（gcc 里带 gfortran） |
+| Ubuntu / Debian | `sudo apt install gfortran libnetcdff-dev cmake git` |
+| Windows | 装 [MSYS2](https://www.msys2.org/)，在 “MSYS2 UCRT64” 终端运行 `pacman -S --needed mingw-w64-ucrt-x86_64-gcc-fortran mingw-w64-ucrt-x86_64-netcdf-fortran mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make git`，再把 `C:\msys64\ucrt64\bin` 加进 Windows 的 PATH |
+
+**3. 检查环境、编译内核、启动：**
+
+```bash
 pnpm install
-pnpm dev
+pnpm check:env      # 检查 .venv、Python 版本、依赖和编译工具，缺什么就给出本系统的安装命令
+pnpm kernel         # 编译 GOTM + pyfabm（含 ERSEM、MIZER、E2E），首次约 5–10 分钟；等于 .venv 的 python kernel/build.py
+pnpm dev            # 同时启动后端 :8765 和前端 :5173
 ```
 
 浏览器打开 <http://localhost:5173>。首次启动会自动创建一个**离线演示项目**（GOTM 官方北海北部算例，不需要联网）。
 
-如果 Python 不在默认位置，设置 `SHOAL_PYTHON=/path/to/python` 后再 `pnpm dev`。
+`pnpm kernel` 和 `pnpm dev` 都用仓库根目录 `.venv` 里的 Python；要换别的解释器，设置 `SHOAL_PYTHON=/path/to/python`。
 
 ## 功能
 
@@ -56,10 +83,10 @@ backend/shoal/        FastAPI 后端
   assistant/agent.py      AI 助手（工具调用）
 frontend/src/             React 前端（pages/、components/、primer/ 教程内容与交互实验）
 kernel/                   计算内核
-  build.sh                获取源码并编译 GOTM 与 pyfabm
+  build.py                获取源码并编译 GOTM 与 pyfabm（pnpm kernel）
   e2e/                    按论文方程重写的 E2E 鱼类与大型底栖 FABM 模块（对照用；官方代码放在 src/ecosmo-e2e）
-  src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.sh 按锁定的版本下载，不进仓库）
-  install/                编译结果（bin/gotm、kernel.json）
+  src/                    GOTM、FABM、ERSEM、fabm-mizer、GOTM 算例、ERSEM 设置（build.py 按锁定的版本下载，不进仓库）
+  install/                编译结果（bin/gotm 或 Windows 上的 bin/gotm.exe、kernel.json）
 workspace/                项目、数据缓存、设置（运行时生成）
 ```
 
@@ -68,9 +95,9 @@ workspace/                项目、数据缓存、设置（运行时生成）
 鱼类与大型底栖功能群默认用 ECOSMO E2E v2.0 的官方 Fortran 代码（Vijayakumaran et al. 2026，Zenodo doi:10.5281/zenodo.20413770，GPL）。它不进本仓库，放在 `kernel/src/ecosmo-e2e/`：
 
 1. 从 Zenodo 下载 `ecosmoe2e_gmd.tar.gz`，把解压出的 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`（`model_output/` 有 5.9 GB 参考结果，不必复制）。
-2. 重新编译：`bash kernel/build.sh`。脚本检测到 `kernel/src/ecosmo-e2e/src/CMakeLists.txt` 后，把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核。
+2. 重新编译：`pnpm kernel`。脚本检测到 `kernel/src/ecosmo-e2e/src/CMakeLists.txt` 后，把官方代码（FABM 模型名 `ecosmoe2e_fish`、`ecosmoe2e_mb`）和本软件按论文方程重写的版本（`e2e/fish`、`e2e/macrobenthos`，在 `kernel/e2e/`）一起编进内核。
 3. 在“食物网配置”的“计算代码”里选择用哪一份；默认是官方代码，参数取自官方的 ERSEM / ECOSMO / ERGOM 算例。
-4. 官方代码里有 5 处物质不守恒或符号错误（鱼的 DOM 部分丢失、鱼呼吸产生氧气、硅按 Redfield 比例被扣掉、呼吸的碳丢失、底栖动物温度项常数）。`kernel/build.sh` 在官方源码的副本上打 `kernel/patches/ecosmo-e2e-corrections.patch`，把修正做成默认关闭的 FABM 参数；“食物网 → 物质收支”选“修正版”（新建配置的默认）时打开。关闭时与原代码逐位相同。说明与验证见 [kernel/patches/README.md](kernel/patches/README.md)。
+4. 官方代码里有 5 处物质不守恒或符号错误（鱼的 DOM 部分丢失、鱼呼吸产生氧气、硅按 Redfield 比例被扣掉、呼吸的碳丢失、底栖动物温度项常数）。`kernel/build.py` 在官方源码的副本上打 `kernel/patches/ecosmo-e2e-corrections.patch`，把修正做成默认关闭的 FABM 参数；“食物网 → 物质收支”选“修正版”（新建配置的默认）时打开。关闭时与原代码逐位相同。说明与验证见 [kernel/patches/README.md](kernel/patches/README.md)。
 
 验证（ERSEM 宿主，北海中部 56°N 3°E，2020–2039 年，官方驱动与配置，“原样”设置）：第一年与官方参考结果相差 1–4%；官方算例里鱼 2 的两个摄食率写作 0.004，而参考结果用的是 0.0045，改成 0.0045 后高营养级第一年在 1% 以内。20 年后的剩余偏差来自 ERSEM 版本（官方未记录），验证时用的是 ERSEM 8510fbf（2024-11-12）。本软件自动生成的鱼类配置与官方配置在同一内核上相差不到 1%。官方算例里的 ECOSMO、ERGOM 是 NECCTON 项目版本（未公开），本软件用 FABM 自带的 nersc/ecosmo 与 msi/ergom1。详见入门教程第 7、12 章。
 
