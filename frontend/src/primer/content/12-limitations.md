@@ -1,7 +1,7 @@
 ---
 id: 12-limitations
 title: 模型的局限：怎样带着怀疑读结果
-order: 13
+order: 14
 summary: 模型结构本身漏掉了什么，Shoal 在哪些地方和它参考的方法不同，以及读模拟结果时该做哪些检查。
 ---
 

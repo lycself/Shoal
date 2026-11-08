@@ -170,7 +170,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                     <span /><span className="hint">{engine === "official"
                       ? "ECOSMO E2E v2.0 作者发布的 Fortran 代码，参数取自其发布的算例。鱼是随深度分布的浓度，跟着饵料走。"
                       : hosts?.e2e_engines?.official_available
-                        ? "本软件按论文方程自己写的版本，只用于和官方代码对照：结果与官方代码有明显差别（见教程第 12 章）。"
+                        ? "本软件按论文方程自己写的版本，只用于和官方代码对照：结果与官方代码有明显差别（见教程“模型的局限”）。"
                         : "内核里没有官方代码，只能用本软件按论文方程重写的版本。重新编译内核（pnpm kernel）就会把官方代码一起编进去。"}</span>
                     {engine === "official" && (
                       <>
@@ -182,7 +182,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                             : <span className="soft">内核编译于修正补丁之前，重新运行 pnpm kernel 后可选修正版</span>}
                         </span>
                         <span /><span className="hint">{spec.htl.e2e.corrected
-                          ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程第 7 章），其余公式和参数不变。鱼和底栖动物不再让宿主里的元素凭空增减，鱼呼吸消耗氧气。第一年结果与论文几乎相同，多年后硅酸盐和硅藻明显更多。"
+                          ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程“按吃什么、住哪里分组：E2E 功能群”），其余公式和参数不变。鱼和底栖动物不再让宿主里的元素凭空增减，鱼呼吸消耗氧气。第一年结果与论文几乎相同，多年后硅酸盐和硅藻明显更多。"
                           : "逐行运行作者发布的代码，ERSEM 宿主下能重现论文的参考结果。但代码里鱼的一部分粪便和尸体凭空消失，呼吸放出的碳不回到水里，鱼呼吸反而产生氧气，硅被不断扣掉（多年后硅酸盐减半）。研究物质循环或浮游植物时请选修正版。"}</span>
                       </>
                     )}

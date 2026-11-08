@@ -283,13 +283,14 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
               <MapCanvas box={study.box} cell={study.res} points={points} varName={varName} diverging={cmp !== "value"} range={range} units={unit} height={520}
                 onPointClick={(p, at) => setCellSel({ point: { lat: p.lat, lon: p.lon }, at })} selected={cellSel?.point}
                 title={`${(label ?? "").trim()}${cmp === "value" ? ` · ${results[ci]?.config_name}` : cmp === "diff" ? `：${results[cj]?.config_name} − ${results[ci]?.config_name}` : `：${results[cj]?.config_name} 相对 ${results[ci]?.config_name} 的变化`}`} />
-              {readOpen && <div>
+              {/* always mounted, so opening and closing can slide instead of popping */}
+              <div className="fwr-side" aria-hidden={!readOpen}><div className="fwr-inner">
               <FigureReading metric={metric} label={label ?? metric} unit={metric.startsWith("monthly:") ? "" : meta[metric]?.units ?? ""} mode={cmp}
                 pairs={pairs} nameA={results[ci]?.config_name} nameB={results[cj]?.config_name}
                 descA={cfgOf(results[ci])?.description} descB={cfgOf(results[cj])?.description}
                 pairKey={pairKeyOf(cfgOf(results[ci]), cfgOf(results[cj]))} boxes={boxes.data ?? []}
                 chg={chg} otherLabels={Object.fromEntries(Object.entries(meta).map(([k, m]: any) => [k, m.label]))} res={study.res} years={study.years} />
-              </div>}
+              </div></div>
             </div>
           </div>
           </>}

@@ -127,7 +127,7 @@ ERA5 日平均气象画成细线，30 天平均画成粗线，并标出最热、
 
 ### 边学边做
 
-13 章入门教程从“为什么需要端到端模型”讲到三维陆架和模型局限，配 8 个可以拖动参数的交互实验。内置的 AI 助手（接 OpenAI 兼容接口或本地模型）能读取你的项目和结果、检索教程、启动模拟，并对配置提出修改建议，由你批准后才生效。
+15 章入门教程从“Shoal 是什么、第一个项目怎么做”和“安装与设置”讲起，一直到三维陆架和模型局限，配 8 个可以拖动参数的交互实验。内置的 AI 助手（接 OpenAI 兼容接口或本地模型）能读取你的项目和结果、检索教程、启动模拟，并对配置提出修改建议，由你批准后才生效。
 
 <p align="center"><img src="docs/images/primer-light.jpg" alt="入门教程" width="100%"></p>
 
@@ -280,7 +280,7 @@ git push origin v1.0.1
 2. 要重跑验证，需要完整的官方压缩包（`ecosmoe2e_gmd.zip`，含驱动数据和参考结果）：下载后把 `README.md`、`src/`、`testcases/`、`forcing/`、`ibt_survey/` 复制到 `kernel/src/ecosmo-e2e/`。
 3. 官方代码里有 5 处物质不守恒或符号错误（鱼的 DOM 部分丢失、鱼呼吸产生氧气、硅按 Redfield 比例被扣掉、呼吸的碳丢失、底栖动物温度项常数）。`kernel/build.py` 在副本上打 `kernel/patches/ecosmo-e2e-corrections.patch`，把修正做成默认关闭的 FABM 参数；“食物网 → 物质收支”选“修正版”（新建配置的默认）时打开，关闭时与原代码逐位相同。说明与验证见 [kernel/patches/README.md](kernel/patches/README.md)。
 
-验证（ERSEM 宿主，北海中部 56°N 3°E，官方驱动与配置，“原样”设置）：第一年与官方参考结果相差 1–4%；官方算例里鱼 2 的两个摄食率写作 0.004，而参考结果用的是 0.0045，改成 0.0045 后高营养级第一年在 1% 以内。官方算例里的 ECOSMO、ERGOM 是未公开的 NECCTON 项目版本，Shoal 用 FABM 自带的 nersc/ecosmo 与 msi/ergom1。详见入门教程第 7、12 章。
+验证（ERSEM 宿主，北海中部 56°N 3°E，官方驱动与配置，“原样”设置）：第一年与官方参考结果相差 1–4%；官方算例里鱼 2 的两个摄食率写作 0.004，而参考结果用的是 0.0045，改成 0.0045 后高营养级第一年在 1% 以内。官方算例里的 ECOSMO、ERGOM 是未公开的 NECCTON 项目版本，Shoal 用 FABM 自带的 nersc/ecosmo 与 msi/ergom1。详见入门教程的“E2E 功能群”和“模型的局限”两章。
 
 </details>
 

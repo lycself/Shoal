@@ -159,6 +159,7 @@ export default function App() {
     { label: "帮助", items: () => [
       { label: "入门教程", icon: "mortar-board", onClick: () => setPage("primer") },
       { label: "软件使用说明", icon: "book", onClick: () => setPage("primer", { chapter: "00-guide" }) },
+      { label: "安装与设置", icon: "desktop-download", onClick: () => setPage("primer", { chapter: "00-install" }) },
       { label: "研究问题", icon: "note", submenu: [
         { label: "对照实验怎么设计、怎么读", onClick: () => setPage("primer", { chapter: "13-designs" }) },
         { label: "鱼的反馈要不要算：单向与双向", onClick: () => setPage("primer", { chapter: "09-paper1" }) },

@@ -687,8 +687,19 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .reading .soft { color: var(--fg-soft); font-size: 12px; }
 .reading-warn { color: var(--warn); }
 .reading-wide { max-width: 980px; }
-.figure-with-reading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 360px); gap: 28px; align-items: start; }
-@media (max-width: 1180px) { .figure-with-reading { grid-template-columns: minmax(0, 1fr); } }
+/* figure + reading notes: the notes column slides open and shut (same two tracks, the second goes to 0) */
+.figure-with-reading { display: grid; grid-template-columns: minmax(0, 1fr) 340px; column-gap: 28px; row-gap: 0; align-items: start; transition: grid-template-columns .22s cubic-bezier(.2, .7, .2, 1), column-gap .22s ease; }
+.figure-with-reading.closed { grid-template-columns: minmax(0, 1fr) 0px; column-gap: 0; }
+.fwr-side { min-width: 0; overflow: hidden; opacity: 1; transition: opacity .18s ease; }
+.fwr-inner { width: 340px; }
+.figure-with-reading.closed .fwr-side { opacity: 0; pointer-events: none; }
+/* narrow windows: the notes sit under the figure and fold away vertically */
+@media (max-width: 1180px) {
+  .figure-with-reading, .figure-with-reading.closed { grid-template-columns: minmax(0, 1fr); column-gap: 0; }
+  .fwr-side { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .22s ease, opacity .18s ease; margin-top: 16px; }
+  .fwr-inner { width: auto; min-height: 0; overflow: hidden; }
+  .figure-with-reading.closed .fwr-side { grid-template-rows: 0fr; margin-top: 0; }
+}
 .reading-cols { columns: 2 320px; column-gap: 36px; max-width: 1100px; }
 .reading-cols h4 { break-after: avoid; }
 .reading-cols li, .reading-cols p { break-inside: avoid; }
@@ -736,7 +747,6 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 /* floating details panel for a clicked map cell */
 .cell-panel { position: fixed; z-index: 60; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow-pop); padding: 12px 14px 12px; max-height: calc(100vh - 80px); overflow: auto; }
 .cell-panel .table td, .cell-panel .table th { padding: 4px 6px; }
-.figure-with-reading.closed { grid-template-columns: minmax(0, 1fr); }
 .term { border-bottom: 1px dotted var(--fg-soft); cursor: help; }
 
 /* desktop app: update / result line under the menu bar */

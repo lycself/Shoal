@@ -14,11 +14,11 @@ const CHAPTERS: Chapter[] = Object.entries(files).map(([path, raw]) => {
   return { id, title: meta.title || id, order: +(meta.order ?? 99), summary: meta.summary || "", body: clean };
 }).sort((a, b) => a.order - b.order);
 const PARTS: [string, (o: number) => boolean][] = [
-  ["开始", (o) => o === 0],
-  ["基础概念：海水与浮游生物", (o) => o >= 1 && o <= 4],
-  ["低营养级与鱼", (o) => o >= 5 && o <= 8],
-  ["研究问题", (o) => o >= 9 && o <= 11],
-  ["拓展", (o) => o >= 12],
+  ["开始", (o) => o <= 1],
+  ["基础概念：海水与浮游生物", (o) => o >= 2 && o <= 5],
+  ["低营养级与鱼", (o) => o >= 6 && o <= 9],
+  ["研究问题", (o) => o >= 10 && o <= 12],
+  ["拓展", (o) => o >= 13],
 ];
 
 // below these page widths the panels float over the article (drawers) instead of taking room from it

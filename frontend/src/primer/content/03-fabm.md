@@ -1,7 +1,7 @@
 ---
 id: 03-fabm
 title: 生态模块怎么接进物理模型：FABM
-order: 4
+order: 5
 summary: 物理模型、生态模块和 FABM 各管什么；fabm.yaml 怎样按名字把鱼接到浮游动物上；为什么不用重新编译；物质怎样守恒、单位怎样换算。
 ---
 
