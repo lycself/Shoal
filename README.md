@@ -70,7 +70,7 @@ Shoal 把整条流程装进一个桌面软件：
 
 连线上的光点从被吃者流向捕食者。光点越密、走得越快，这条链上的摄食压力（偏好 × 饵料生物量）越大。节点里的条形是各类群的年均生物量，悬停一个节点只看与它相关的连线。
 
-<p align="center"><img src="docs/images/foodweb-flow.gif" alt="食物网能量流动画" width="560"></p>
+<p align="center"><img src="docs/images/foodweb-flow.gif" alt="食物网能量流动画" width="520"></p>
 
 ### 一根水柱里发生了什么
 
