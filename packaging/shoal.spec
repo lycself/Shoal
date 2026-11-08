@@ -54,7 +54,9 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz,
     a.scripts,
-    [],
+    # UTF-8 mode, like PYTHONUTF8=1 for a source checkout (a frozen app ignores that variable). Without it,
+    # Windows reads and writes text files in the locale code page and fails on Chinese text.
+    [("X utf8", None, "OPTION")],
     exclude_binaries=True,
     name="Shoal",
     console=False,  # no terminal window; logs go to the user data folder (logs/shoal.log)

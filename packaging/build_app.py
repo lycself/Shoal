@@ -47,14 +47,13 @@ def preflight() -> None:
                        (REPO / "kernel" / "src" / "gotm-cases" / "nns_annual" / "gotm.yaml", "pnpm kernel")]:
         if not need.exists():
             sys.exit(f"!! missing {need.relative_to(REPO)} (run: {hint})")
-    try:
-        import pyfabm  # noqa: F401
-        import PyInstaller  # noqa: F401
-        import pystray  # noqa: F401
-        if MACOS:
-            import delocate  # noqa: F401
-    except ImportError as e:
-        sys.exit(f"!! {e}. Install the packaging requirements: python -m pip install -r packaging/requirements.txt")
+    import importlib.util
+
+    # only check that they are installed: importing pystray on Linux already needs an X display
+    needed = ["pyfabm", "PyInstaller", "pystray", "PIL"] + (["delocate"] if MACOS else [])
+    missing = [m for m in needed if importlib.util.find_spec(m) is None]
+    if missing:
+        sys.exit(f"!! missing {', '.join(missing)}. Install: python -m pip install -r packaging/requirements.txt")
 
 
 def bundle_kernel_macos() -> Path:
