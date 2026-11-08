@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from . import events, projects
-from .config import gotm_executable, load_settings
+from .config import gotm_executable, gotm_popen_kwargs, load_settings
 from .runs import prepare_run
 from .sites import builder as sites
 
@@ -87,7 +87,10 @@ class Runner:
         job.cancel_requested = True
         if job.proc and job.proc.poll() is None:
             try:
-                os.killpg(os.getpgid(job.proc.pid), signal.SIGTERM)
+                if os.name == "nt":
+                    job.proc.terminate()  # gotm.exe has no children; TerminateProcess is enough
+                else:
+                    os.killpg(os.getpgid(job.proc.pid), signal.SIGTERM)
             except Exception:
                 job.proc.terminate()
         if job.status == "queued":
@@ -172,7 +175,7 @@ class Runner:
         if proj.get("site_status") != "ready":
             raise RuntimeError("站点数据尚未构建，请先在“站点”页构建站点")
         if gotm_executable() is None:
-            raise RuntimeError("找不到 GOTM 内核，请先运行 kernel/build.sh")
+            raise RuntimeError("找不到 GOTM 内核，请先运行 pnpm kernel")
         sim = dict(proj["simulation"])
         if sim_override:
             sim.update(sim_override)
@@ -227,7 +230,7 @@ class Runner:
             exe = str(gotm_executable())
             with open(rdir / "gotm.log", "w") as log:
                 job.proc = subprocess.Popen([exe, "gotm.yaml"], cwd=rdir, stdout=log, stderr=subprocess.STDOUT,
-                                            start_new_session=True)
+                                            **gotm_popen_kwargs())
                 job.message = "GOTM 运行中"
                 last_emit = 0.0
                 while job.proc.poll() is None:

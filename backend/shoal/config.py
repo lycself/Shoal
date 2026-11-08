@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -41,22 +42,54 @@ def kernel_prefix() -> Path:
 
 
 def gotm_executable() -> Path | None:
-    exe = kernel_prefix() / "bin" / "gotm"
+    exe = kernel_prefix() / "bin" / ("gotm.exe" if os.name == "nt" else "gotm")
     if exe.exists():
         return exe
     found = shutil.which("gotm")
     return Path(found) if found else None
 
 
-def kernel_info() -> dict:
-    """What the kernel build reported (kernel/build.sh writes kernel.json)."""
+def _read_kernel_json() -> dict:
     info_file = kernel_prefix() / "kernel.json"
-    info: dict = {}
     if info_file.exists():
         try:
-            info = json.loads(info_file.read_text())
-        except json.JSONDecodeError:
-            info = {}
+            return json.loads(info_file.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            pass
+    return {}
+
+
+def runtime_dll_dirs() -> list[str]:
+    """Windows: folders holding the MinGW runtime DLLs (libgfortran, NetCDF) that gotm.exe and pyfabm load.
+
+    kernel/build.py records the gfortran folder it compiled with; SHOAL_DLL_DIRS (os.pathsep-separated) adds more.
+    """
+    if os.name != "nt":
+        return []
+    dirs = list(_read_kernel_json().get("runtime_dll_dirs") or [])
+    dirs += [d for d in os.environ.get("SHOAL_DLL_DIRS", "").split(os.pathsep) if d]
+    return [d for d in dict.fromkeys(dirs) if Path(d).is_dir()]
+
+
+def kernel_env() -> dict:
+    """Environment for running gotm: on Windows its runtime DLL folders go in front of PATH."""
+    env = dict(os.environ)
+    dirs = runtime_dll_dirs()
+    if dirs:
+        env["PATH"] = os.pathsep.join(dirs + [env.get("PATH", "")])
+    return env
+
+
+def gotm_popen_kwargs() -> dict:
+    """Start gotm in its own process group, so cancelling it never signals the backend itself."""
+    if os.name == "nt":
+        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP, "env": kernel_env()}
+    return {"start_new_session": True}
+
+
+def kernel_info() -> dict:
+    """What the kernel build reported (kernel/build.py writes kernel.json)."""
+    info = _read_kernel_json()
     exe = gotm_executable()
     info["gotm_path"] = str(exe) if exe else None
     info["gotm_available"] = exe is not None

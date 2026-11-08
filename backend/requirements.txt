@@ -1,0 +1,25 @@
+# Python packages for the Shoal backend. Install into the project's .venv:
+#   .venv/bin/python -m pip install -r backend/requirements.txt     (Windows: .venv\Scripts\python ...)
+# Versions are the ones Shoal is tested with (Python 3.11).
+
+# web API
+fastapi==0.162.0
+uvicorn==0.54.0
+websockets==17.4
+httpx==0.28.1
+
+# data and model output
+numpy==2.4.6
+xarray==2026.9.0
+netCDF4==1.7.4
+cftime==1.6.6
+ruamel.yaml==0.19.1
+PyYAML==6.0.3        # used by pyfabm
+psutil==7.2.2
+
+# optional AI assistant
+openai==3.46.0
+
+# needed to build pyfabm into the venv (kernel/build.py installs it with --no-build-isolation)
+setuptools==84.2.1
+wheel==0.48.0

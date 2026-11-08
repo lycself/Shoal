@@ -10,7 +10,7 @@
 !   EGUsphere, doi:10.5194/egusphere-2026-3078   (Eqs. 1-19, Tables 1-3)
 !
 ! This is NOT the official ECOSMO E2E code (Zenodo 10.5281/zenodo.20413770).
-! When the official code is placed in kernel/src/ecosmo-e2e, kernel/build.sh
+! When the official code is placed in kernel/src/ecosmo-e2e, kernel/build.py
 ! compiles that instead.
 !
 ! Conventions

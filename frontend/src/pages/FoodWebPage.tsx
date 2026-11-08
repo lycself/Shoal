@@ -165,7 +165,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                           {hosts?.e2e_engines?.corrections_available
                             ? <Seg value={spec.htl.e2e.corrected ? "fixed" : "orig"} onChange={(v: string) => upd((s) => { s.htl.e2e.corrected = v === "fixed"; })}
                                 options={[["orig", "原样（论文所用代码）"], ["fixed", "修正版（收支闭合）", "check"]] as any} />
-                            : <span className="soft">内核编译于修正补丁之前，重新运行 kernel/build.sh 后可选修正版</span>}
+                            : <span className="soft">内核编译于修正补丁之前，重新运行 pnpm kernel 后可选修正版</span>}
                         </span>
                         <span /><span className="hint">{spec.htl.e2e.corrected
                           ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程第 7 章），其余公式和参数不变。鱼和底栖动物不再让宿主里的元素凭空增减，鱼呼吸消耗氧气。第一年结果与论文几乎相同，多年后硅酸盐和硅藻明显更多。"

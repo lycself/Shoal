@@ -22,7 +22,7 @@ from pathlib import Path
 import numpy as np
 
 from .. import events, projects, yamlio
-from ..config import gotm_executable
+from ..config import gotm_executable, kernel_env
 from ..data import sources
 from ..ecosystem import builder
 from ..ecosystem.hosts import HOSTS
@@ -285,7 +285,7 @@ class ShelfJob:
                     import subprocess
 
                     with open(rdir / "gotm.log", "w") as log:
-                        proc = subprocess.run([exe, "gotm.yaml"], cwd=rdir, stdout=log, stderr=subprocess.STDOUT)
+                        proc = subprocess.run([exe, "gotm.yaml"], cwd=rdir, stdout=log, stderr=subprocess.STDOUT, env=kernel_env())
                     if proc.returncode != 0:
                         return {"i": p["i"], "error": True}
                     return {"i": p["i"], **_column_metrics(rdir, {"spec": spec, "timing": timing})}

@@ -70,7 +70,7 @@ export default function SettingsPage() {
             </div>
           </div>
         )}
-        <div className="hint" style={{ marginTop: 8 }}>重新编译：<code>bash kernel/build.sh</code>。官方 ECOSMO E2E 压缩包里的文件夹（含 <code>src/</code> 与 <code>testcases/</code>）放到 <code>kernel/src/ecosmo-e2e</code> 后重新编译，就会和按论文方程重写的版本一起编进内核。</div>
+        <div className="hint" style={{ marginTop: 8 }}>重新编译：<code>pnpm kernel</code>。官方 ECOSMO E2E 压缩包里的文件夹（含 <code>src/</code> 与 <code>testcases/</code>）放到 <code>kernel/src/ecosmo-e2e</code> 后重新编译，就会和按论文方程重写的版本一起编进内核。</div>
       </div>
     </div>
   );

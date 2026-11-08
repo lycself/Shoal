@@ -8,8 +8,8 @@
     "dev:api": "node scripts/dev-api.mjs",
     "dev:web": "pnpm --dir frontend dev",
     "build": "pnpm --dir frontend build",
-    "kernel": "bash kernel/build.sh",
-    "setup:env": "bash scripts/setup-env.sh"
+    "kernel": "node scripts/venv.mjs kernel/build.py",
+    "check:env": "node scripts/venv.mjs scripts/check_env.py"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
