@@ -100,7 +100,7 @@ export function Select({ value, onChange, children, size, style, disabled, title
   return (
     <span className={`select ${size === "sm" ? "sm" : ""} ${open ? "open" : ""}`} style={style} title={title}>
       <button ref={btn} type="button" className="sel-btn" disabled={disabled} onClick={() => (open ? setOpen(false) : show())} onKeyDown={key} aria-haspopup="listbox" aria-expanded={open}>
-        <span className="sel-val">{cur ? cur.label : <span className="soft">请选择</span>}</span>
+        <span className="sel-val">{cur ? (/^[\s　]*└/.test(cur.text) ? cur.text.replace(/^[\s　]*└\s*/, "") : cur.label) : <span className="soft">请选择</span>}</span>
         <Icon name="chevron-down" />
       </button>
       {open && pos && createPortal(
@@ -412,10 +412,17 @@ function useSplit(id: string, initial = 280, min = 200, max = 520) {
   return { ...cur, update: (v: Partial<SplitState>) => setSt(id, { ...cur, ...v }) };
 }
 
-/** The button that opens and closes a page's side panel; put it at the left of the page header. */
-export function PanelToggle({ id, label }: { id: string; label: string }) {
+/** Side-panel switch. `inPanel`: the fold button at the right of the panel's own top row (the panel is open).
+ *  Otherwise: the button that brings a folded panel back, at the left of the main column's header; it slides in only
+ *  while the panel is folded, so each button sits next to the thing it acts on. */
+export function PanelToggle({ id, label, inPanel }: { id: string; label: string; inPanel?: boolean }) {
   const sp = useSplit(id);
-  return <IconBtn icon={sp.collapsed ? "layout-sidebar-left-off" : "layout-sidebar-left"} title={sp.collapsed ? `显示${label}` : `收起${label}（也可以拖动或双击它的右边缘）`} active={!sp.collapsed} onClick={() => sp.update({ collapsed: !sp.collapsed })} />;
+  if (inPanel) return <IconBtn icon="layout-sidebar-left" size="sm" title={`收起${label}（也可以拖动或双击它的右边缘）`} onClick={() => sp.update({ collapsed: true })} />;
+  return (
+    <span className={`ptoggle-slot ${sp.collapsed ? "" : "hidden"}`} aria-hidden={!sp.collapsed}>
+      <IconBtn icon="layout-sidebar-left-off" title={`显示${label}`} tabIndex={sp.collapsed ? 0 : -1} onClick={() => sp.update({ collapsed: false })} />
+    </span>
+  );
 }
 
 /**
@@ -498,6 +505,11 @@ export function RightPane({ id, open, onClose, initial = 380, min = 280, max = 6
       </div>
     </>
   );
+}
+
+/** Expandable group body: slides open and shut instead of appearing and vanishing. */
+export function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return <div className={`collapse ${open ? "open" : ""}`} aria-hidden={!open}><div className="collapse-inner">{children}</div></div>;
 }
 
 export function Stat({ k, v, unit, delta }: { k: string; v: React.ReactNode; unit?: string; delta?: number | null }) {

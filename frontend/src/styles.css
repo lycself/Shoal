@@ -427,7 +427,7 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .kv > .v { color: var(--fg); min-width: 0; overflow-wrap: anywhere; }
 
 /* key figures: numbers on a hairline, not boxed tiles */
-.stats { display: flex; flex-wrap: wrap; gap: 14px 40px; border-top: 1px solid var(--border); padding-top: 12px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px 32px; border-top: 1px solid var(--border); padding-top: 12px; }
 .stat { flex: 0 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .stat .k { color: var(--fg-soft); font-size: 12px; }
 .stat .v { color: var(--fg-strong); font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; line-height: 1.25; }
@@ -504,7 +504,7 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .plot-reset:hover { border-color: var(--accent); color: var(--accent); }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--fg-muted); }
 .legend span { display: inline-flex; align-items: center; gap: 6px; }
-.colorbar { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--fg-muted); min-width: 0; max-width: 100%; flex-wrap: wrap; }
+.colorbar { display: flex; align-items: center; gap: 8px; font-size: 11.5px; color: var(--fg-muted); min-width: 0; max-width: 100%; flex-wrap: nowrap; white-space: nowrap; }
 /* the ramp shrinks before the labels do, so narrow map panels never push their legends into each other */
 .colorbar .ramp { width: 200px; flex: 0 1 200px; min-width: 50px; height: 9px; border-radius: 2px; border: 1px solid var(--border); }
 
@@ -761,3 +761,40 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .page.fill .split-side-inner > .tree-head:first-child,
 .page.fill .split-side-inner > .split-scroll:first-child > .tree-head:first-child,
 .page.fill .split-side-inner > div:first-child > .tree-head:first-child { height: 44px; border-bottom: 1px solid var(--border); }
+
+/* the "show panel" button slides into the header while its panel is folded */
+.ptoggle-slot { display: inline-flex; flex: none; overflow: hidden; width: 30px; transition: width .2s ease, opacity .2s ease, margin .2s ease; }
+.ptoggle-slot.hidden { width: 0; opacity: 0; margin-right: -8px; pointer-events: none; }
+.tabs-left:has(> .ptoggle-slot.hidden) { padding: 0; border-right-color: transparent; }
+.tabs-left { transition: padding .2s ease; }
+
+.collapse { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .2s ease; }
+.collapse.open { grid-template-rows: 1fr; }
+.collapse-inner { overflow: hidden; min-height: 0; }
+/* panels and popups arrive with a short motion instead of popping in */
+.bottom-panel { animation: rise-in .2s ease-out; }
+@keyframes rise-in { from { height: 0; opacity: 0; } to { height: 230px; opacity: 1; } }
+.cell-panel { animation: pop-in .14s ease-out; }
+@keyframes pop-in { from { opacity: 0; transform: translateY(4px) scale(.99); } to { opacity: 1; transform: none; } }
+.split-side.animate, .rpane.animate, .activity.animate { transition-duration: .22s; transition-timing-function: cubic-bezier(.2, .7, .2, 1); }
+/* narrow column: the reading notes float over the figure's right edge instead of squeezing it */
+.fig-aside { position: relative; }
+.fig-aside.narrow > .sash { display: none; }
+.fig-aside.narrow > .reading-rpane { position: absolute; right: 0; top: 0; bottom: 0; z-index: 6; box-shadow: var(--shadow-pop); background: var(--bg); }
+.fig-aside.narrow > .fig-main { min-width: 0; }
+
+/* motion for menus, pop-overs, dialogs and tooltips */
+.menu, .menu-sub .menu { animation: sel-in .12s ease-out; }
+.modal { animation: pop-in .16s ease-out; }
+.tooltip { animation: tip-in .1s ease-out; }
+@keyframes tip-in { from { opacity: 0; } to { opacity: 1; } }
+.toast { animation: pop-in .16s ease-out; }
+
+.settings-page .form .control > .input, .settings-page .form .control > .select { flex: 0 1 380px; max-width: 380px; }
+.settings-page .kernel-info { padding: 4px 0; }
+.save-bar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 10px; margin: 18px -4px 0; padding: 10px 12px; background: var(--bg); border-top: 1px solid var(--border); transform: translateY(110%); opacity: 0; transition: transform .2s ease, opacity .2s ease; pointer-events: none; }
+.save-bar.show { transform: none; opacity: 1; pointer-events: auto; }
+
+/* primer: the bar buttons only bring a closed panel back, and slide away while it is open */
+.learn-bar-btn.reveal { transition: max-width .2s ease, opacity .2s ease, padding .2s ease; max-width: 140px; overflow: hidden; }
+.learn-bar-btn.reveal.gone { max-width: 0; opacity: 0; padding: 0; border: 0; pointer-events: none; }

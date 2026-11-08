@@ -42,7 +42,7 @@ export default function ShelfPage() {
       </div>
       } id="shelf" label="研究列表" initial={260} side={
         <>
-          <div className="tree-head">研究<span className="actions"><IconBtn icon="add" title="新建" size="sm" onClick={() => setPlanning(true)} /></span></div>
+          <div className="tree-head">研究<span className="actions"><IconBtn icon="add" title="新建陆架研究" size="sm" onClick={() => setPlanning(true)} /><PanelToggle id="shelf" label="研究列表" inPanel /></span></div>
           <div className="split-scroll">
             {(studies.data ?? []).map((s) => (
               <div key={s.id} className={`tree-item flat ${s.id === sel ? "active" : ""}`} onClick={() => setSel(s.id)} style={{ paddingTop: 7, paddingBottom: 7 }}>

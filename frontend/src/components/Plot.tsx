@@ -91,14 +91,18 @@ Plotly.register({ moduleType: "locale", name: "zh-CN", dictionary: {
   "Reset camera to default": "还原默认视角", "Double-click to zoom back out": "双击还原",
 }, format: {} });
 
-export function Plot({ data, layout, height, fill, config, onClick }: { data: any[]; layout?: any; height?: number; fill?: boolean; config?: any; onClick?: (ev: any) => void }) {
+/** `layout` may be a function of the plot's real pixel size, so callouts can be placed for the space they really have. */
+export function Plot({ data, layout, height, fill, config, onClick }: { data: any[]; layout?: any | ((px: [number, number]) => any); height?: number; fill?: boolean; config?: any; onClick?: (ev: any) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const dark = useApp((s) => s.dark);
   const [zoomed, setZoomed] = useState(false);
+  const layoutRef = useRef(layout); layoutRef.current = layout;
+  const drawRef = useRef<() => void>(() => {});
   const draw = () => {
     const el = ref.current;
     if (!el) return;
-    const l = themeLayout(dark, layout || {});
+    const box: [number, number] = [Math.max(200, el.clientWidth - 90), Math.max(120, (height && !fill ? height : el.clientHeight) - 80)];
+    const l = themeLayout(dark, (typeof layout === "function" ? layout(box) : layout) || {});
     if (height && !fill) l.height = height;
     Plotly.react(el, data, l, {
       responsive: true, displaylogo: false, displayModeBar: "hover", locale: "zh-CN", doubleClick: "reset", showTips: false,
@@ -106,6 +110,7 @@ export function Plot({ data, layout, height, fill, config, onClick }: { data: an
       toImageButtonOptions: { format: "png", scale: 3, filename: "shoal" }, ...(config || {}),
     });
   };
+  drawRef.current = draw;
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -129,7 +134,7 @@ export function Plot({ data, layout, height, fill, config, onClick }: { data: an
     // resize once the container has settled (e.g. after a side panel slides), not on every animation frame:
     // redrawing a plot 10 times during a 180 ms slide is what made pages flicker
     let t = 0;
-    const ro = new ResizeObserver(() => { window.clearTimeout(t); t = window.setTimeout(() => el && el.offsetParent && Plotly.Plots.resize(el), 140); });
+    const ro = new ResizeObserver(() => { window.clearTimeout(t); t = window.setTimeout(() => { if (!el || !el.offsetParent) return; if (typeof layoutRef.current === "function") drawRef.current(); else Plotly.Plots.resize(el); }, 140); });
     if (el) ro.observe(el);
     return () => { window.clearTimeout(t); ro.disconnect(); if (el) Plotly.purge(el); };
   }, []);

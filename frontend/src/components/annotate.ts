@@ -84,14 +84,19 @@ export function placeCallouts(events: SeasonEvent[], series: PlaceSeries[], opts
   const pts: [number, number][] = [];
   for (const s of series) {
     const xs = s.x.map(toNum);
+    const fin = s.y.filter((v) => v !== null && isFinite(v as number)) as number[];
+    const yspan = (Math.max(...fin) - Math.min(...fin)) || 1;
     const dense = xs.length >= 150;
     for (let i = 0; i < xs.length; i++) {
       const y = s.y[i];
       if (y === null || !isFinite(y)) continue;
       pts.push([xs[i], y]);
       const y2 = s.y[i + 1];
-      // sparse curves (12 months, a profile): add points along each segment so the line itself counts
-      if (!dense && i + 1 < xs.length && y2 !== null && y2 !== undefined && isFinite(y2)) for (let k = 1; k < 8; k++) pts.push([xs[i] + ((xs[i + 1] - xs[i]) * k) / 8, y + ((y2 - y) * k) / 8]);
+      if (i + 1 >= xs.length || y2 === null || y2 === undefined || !isFinite(y2)) continue;
+      // fill in each segment so the line itself counts: every segment of a sparse curve, and the steep ones of a
+      // dense curve (a spike between two daily values would otherwise be invisible to the test)
+      const steps = dense ? Math.min(12, Math.floor((Math.abs(y2 - y) / yspan) * 40)) : 8;
+      for (let k = 1; k < steps; k++) pts.push([xs[i] + ((xs[i + 1] - xs[i]) * k) / steps, y + ((y2 - y) * k) / steps]);
     }
   }
   if (!pts.length) return events.map(() => null);
@@ -118,7 +123,13 @@ export function placeCallouts(events: SeasonEvent[], series: PlaceSeries[], opts
       const clash = placed.filter(([a0, a1, b0, b1]) => x0 < a1 && x1 > a0 && y0 < b1 && y1 > b0).length;
       // also keep the label clear of the point itself and of the other events' points
       const own = events.some((q) => { const qx = toNum(q.x); return qx >= x0 && qx <= x1 && q.y >= y0 && q.y <= y1; }) ? 1 : 0;
-      const cost = hits * 10 + clash * 100 + own * 20 + Math.hypot(fx, fy);
+      // the leader from the point to the label should not run through the data either
+      let cross = 0;
+      for (let k = 1; k < 10; k++) {
+        const lx = px + ((cx - px) * k) / 10, ly = py + ((cy - py) * k) / 10, rx = xs * 0.006, ry = ys * 0.02;
+        for (const [x, y] of pts) if (Math.abs(x - lx) < rx && Math.abs(y - ly) < ry) { cross++; break; }
+      }
+      const cost = hits * 10 + clash * 100 + own * 20 + cross * 4 + Math.hypot(fx, fy);
       if (!best || cost < best.cost) best = { cx, cy, cost };
     }
     if (!best) return null;

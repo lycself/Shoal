@@ -3,7 +3,7 @@ import { ask } from "../dialog";
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
 import { FoodWebGraph } from "../components/FoodWebGraph";
-import { Btn, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Switch, Tabs, useAsync, HelpLink, PanelToggle } from "../components/ui";
+import { Btn, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Switch, Tabs, useAsync, HelpLink, PanelToggle, Collapse } from "../components/ui";
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
 
 const HTL_NAMES: Record<string, string> = { MB: "大型底栖动物 MB", F1: "鱼 1 · 浮游食性", F2: "鱼 2 · 底栖 / 鱼食性" };
@@ -38,7 +38,7 @@ export default function FoodWebPage() {
       </div>
       } id="foodweb" label="配置列表" initial={270} side={
         <>
-          <div className="tree-head">配置<span className="actions"><IconBtn icon="add" title="新配置" size="sm" onClick={add} /><IconBtn icon="refresh" title="刷新" size="sm" onClick={configs.reload} /></span></div>
+          <div className="tree-head">配置<span className="actions"><IconBtn icon="add" title="新配置" size="sm" onClick={add} /><IconBtn icon="refresh" title="刷新" size="sm" onClick={configs.reload} /><PanelToggle id="foodweb" label="配置列表" inPanel /></span></div>
           <div className="split-scroll">
             {configs.loading && !configs.data && <Loading />}
             {Object.entries(groups).map(([h, cs]) => (
@@ -46,7 +46,7 @@ export default function FoodWebPage() {
                 <div className="tree-group" data-tip={open[h] === false ? "展开这一组" : "收起这一组"} onClick={() => setOpen({ ...open, [h]: open[h] === false })}>
                   <Icon name={open[h] === false ? "chevron-right" : "chevron-down"} />{HOST_LABEL[h]}<span className="soft" style={{ marginLeft: "auto", fontWeight: 500 }}>{cs.length}</span>
                 </div>
-                {open[h] !== false && cs.map((c) => (
+                <Collapse open={open[h] !== false}>{cs.map((c) => (
                   <div key={c.id} className={`tree-item ${c.id === sel ? "active" : ""}`} onClick={async () => { if (c.id !== sel && await useApp.getState().confirmLeave()) setSel(c.id); }} title={c.description}>
                     <Icon name={HTL_ICON[c.spec.htl.kind]} />
                     <div className="grow">
@@ -54,7 +54,7 @@ export default function FoodWebPage() {
                       <div className="meta">{HTL_LABEL[c.spec.htl.kind]}{c.spec.htl.kind === "mizer" ? (c.spec.htl.mizer.feedback ? " · 双向" : " · 单向") : ""}{c.spec.ltl.zoo_mortality_factor !== 1 ? ` · 浮游动物死亡 ×${c.spec.ltl.zoo_mortality_factor}` : ""}</div>
                     </div>
                   </div>
-                ))}
+                ))}</Collapse>
               </div>
             ))}
           </div>
@@ -126,7 +126,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
         { id: "graph", label: "食物网", icon: "type-hierarchy" },
         { id: "comp", label: "组成", icon: "settings" },
         { id: "params", label: "高营养级参数", icon: "symbol-parameter" },
-        { id: "yaml", label: "fabm.yaml", icon: "file-code" },
+        { id: "yaml", label: "配置文件", icon: "file-code", tip: "模型实际读取的 fabm.yaml，由上面的设置自动生成" },
       ]} />
       <div className="split-scroll" style={tab === "graph" ? { padding: 0 } : { padding: "18px 22px" }}>
         {tab === "graph" && (graph ? (

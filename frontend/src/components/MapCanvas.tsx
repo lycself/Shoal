@@ -121,7 +121,7 @@ export function MapCanvas({ box, points = [], cell, scale, range, onPick, marker
     return extent(v);
   }, [points, range]);
 
-  const M = compact ? { l: 34, r: 6, t: 6, b: 20 } : { l: 44, r: 10, t: 8, b: 26 };
+  const M = compact ? { l: 34, r: 16, t: 6, b: 20 } : { l: 44, r: 20, t: 8, b: 26 }; // right margin leaves room for the last longitude label
   const kx = Math.cos(((lat0 + lat1) / 2) * Math.PI / 180);
   const aspect = ((lon1 - lon0) * kx) / (lat1 - lat0);
   const availW = Math.max(200, w - M.l - M.r);

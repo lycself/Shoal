@@ -123,6 +123,9 @@ export function ShelfEnsemble({ results }: { results: any[] }) {
           <text x={14} y={(top + H - bottom) / 2} fontSize={11} fill={soft} textAnchor="middle" transform={`rotate(-90 14 ${(top + H - bottom) / 2})`}>{LABEL[v] ?? v}{unit ? ` (${unit})` : ""}</text>
           <line x1={xOf(sMax)} x2={xOf(sMax)} y1={top} y2={H - bottom} stroke={cssVar("--glow")} strokeOpacity={0.35} strokeDasharray="3 4" />
           <text x={xOf(sMax) + 5} y={top + 10} fontSize={10.5} fill={cssVar("--glow")}>各水柱分歧最大</text>
+          {/* the beams after December are not a 13th month: a divider says they lead to each zone's annual mean */}
+          <line x1={plotR + 8} x2={plotR + 8} y1={top} y2={H - bottom} stroke={cssVar("--border-strong")} strokeDasharray="2 3" />
+          <text x={(plotR + convX) / 2} y={H - bottom + 18} textAnchor="middle" fontSize={11} fill={soft}>全年平均 →</text>
           {/* one line per column, then its beam into the zone point */}
           {cols.map((c: any) => {
             const pts = c.ys.map((y: number, m: number) => [xOf(m), yOf(y)] as [number, number]);

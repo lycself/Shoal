@@ -159,9 +159,10 @@ export default function App() {
     { label: "帮助", items: () => [
       { label: "入门教程", icon: "mortar-board", onClick: () => setPage("primer") },
       { label: "软件使用说明", icon: "book", onClick: () => setPage("primer", { chapter: "00-guide" }) },
-      { label: "方法来源", icon: "note", submenu: [
-        { label: "鱼吃掉浮游生物后会差多少：单向与双向耦合", onClick: () => setPage("primer", { chapter: "09-paper1" }) },
-        { label: "换一个浮游生物模型，鱼和底栖还一样吗", onClick: () => setPage("primer", { chapter: "10-paper2" }) },
+      { label: "研究问题", icon: "note", submenu: [
+        { label: "对照实验怎么设计、怎么读", onClick: () => setPage("primer", { chapter: "13-designs" }) },
+        { label: "鱼的反馈要不要算：单向与双向", onClick: () => setPage("primer", { chapter: "09-paper1" }) },
+        { label: "鱼和底栖的影响，换宿主还一样吗", onClick: () => setPage("primer", { chapter: "10-paper2" }) },
       ] },
       { label: "键盘快捷键", icon: "keyboard", onClick: () => setDialog("keys") },
       { type: "separator" },
@@ -175,7 +176,6 @@ export default function App() {
         <IconBtn icon="play" title="运行实验" disabled={!project} onClick={() => setPage("experiments")} />
         <IconBtn icon="debug-stop" title={active.length ? `停止全部任务（${active.length}）` : "没有运行中的任务"} disabled={!active.length} onClick={stopAll} />
         <span className="vsep" />
-        <IconBtn icon={collapsed ? "layout-sidebar-left-off" : "layout-sidebar-left"} title="折叠侧栏（Ctrl+B）" onClick={s.toggleCollapsed} />
         <IconBtn icon={panelOpen ? "layout-panel" : "layout-panel-off"} title="任务面板（Ctrl+J）" onClick={() => setPanelOpen(!panelOpen)} />
         <span className="vsep" />
         <IconBtn icon="sparkle" title="AI 助手（Ctrl+Shift+A）" active={assistantOpen} onClick={s.toggleAssistant} />
@@ -184,7 +184,7 @@ export default function App() {
       <UpdateBanner />
       <div className="shell-body">
         <nav className={`activity ${liveSide == null ? "animate" : ""}`} style={{ width: sideW }}>
-          <div className="side-head">Shoal {appInfo?.version ?? "…"} · 内核 {k?.gotm?.split(" ")[0] ?? "…"}</div>
+          <div className="side-head" data-tip={`计算内核 GOTM ${k?.gotm?.split(" ")[0] ?? "?"}`}>Shoal {appInfo?.version ?? "…"}</div>
           {PAGES.map((it) => (
             <div key={it.id} className={`nav-item ${page === it.id ? "active" : ""} ${it.project && !project ? "disabled" : ""}`} data-tip={collapsed ? it.label : undefined} onClick={() => navTo(it.id)}>
               <span className="nav-icon"><Icon name={it.icon} /></span>

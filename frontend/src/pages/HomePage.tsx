@@ -96,7 +96,7 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
       facts: done.length ? <>可分析 {done.length} 次运行：指标对比、时间–深度矩阵、年循环、差值、粒径谱、食物网差异</> : <>需要至少一次完成的运行</>,
       action: "打开" },
     { n: 5, page: "results", title: "模型验证与稳态检查", state: done.length ? "optional" : "todo",
-      facts: <>与 WOA23 气候态比较温盐与营养盐（偏差、RMSE、相关、Taylor 图）；检查预热是否达到稳态</>, action: "验证",
+      facts: <>把模拟的温度、盐度、营养盐和多年观测平均值（WOA23）比一比；看预热够不够、结果是否已经稳定</>, action: "验证",
       onAction: () => { if (done[0]) setSelectedRuns([done[0].id]); setPage("results"); setTimeout(() => window.dispatchEvent(new CustomEvent("results-tab", { detail: "validate" })), 50); } },
     { n: 6, page: "shelf", title: "三维陆架（可选）", state: (shelves.data ?? []).some((s) => s.status === "done") ? "done" : (shelves.data ?? []).some((s) => s.status === "running") ? "busy" : "optional",
       facts: <>{shelves.data?.length ?? 0} 项陆架研究 · 水柱集合，空间分布图与区域统计</>, action: "打开" },
@@ -114,7 +114,6 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
           <div className="page-hint">{p.description}</div>
           {p.paper && <div className="soft small" style={{ marginTop: 2, fontStyle: "italic" }}>方法参考：{p.paper}</div>}
         </div>
-        <div className="page-actions"><Btn icon="new-folder" onClick={onNew}>新建项目…</Btn></div>
       </div>
       <div className="hub">
         <section>
@@ -158,7 +157,7 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
             </div>
           </section>
           <section>
-            <div className="sec-title">其他项目<span className="grow" /><IconBtn icon="refresh" title="刷新" size="sm" onClick={() => refreshProjects()} /></div>
+            <div className="sec-title">其他项目<span className="grow" /><Btn size="sm" icon="new-folder" onClick={onNew}>新建项目…</Btn><IconBtn icon="refresh" title="刷新项目列表" size="sm" onClick={() => refreshProjects()} /></div>
             <div className="plain-list">
               {projects.filter((x) => x.id !== p.id).map((x) => (
                 <div key={x.id} className="row hover" onClick={() => openProject(x.id)}>

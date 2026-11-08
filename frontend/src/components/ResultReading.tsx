@@ -7,7 +7,7 @@
  * sentences are only emitted when the data support them (thresholds below), so the text follows
  * the figure instead of a textbook expectation.
  */
-import { useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useApp } from "../store";
 import { fmt, Icon, IconBtn, RightPane } from "./ui";
 import { METRIC_INFO, PAIR_INTRO, cascadeText, configKind, infoKey, mechanism, pairKeyOf } from "./ShelfExplain";
@@ -104,10 +104,27 @@ export function ReadingToggle({ open, toggle }: { open: boolean; toggle: () => v
 /** Figure with the reading panel on its right. The panel slides open and closed; the book button
  *  (<ReadingToggle>) in the tab's option bar is its switch, as AVAS puts panel toggles in the bar above. */
 export function FigAside({ open, figure, reading, toggle }: { open: boolean; figure: ReactNode; reading: ReactNode; toggle?: () => void }) {
+  // when the column is too narrow for figure and notes side by side (e.g. the assistant is open), the notes float
+  // over the figure's right edge instead of squeezing the figure and clipping their own text
+  const ref = useRef<HTMLDivElement>(null);
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setNarrow(el.clientWidth < 760));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  // in a narrow column the notes start hidden (the figure needs the room); each press of the book button shows/hides them
+  const [local, setLocal] = useState(false);
+  const firstOpen = useRef(true);
+  useEffect(() => { setLocal(false); }, [narrow]);
+  useEffect(() => { if (firstOpen.current) { firstOpen.current = false; return; } if (narrow) setLocal((v) => !v); }, [open]);
+  const shown = narrow ? local : open;
   return (
-    <div className="fig-aside">
+    <div className={`fig-aside ${narrow ? "narrow" : ""}`} ref={ref}>
       <div className="fig-main">{figure}</div>
-      <RightPane id="reading" open={open} onClose={() => toggle?.()} initial={340} min={260} max={560} label="读图说明" className="reading-rpane">
+      <RightPane id="reading" open={shown} onClose={() => (narrow ? setLocal(false) : toggle?.())} initial={340} min={260} max={560} label="读图说明" className="reading-rpane">
         <div className="reading-aside-inner">{reading}</div>
       </RightPane>
     </div>

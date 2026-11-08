@@ -33,7 +33,7 @@ export function ValidateTab({ pid, run }: { pid: string; run: any }) {
                 shapes: [{ type: "line", x0: sd.analysis_from - 0.5, x1: sd.analysis_from - 0.5, yref: "paper", y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--fg-soft") } },
                   { type: "line", xref: "paper", x0: 0, x1: 1, y0: 100, y1: 100, line: { width: 1, color: cssVar("--glow") } }],
                 annotations: [{ x: sd.analysis_from - 0.5, y: 1, yref: "paper", yanchor: "bottom", text: "← 预热期　｜　分析期 →", showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } },
-                  { xref: "paper", x: 1, xanchor: "right", y: 2, yanchor: "bottom", text: "100%：已稳定", showarrow: false, font: { size: 10.5, color: cssVar("--glow") } }],
+                  { xref: "paper", x: 0, xanchor: "left", y: 2, yanchor: "bottom", text: "100% = 与末年相同（已稳定）", showarrow: false, font: { size: 10.5, color: cssVar("--glow") } }],
                 legend: { orientation: "h", x: 0, y: -0.3, yanchor: "top", font: { size: 11 } } }} />
               <div className="panel" style={{ overflow: "auto", maxHeight: 360 }}>
                 <table className="table">
@@ -58,13 +58,13 @@ export function ValidateTab({ pid, run }: { pid: string; run: any }) {
               <Plot height={430} data={[
                 { type: "scatterpolar", r: [1], theta: [0], mode: "markers+text", text: ["WOA"], textposition: "top right", marker: { size: 11, color: cssVar("--fg-strong"), symbol: "star" }, name: "参考（WOA23）" },
                 ...vd.vars.map((x: any, i: number) => ({ type: "scatterpolar", r: [x.stats.sd_ratio], theta: [Math.acos(Math.max(-1, Math.min(1, x.stats.r ?? 0))) * 180 / Math.PI], mode: "markers", name: x.label, hovertemplate: `${x.label}<br>r = ${fmt(x.stats.r)}<br>σm/σo = ${fmt(x.stats.sd_ratio)}<extra></extra>`, marker: { size: 12, line: { width: 1, color: dark ? "#111" : "#fff" }, color: seriesColor(i, dark) } })),
-              ]} layout={{ showlegend: true, legend: { orientation: "h", y: -0.12, x: 0, font: { size: 11 } }, margin: { l: 40, r: 30, t: 34, b: 10 },
+              ]} layout={{ showlegend: true, legend: { orientation: "h", y: -0.12, x: 0, font: { size: 11 } }, margin: { l: 40, r: 30, t: 56, b: 10 },
                 polar: { sector: [0, 90], bgcolor: "rgba(0,0,0,0)", radialaxis: { range: [0, Math.max(1.6, ...vd.vars.map((x: any) => (x.stats.sd_ratio ?? 0) * 1.1))], title: { text: "σ模式 / σ观测" }, gridcolor: cssVar("--plot-grid") },
                   angularaxis: { direction: "clockwise", rotation: 90, tickvals: [0, 25.8, 45.6, 63.3, 72.5, 84.3, 90], ticktext: ["1", "0.9", "0.7", "0.45", "0.3", "0.1", "0"], gridcolor: cssVar("--plot-grid") } },
-                annotations: [{ text: "相关系数", x: 0.85, y: 0.95, xref: "paper", yref: "paper", showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } }], title: { text: "Taylor 图（月 × 深度）" } }} />
+                annotations: [{ text: "相关系数", x: 0.85, y: 0.95, xref: "paper", yref: "paper", showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } }], title: { text: "Taylor 图：点离★越近，模式越像观测", y: 0.99 } }} />
               <div className="panel" style={{ overflow: "auto" }}>
                 <table className="table dense">
-                  <thead><tr><th>变量</th><th className="num">观测均值</th><th className="num">模式均值</th><th className="num">偏差</th><th className="num">RMSE</th><th className="num">r</th><th className="num">σm/σo</th></tr></thead>
+                  <thead><tr><th>变量</th><th className="num">观测均值</th><th className="num">模式均值</th><th className="num" data-tip="模式均值减观测均值">偏差</th><th className="num" data-tip="均方根误差：逐月逐层差值的典型大小，越小越好">误差</th><th className="num" data-tip="相关系数 r：季节和垂向变化的形状像不像，1 最好">相关</th><th className="num" data-tip="模式与观测的变化幅度之比，1 最好">变幅比</th></tr></thead>
                   <tbody>{vd.vars.map((x: any) => (
                     <tr key={x.key}><td style={{ whiteSpace: "nowrap" }}>{x.label}<div className="sub">{x.units} · <span className="mono">{x.model_var}</span></div></td>
                       <td className="num">{fmt(x.stats.obs_mean)}</td><td className="num">{fmt(x.stats.model_mean)}</td>

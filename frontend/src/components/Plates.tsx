@@ -331,7 +331,10 @@ function YearsPlate({ pid, runs }: { pid: string; runs: any[] }) {
       layout[i ? "yaxis2" : "yaxis"] = { title: { text: s.units } };
     });
     const st = panel.find((s: any) => s?.start)?.start;
-    if (st) (layout.shapes ??= []).push({ type: "line", xref: xa, yref: `${ya} domain`, x0: st, x1: st, y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--fg-soft") } });
+    if (st) {
+      (layout.shapes ??= []).push({ type: "line", xref: xa, yref: `${ya} domain`, x0: st, x1: st, y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--fg-soft") } });
+      layout.annotations.push({ x: st, xref: xa, yref: `${ya} domain`, y: 1, yanchor: "top", xanchor: "left", text: " 分析期开始", showarrow: false, font: { size: 10.5, color: cssVar("--fg-muted") } });
+    }
   });
   return (
     <div className="col" style={{ gap: 8 }}>

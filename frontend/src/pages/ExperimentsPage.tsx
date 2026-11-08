@@ -35,7 +35,7 @@ export default function ExperimentsPage() {
       <Split header={
       <div className="page-header">
         <div>
-          <div className="row"><PanelToggle id="exps" label="实验列表" /><div className="page-title">实验与运行</div><HelpLink chapter="00-guide" title="使用说明" /></div>
+          <div className="row"><PanelToggle id="exps" label="实验列表" /><div className="page-title">实验与运行</div><HelpLink chapter="13-designs" title="对照实验怎么设计、怎么读（教程）" /></div>
         </div>
         <div className="page-actions">
           {p.site_status !== "ready" && <span className="badge warn"><Icon name="warning" />站点未就绪</span>}
@@ -45,7 +45,7 @@ export default function ExperimentsPage() {
       </div>
       } id="exps" label="实验列表" initial={300} side={
         <>
-          <div className="tree-head">实验<span className="actions"><IconBtn icon="refresh" title="刷新" size="sm" onClick={() => { exps.reload(); runs.reload(); }} /></span></div>
+          <div className="tree-head">实验<span className="actions"><IconBtn icon="refresh" title="刷新" size="sm" onClick={() => { exps.reload(); runs.reload(); }} /><PanelToggle id="exps" label="实验列表" inPanel /></span></div>
           <div className="split-scroll">
             {(exps.data ?? []).map((e) => {
               const st = e.items.map((it: any) => { const r = latest(it.config_id); return r ? statusOf(r) : "none"; });

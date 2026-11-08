@@ -92,7 +92,8 @@ function Stratification() {
   const bloom = d.days.find((t) => t > 30 && d.mld[t] < d.crit[t]);
   // the crossing where the mixed layer becomes shallower than the critical depth: the bloom starts there
   const bloomEv = eventLayer(bloom !== undefined ? [{ x: bloom, y: d.mld[bloom], title: "水华开始", detail: `第 ${bloom} 天：混合层浅于临界深度` }] : [],
-    { series: [{ x: d.days, y: d.mld }, { x: d.days, y: d.crit }], xRange: [0, 365], yRange: [0, 150], px: [520, 200] });
+    // the vertical bloom line counts as an obstacle too, so the label never sits on it
+    { series: [{ x: d.days, y: d.mld }, { x: d.days, y: d.crit }, ...(bloom !== undefined ? [{ x: Array.from({ length: 31 }, () => bloom), y: Array.from({ length: 31 }, (_, k) => k * 5) }] : [])], xRange: [0, 365], yRange: [0, 150], px: [520, 200] });
   return (
     <LabShell title="混合层与临界深度：春季水华何时开始？" note="简化模型：海面受热时，风搅出的湍流要把轻的暖水往下压，浮力又把它往上托，两者打平的深度就是混合层底（这个深度叫 Monin–Obukhov 长度，风越大越深、加热越强越浅）；海面冷却时，表层水变重下沉，对流把混合层加深。临界深度按 Sverdrup 的思路随光照变化：混合层加深到这个深度时，整层浮游植物的光合作用刚好抵消呼吸和被吃掉的损失。混合层浅于临界深度时浮游植物净生长，水华开始。">
       <Slider label="10 m 风速" value={wind} min={2} max={16} onChange={setWind} unit="m/s" />
@@ -101,8 +102,10 @@ function Stratification() {
       <Plot height={280} data={[
         { x: d.days, y: d.mld, name: "混合层深度", type: "scatter", line: { color: cssVar("--accent"), width: 2.5 } },
         { x: d.days, y: d.crit, name: "临界深度", type: "scatter", line: { color: cssVar("--eco-phyto"), dash: "dash" } },
+        // the orange dotted line is a named trace, so the legend says what it is
+        ...(bloom !== undefined ? [{ x: [bloom, bloom], y: [0, 150], name: "水华开始日", type: "scatter", mode: "lines", line: { color: cssVar("--eco-zoo"), dash: "dot", width: 1.5 }, hoverinfo: "skip" }] : []),
         ...(bloomEv.marker ? [bloomEv.marker] : []),
-      ]} layout={{ yaxis: { title: "深度 m", range: [150, 0] }, xaxis: MONTH_TICKS, showlegend: true, annotations: bloomEv.annotations, shapes: bloom ? [{ type: "line", x0: bloom, x1: bloom, yref: "paper", y0: 0, y1: 1, line: { color: cssVar("--eco-zoo"), dash: "dot" } }] : [] }} />
+      ]} layout={{ yaxis: { title: "深度 m", range: [150, 0] }, xaxis: MONTH_TICKS, showlegend: true, legend: { orientation: "h", x: 0, y: -0.2, yanchor: "top" }, margin: { b: 70 }, annotations: bloomEv.annotations }} />
       <div className="lab-readout">{bloom !== undefined ? <>预测水华开始：约第 <b>{bloom}</b> 天（{Math.floor(bloom / 30.4) + 1} 月）</> : "混合层始终深于临界深度：本年无水华"}</div>
     </LabShell>
   );

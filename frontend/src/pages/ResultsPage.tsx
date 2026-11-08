@@ -3,7 +3,7 @@ import { api } from "../api";
 import { FoodWebGraph } from "../components/FoodWebGraph";
 import { sampleScale } from "../components/MapCanvas";
 import { Plot, colorscaleFor, seriesColor } from "../components/Plot";
-import { Btn, Check, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Stat, Tabs, cssVar, extent, fmt, useAsync, PanelToggle, SearchInput } from "../components/ui";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Stat, Tabs, cssVar, extent, fmt, useAsync, PanelToggle, SearchInput, Collapse } from "../components/ui";
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
 import { PlatesTab } from "../components/Plates";
 import { varName } from "../varnames";
@@ -115,8 +115,8 @@ function SidePanel({ runs, exps, sel, provisional, setSel, vars, v, setV, win, s
   const baseRun = sel.length > 1 ? runs.find((r: any) => r.id === sel[0]) : null;
   return (
     <>
-      <div style={{ padding: "10px 12px 8px", borderBottom: "1px solid var(--border)" }}>
-        <Seg value={win} onChange={setWin} size="sm" options={[["analysis", "分析时段"], ["all", "全部年份"]]} />
+      <div className="row" style={{ height: 36, padding: "0 6px 0 12px", borderBottom: "1px solid var(--border)", flex: "none" }}>
+        <Seg value={win} onChange={setWin} size="sm" options={[["analysis", "分析时段"], ["all", "全部年份"]]} /><span className="grow" /><PanelToggle id="results" label="运行与变量列表" inPanel />
       </div>
       <div style={{ flex: "1 1 50%", minHeight: 120, display: "flex", flexDirection: "column", borderBottom: "1px solid var(--border)" }}>
         <div className="tree-head">运行<span className="actions"><span className="soft" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>已选 {sel.length}</span>{sel.length > 0 && <IconBtn icon="clear-all" title="清空选择" size="sm" onClick={() => setSel([])} />}</span></div>
@@ -125,16 +125,17 @@ function SidePanel({ runs, exps, sel, provisional, setSel, vars, v, setV, win, s
           {groups.map((g) => (
             <div key={g.id}>
               <div className="tree-group" data-tip={closed[g.id] ? "展开这一组" : "收起这一组"} onClick={() => setClosed({ ...closed, [g.id]: !closed[g.id] })}><Icon name={closed[g.id] ? "chevron-right" : "chevron-down"} /><span className="ellipsis">{g.name}</span></div>
-              {!closed[g.id] && g.runs.map((r: any) => {
+              <Collapse open={!closed[g.id]}>{g.runs.map((r: any) => {
                 const i = sel.indexOf(r.id);
                 return (
                   <div key={r.id} className={`tree-item ${i >= 0 ? "active" : ""}`} style={{ paddingLeft: 16 }} onClick={() => toggle(r.id)} title={`${r.id}\n${HOST_LABEL[r.spec?.host]} · ${HTL_LABEL[r.spec?.htl?.kind]}`}>
                     <span onClick={(e) => { e.stopPropagation(); e.preventDefault(); toggle(r.id); }}><Check checked={i >= 0} onChange={() => {}} /></span>
-                    {i >= 0 ? <span className="swatch round" style={{ background: seriesColor(i, dark) }} /> : <span className="swatch round" style={{ background: "var(--border)" }} />}
+                    {/* colour dot only for ticked runs: it is the run's colour in every chart */}
+                    <span className="swatch round" style={{ background: i >= 0 ? seriesColor(i, dark) : "transparent" }} />
                     <div className="grow"><div className="ellipsis">{r.label}</div><div className="meta">{(r.created || "").slice(5, 16).replace("T", " ")}{i === 0 && sel.length > 1 ? " · 基准" : ""}</div></div>
                   </div>
                 );
-              })}
+              })}</Collapse>
             </div>
           ))}
         </div>
@@ -151,12 +152,12 @@ function SidePanel({ runs, exps, sel, provisional, setSel, vars, v, setV, win, s
             return (
               <div key={g.id}>
                 <div className="tree-group" data-tip={shut ? "展开这一组" : "收起这一组"} onClick={() => setClosed({ ...closed, [key]: !shut })}><Icon name={shut ? "chevron-right" : "chevron-down"} />{g.label}<span className="soft" style={{ marginLeft: "auto", fontWeight: 500 }}>{vs.length}</span></div>
-                {!shut && vs.map((x: any) => (
+                <Collapse open={!shut}>{vs.map((x: any) => (
                   <div key={x.name} className={`tree-item ${x.name === v ? "active" : ""}`} onClick={() => setV(x.name)} title={`${x.long_name}${x.units ? ` (${x.units})` : ""}`}>
                     <Icon name={x.depth ? "symbol-array" : "symbol-number"} />
-                    <div className="grow"><div className="ellipsis">{varName(x.name) ?? x.long_name}</div><div className="meta ellipsis mono">{x.name}{varName(x.name) ? ` · ${x.long_name}` : ""}</div></div>
+                    <div className="grow"><div className="ellipsis">{varName(x.name) ?? x.long_name}</div><div className="meta ellipsis mono">{x.name}</div></div>
                   </div>
-                ))}
+                ))}</Collapse>
               </div>
             );
           })}
@@ -166,10 +167,10 @@ function SidePanel({ runs, exps, sel, provisional, setSel, vars, v, setV, win, s
   );
 }
 
-function VarTitle({ curVar }: { curVar?: any }) {
+function VarTitle({ curVar, units }: { curVar?: any; units?: string }) {
   if (!curVar) return null;
   const zh = varName(curVar.name);
-  return <span className="row" style={{ gap: 6 }} title={curVar.long_name}><b style={{ color: "var(--fg-strong)" }}>{zh ?? curVar.long_name}</b><span className="soft ellipsis"><span className="mono">{curVar.name}</span>{curVar.units ? ` · ${curVar.units}` : ""}</span></span>;
+  return <span className="row" style={{ gap: 6 }} title={curVar.long_name}><b style={{ color: "var(--fg-strong)" }}>{zh ?? curVar.long_name}</b><span className="soft ellipsis"><span className="mono">{curVar.name}</span>{(units ?? curVar.units) ? ` · ${units ?? curVar.units}` : ""}</span></span>;
 }
 
 export function downloadCsv(name: string, rows: any[][]) {
@@ -297,6 +298,7 @@ function HovTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; v: 
       layout.annotations.push({ text: `<b>${d.label}</b>${maxNote}`, xref: "paper", yref: "paper", x: 0, y: y1 + 0.005, xanchor: "left", yanchor: "bottom", showarrow: false, font: { size: 12 } });
     });
     layout.xaxis = { anchor: n > 1 ? `y${n}` : "y" };
+    if (probe) layout.annotations.push({ x: probe.t, y: 1, xref: "x", yref: "paper", yanchor: "bottom", text: "点击的时刻", showarrow: false, font: { size: 10.5, color: cssVar("--fg-muted") } });
     if (probe) layout.shapes = [{ type: "line", xref: "x", yref: "paper", x0: probe.t, x1: probe.t, y0: 0, y1: 1, line: { color: dark ? "#fff" : "#111", width: 1, dash: "dash" } }];
     return { traces, layout };
   }, [data.data, dark, diff, contour, v, probe]);
@@ -337,9 +339,10 @@ function HovProbe({ probe, panels, onClose }: { probe: { t: string; z: number; a
       <div className="row"><b style={{ color: "var(--fg-strong)" }}>{p0.time[j]} · {p0.depth[k].toFixed(1)} m</b><span className="soft small">{fmt(val)} {u}</span><span className="grow" /><IconBtn icon="close" size="sm" title="关闭（Esc）" onClick={onClose} /></div>
       <div style={{ display: "grid", gridTemplateColumns: "150px minmax(0,1fr)", gap: 8, marginTop: 6 }}>
         <Plot height={230} data={panels.map((p, i) => ({ x: p.values.map((row: any[]) => row[j]), y: p.depth, type: "scatter", mode: "lines", name: p.label, line: { color: seriesColor(i, dark), width: 1.8 } }))}
-          layout={{ margin: { l: 34, r: 4, t: 18, b: 28 }, showlegend: false, title: { text: "该时刻剖面", font: { size: 11 } }, xaxis: { type: "linear" }, yaxis: { autorange: "reversed", type: "linear" }, shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: p0.depth[k], y1: p0.depth[k], line: { dash: "dot", width: 1, color: "#888" } }] }} />
+          layout={{ margin: { l: 34, r: 4, t: 18, b: 28 }, showlegend: false, title: { text: "该时刻剖面", font: { size: 11 } }, xaxis: { type: "linear" }, yaxis: { autorange: "reversed", type: "linear" }, shapes: [{ type: "line", xref: "paper", x0: 0, x1: 1, y0: p0.depth[k], y1: p0.depth[k], line: { dash: "dot", width: 1, color: "#888" } }],
+            annotations: [{ xref: "paper", x: 1, xanchor: "right", y: p0.depth[k], yanchor: "bottom", text: "所选深度", showarrow: false, font: { size: 10, color: cssVar("--fg-muted") } }] }} />
         <Plot height={230} data={panels.map((p, i) => ({ x: p.time, y: p.values[k], type: "scatter", mode: "lines", name: p.label, line: { color: seriesColor(i, dark), width: 1.4 } }))}
-          layout={{ margin: { l: 40, r: 6, t: 18, b: 28 }, showlegend: panels.length > 1, legend: { orientation: "h", y: -0.25, font: { size: 10 } }, title: { text: `${p0.depth[k].toFixed(0)} m 处的时间序列`, font: { size: 11 } }, xaxis: { type: "date" }, yaxis: { type: "linear" }, shapes: [{ type: "line", yref: "paper", x0: p0.time[j], x1: p0.time[j], y0: 0, y1: 1, line: { dash: "dot", width: 1, color: "#888" } }] }} />
+          layout={{ margin: { l: 40, r: 6, t: 18, b: 28 }, showlegend: panels.length > 1, legend: { orientation: "h", y: -0.25, font: { size: 10 } }, title: { text: `${p0.depth[k].toFixed(0)} m 处的时间序列`, font: { size: 11 } }, xaxis: { type: "date" }, yaxis: { type: "linear" }, shapes: [{ type: "line", yref: "paper", x0: p0.time[j], x1: p0.time[j], y0: 0, y1: 1, line: { dash: "dot", width: 1, color: "#888" } }], annotations: [{ x: p0.time[j], y: 1, yref: "paper", yanchor: "bottom", text: "所选时刻", showarrow: false, font: { size: 10, color: cssVar("--fg-muted") } }] }} />
       </div>
       <div className="soft small" style={{ marginTop: 4 }}>剖面里虚线是所选深度；时间序列里虚线是所选时刻。</div>
     </div>
@@ -413,11 +416,11 @@ function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVar
     callouts.push({ z: zk, title: uniform ? "浮游植物（均匀）" : "浮游植物最多处", sub, value: uniform ? "全柱接近" : `${zk.toFixed(0)} m`, color: cssVar("--eco-phyto") });
   }
   const series = [
-    { k: "nut", name: `营养盐 ${keys!.nut}`, c: "--eco-nut", w: 1.6, dash: "solid" },
-    { k: "phyto", name: `浮游植物 ${keys!.phyto}`, c: "--eco-phyto", w: 2.6, dash: "solid" },
-    { k: "phyto2", name: `浮游植物 ${keys!.phyto2}`, c: "--eco-phyto", w: 1.4, dash: "dash" },
-    { k: "zoo", name: `浮游动物 ${keys!.zoo}`, c: "--eco-zoo", w: 2.6, dash: "solid" },
-    { k: "det", name: `碎屑 ${keys!.det}`, c: "--eco-organic", w: 1.4, dash: "dot" },
+    { k: "nut", name: varName(keys!.nut ?? "") ?? "营养盐", c: "--eco-nut", w: 1.6, dash: "solid" },
+    { k: "phyto", name: varName(keys!.phyto ?? "") ?? "浮游植物", c: "--eco-phyto", w: 2.6, dash: "solid" },
+    { k: "phyto2", name: varName(keys!.phyto2 ?? "") ?? "浮游植物（第二类）", c: "--eco-phyto", w: 1.4, dash: "dash" },
+    { k: "zoo", name: varName(keys!.zoo ?? "") ?? "浮游动物", c: "--eco-zoo", w: 2.6, dash: "solid" },
+    { k: "det", name: varName(keys!.det ?? "") ?? "碎屑", c: "--eco-organic", w: 1.4, dash: "dot" },
   ].filter((s) => d[s.k]);
   return (
     <>
@@ -468,7 +471,8 @@ function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVar
         {fishS && !fishS.missing && (
           <Plot height={190} data={[
             { x: fishS.time, y: fishS.values, type: "scatter", mode: "lines", line: { color: cssVar("--eco-fish"), width: 1.8 }, fill: "tozeroy", fillcolor: "rgba(24,100,171,.08)", name: "鱼类" },
-          ]} layout={{ title: { text: `鱼类生物量 ${fishVar}（${d.fish.units}）` }, margin: { t: 30, b: 30 }, showlegend: false, yaxis: { type: "linear", rangemode: "tozero" }, xaxis: { type: "date" },
+          ]} layout={{ title: { text: `${varName(fishVar ?? "") ?? "鱼类"}生物量（${d.fish.units}）` }, margin: { t: 30, b: 30 }, showlegend: false, yaxis: { type: "linear", rangemode: "tozero" }, xaxis: { type: "date" },
+            annotations: [{ x: d.temp.time[ti], y: 1, yref: "paper", yanchor: "bottom", text: "当前时刻", showarrow: false, font: { size: 10.5, color: cssVar("--danger") } }],
             shapes: [{ type: "line", x0: d.temp.time[ti], x1: d.temp.time[ti], yref: "paper", y0: 0, y1: 1, line: { color: cssVar("--danger"), width: 1.5, dash: "dot" } }] }} />
         )}
         <div className="reading-cols" style={{ marginTop: 12 }}>
@@ -559,13 +563,13 @@ function SeriesTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; 
     : extremeEvents(first.time, first.values, "整段最高", "整段最低", (t: string) => String(t).slice(0, 10));
   const ys = live.flatMap((x: any) => kind === "annual" ? [...x.mean, ...(x.years > 1 ? [...x.min, ...x.max] : [])] : x.values);
   // callouts go where they cover no curve: every plotted series counts as an obstacle
-  const ev = eventLayer(events, { units, series: live.map((x: any) => (kind === "annual" ? { x: x.doy, y: x.mean } : { x: x.time, y: x.values })), yRange: headroom(ys), xRange: kind === "annual" ? [1, 365] : undefined });
+  const evOpts = { units, series: live.map((x: any) => (kind === "annual" ? { x: x.doy, y: x.mean } : { x: x.time, y: x.values })), yRange: headroom(ys), xRange: kind === "annual" ? [1, 365] as [number, number] : undefined };
+  const ev = eventLayer(events, evOpts);
   if (ev.marker) traces.push(ev.marker);
-  const annotations = ev.annotations;
   return (
     <>
       <div className="optbar">
-        <VarTitle curVar={curVar} />
+        <VarTitle curVar={curVar} units={(data.data as any)?.units} />
         <span className="grow" />
         {curVar?.depth && <Seg size="sm" value={mode} options={[["integral", "深度积分"], ["mean", "深度平均"], ["surface", "表层"], ["bottom", "底层"]]} onChange={setMode} />}
         <Seg size="sm" value={kind} options={[["annual", "年循环"], ["series", "完整序列"]]} onChange={setKind} />
@@ -577,7 +581,7 @@ function SeriesTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; 
         <ReadingToggle open={open} toggle={toggle} />
       </div>
       {data.loading ? <Loading /> : (
-        <FigAside open={open} toggle={toggle} figure={<Plot fill data={traces} layout={{ xaxis: kind === "annual" ? { ...MONTH_AXIS, title: { text: "年内日序" } } : { title: { text: "时间" } }, yaxis: { title: { text: units }, ...(events.length ? { range: headroom(ys) } : {}) }, hovermode: "x unified", margin: { t: 16 }, annotations }} />}
+        <FigAside open={open} toggle={toggle} figure={<Plot fill data={traces} layout={(px: [number, number]) => ({ xaxis: kind === "annual" ? { ...MONTH_AXIS, title: { text: "年内日序" } } : { title: { text: "时间" } }, yaxis: { title: { text: units }, ...(events.length ? { range: headroom(ys) } : {}) }, hovermode: "x unified", margin: { t: 16 }, annotations: eventLayer(events, { ...evOpts, px }).annotations })} />}
           reading={<SeriesReading data={data.data} kind={kind} v={v} label={varName(v) ?? (curVar?.long_name || v)} mode={curVar?.depth ? mode : "integral"} repeat={repeat} />} />
       )}
     </>
@@ -629,12 +633,12 @@ function ProfilePlot({ profiles, units, runs, months, dashes, dark }: { profiles
   // the x range gets a margin on the right so labels have empty room next to the curves
   const allX = profiles.flatMap((p: any) => p.values).filter((v: any) => v !== null && isFinite(v)) as number[];
   const allD = profiles.flatMap((p: any) => p.depth) as number[];
-  const xr: [number, number] = allX.length ? [Math.min(0, ...allX), Math.max(...allX) * 1.3] : [0, 1];
+  const xr: [number, number] = allX.length ? [Math.min(0, ...allX) - 0.03 * Math.max(...allX.map(Math.abs)), Math.max(...allX) * 1.3] : [0, 1];
   const dr: [number, number] = allD.length ? [Math.min(...allD) - 1, Math.max(...allD) + 1] : [0, 1];
-  const ev = eventLayer(events, { series: profiles.map((p: any) => ({ x: p.values, y: p.depth })), xRange: xr, yRange: dr });
-  ev.annotations.forEach((a: any, i: number) => { a.arrowcolor = events[i].c; });
+  const pOpts = { series: profiles.map((p: any) => ({ x: p.values, y: p.depth })), xRange: xr, yRange: dr };
+  const anns = (px: [number, number]) => { const a = eventLayer(events, { ...pOpts, px }).annotations; a.forEach((x: any, i: number) => { x.arrowcolor = events[i].c; }); return a; };
   events.forEach((e) => traces.push({ x: [e.x], y: [e.y], type: "scatter", mode: "markers", marker: { size: 7, color: e.c, line: { width: 1.5, color: cssVar("--bg") } }, showlegend: false, hoverinfo: "skip" }));
-  return <Plot fill data={traces} layout={{ yaxis: { range: [dr[1], dr[0]], title: { text: "深度 (m)" } }, xaxis: { title: { text: units }, range: xr }, legend: { orientation: "h", x: 0, y: -0.1, yanchor: "top" }, margin: { r: 30, t: 14, b: 70 }, annotations: ev.annotations }} />;
+  return <Plot fill data={traces} layout={(px: [number, number]) => ({ yaxis: { range: [dr[1], dr[0]], title: { text: "深度 (m)" } }, xaxis: { title: { text: units }, range: xr }, legend: { orientation: "h", x: 0, y: -0.1, yanchor: "top" }, margin: { r: 30, t: 14, b: 70 }, annotations: anns(px) })} />;
 }
 
 /** Least-squares slope of log10 density against log10 weight over the fished-and-forage range. */
@@ -674,7 +678,7 @@ function SpectrumTab({ pid, runs }: { pid: string; runs: any[] }) {
             layout={{ xaxis: { type: "log", title: { text: "个体湿重 w (g)" }, exponentformat: "power" }, yaxis: { type: "log", title: { text: "生物量密度 (g m⁻² g⁻¹)" }, exponentformat: "power" }, margin: { t: 16 },
               shapes: [{ type: "line", x0: wF, x1: wF, yref: "paper", y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--danger"), width: 1.2 } }],
               annotations: [{ x: Math.log10(wF), y: 0.98, yref: "paper", text: ` 捕捞下限 ${wtxt(wF)}`, showarrow: false, font: { size: 11, color: cssVar("--danger") }, xanchor: "left" },
-                ...ds.map((d, i) => { const sl = spectrumSlope(d.w, d.density); return sl === null ? null : { xref: "paper", yref: "paper", x: 0.01, y: 0.04 + i * 0.07, xanchor: "left", yanchor: "bottom", showarrow: false, bgcolor: cssVar("--bg"),
+                ...ds.map((d, i) => { const sl = spectrumSlope(d.w, d.density); return sl === null ? null : { xref: "paper", yref: "paper", x: 0.99, y: 0.97 - i * 0.07, xanchor: "right", yanchor: "top", showarrow: false, bgcolor: cssVar("--bg"),
                   text: `<span style="color:${seriesColor(i, dark)}">●</span> ${ds.length > 1 ? `${d.label}：` : ""}1–1000 g 拟合斜率 <b>${sl.toFixed(2)}</b><span style="color:${cssVar("--fg-soft")}">（约 −1 表示各对数粒径级的总生物量相近）</span>`, font: { size: 11.5, color: cssVar("--fg-strong") } }; }).filter(Boolean)] }} />
         ) : (
           <Plot fill data={[{ type: "heatmap", x: ds[0].time, y: ds[0].w, z: ds[0].log10_biomass_time, colorscale: colorscaleFor("", dark), colorbar: { title: { text: "log₁₀ g m⁻²", side: "right" }, thickness: 12 }, zsmooth: "best" }]}
