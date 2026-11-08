@@ -131,28 +131,27 @@ class CheckNeverRaises(unittest.TestCase):
             updater.validate(manifest, updater.DEFAULT_URL)
 
     def test_background_thread_survives_failures(self):
+        """The loop keeps checking after failures and its thread never dies."""
         os.environ["SHOAL_UPDATE_URL"] = f"http://127.0.0.1:{free_port()}/update.json"
         updater._started = False
         updater._stop.clear()
+        before = updater.completed_checks
         updater.start_background(delay=0, interval=0.05)
         try:
-            time.sleep(0.5)
-            names = [t.name for t in threading.enumerate()]
-            self.assertIn("update-check", names)
-            # the unreachable server is retried a few times, then reported as an error (on Windows each
-            # refused connection to localhost takes about 2 s, so this can take ~12 s)
-            for _ in range(400):
-                if updater.state()["phase"] == "error":
+            # two failed checks in a row (a refused connection to localhost takes ~2 s each on Windows)
+            for _ in range(1200):
+                if updater.completed_checks >= before + 2:
                     break
                 time.sleep(0.1)
-            self.assertEqual(updater.state()["phase"], "error")
+            self.assertGreaterEqual(updater.completed_checks, before + 2)
+            self.assertIn("update-check", [t.name for t in threading.enumerate()])
+            self.assertIn("GitHub", updater.state()["error"] or "")
         finally:
             updater._stop.set()
             for t in threading.enumerate():
                 if t.name == "update-check":
                     t.join(60)  # never let this thread leak into the next test
                     self.assertFalse(t.is_alive())
-
 
 class InstallFailuresAreReported(unittest.TestCase):
     def setUp(self):
