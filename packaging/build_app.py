@@ -114,6 +114,8 @@ def make_dmg(platform: str) -> Path:
     stage.mkdir()
     run(["ditto", DIST / "Shoal.app", stage / "Shoal.app"])
     (stage / "Applications").symlink_to("/Applications")
+    for f in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
+        shutil.copy2(REPO / f, stage / f)
     out = RELEASE / f"Shoal-{__version__}-{platform}.dmg"
     out.unlink(missing_ok=True)
     run(["hdiutil", "create", "-volname", f"Shoal {__version__}", "-srcfolder", stage, "-ov", "-format", "UDZO", out])
@@ -136,6 +138,8 @@ def make_tarball(platform: str) -> Path:
     out = RELEASE / f"Shoal-{__version__}-{platform}.tar.gz"
     shutil.copy2(REPO / "packaging" / "icons" / "Shoal.png", DIST / "Shoal" / "Shoal.png")
     shutil.copy2(REPO / "packaging" / "linux" / "install-desktop-entry.sh", DIST / "Shoal" / "install-desktop-entry.sh")
+    for f in ("LICENSE", "THIRD_PARTY_NOTICES.md"):
+        shutil.copy2(REPO / f, DIST / "Shoal" / f)
     with tarfile.open(out, "w:gz") as tar:
         tar.add(DIST / "Shoal", arcname="Shoal")
     return out

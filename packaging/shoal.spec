@@ -22,6 +22,8 @@ datas = [
     (str(REPO / "frontend" / "src" / "primer" / "content"), "frontend/src/primer/content"),
     (str(REPO / "kernel" / "src" / "gotm-cases" / "nns_annual"), "kernel/src/gotm-cases/nns_annual"),
 ]
+datas += [(str(REPO / "LICENSE"), "."), (str(REPO / "THIRD_PARTY_NOTICES.md"), "."),
+          (str(REPO / "kernel" / "vendor" / "ecosmo-e2e" / "NOTICE.md"), "licenses/ecosmo-e2e")]
 datas += collect_data_files("shoal")  # site templates, data tables, tray icon
 datas += collect_data_files("pyfabm")
 binaries = collect_dynamic_libs("pyfabm")
@@ -80,6 +82,6 @@ if MACOS:
             "LSUIElement": True,  # lives in the menu bar, no Dock icon; the work happens in the browser
             "LSMinimumSystemVersion": "12.0",
             "NSHighResolutionCapable": True,
-            "NSHumanReadableCopyright": "Includes GOTM, FABM, ERSEM, FABM-MIZER (GPL) and ECOSMO E2E v2.0 (CC BY 4.0)",
+            "NSHumanReadableCopyright": "GNU GPL v3 or later. Third-party components: see THIRD_PARTY_NOTICES.md",
         },
     )

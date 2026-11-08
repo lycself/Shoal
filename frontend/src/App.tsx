@@ -218,7 +218,8 @@ export default function App() {
             {k && <div className="kv small">{[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E", k.e2e?.source === "official" ? "官方 ECOSMO E2E v2.0" : "按论文方程重写"], ["编译", k.built]].map(([a, b]) => <Fragment key={String(a)}><span className="k" key={a}>{a}</span><span className="v mono" key={a + "v"}>{b ?? "–"}</span></Fragment>)}</div>}
             <div className="small muted" style={{ lineHeight: 1.7 }}>
               参考文献：Powley et al. (2026) Prog. Oceanogr. 243, 103701 · Vijayakumaran et al. (2026) EGUsphere-2026-3078 · Burchard et al. (1999) GOTM · Bruggeman &amp; Bolding (2014) FABM · Butenschön et al. (2016) ERSEM。<br />
-              数据：ERA5（Copernicus C3S，经 Open-Meteo）· World Ocean Atlas 2023（NOAA NCEI）· ETOPO 2022（NOAA）。
+              数据：ERA5（Copernicus C3S，经 Open-Meteo）· World Ocean Atlas 2023（NOAA NCEI）· ETOPO 2022（NOAA）。<br />
+              许可证：GNU GPL 第 3 版或更高版本；第三方组件的许可证见 <a href="https://github.com/lycself/Shoal/blob/main/THIRD_PARTY_NOTICES.md" target="_blank" rel="noreferrer">THIRD_PARTY_NOTICES</a>。
             </div>
           </div>
         </Modal>

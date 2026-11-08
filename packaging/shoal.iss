@@ -36,6 +36,7 @@ WizardStyle=modern
 AppMutex=ShoalDesktopAppMutex
 CloseApplications=no
 ShowLanguageDialog=no
+LicenseFile=..\LICENSE
 
 [Languages]
 Name: "chinesesimplified"; MessagesFile: "languages\ChineseSimplified.isl"
