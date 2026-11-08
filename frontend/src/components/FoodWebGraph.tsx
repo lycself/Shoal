@@ -9,13 +9,28 @@ const ROWS: [string, (n: FWNode) => boolean][] = [
   ["顶层鱼类", (n) => n.level >= 3.8],
   ["鱼类", (n) => n.level >= 3 && n.level < 3.8],
   ["中型浮游动物 · 底栖动物", (n) => n.level >= 2.4 && n.level < 3],
-  ["小型浮游动物", (n) => n.level >= 1.9 && n.level < 2.4],
+  ["微型浮游动物 · 鞭毛虫", (n) => n.level >= 1.9 && n.level < 2.4],
   ["初级生产者 · 细菌", (n) => n.level >= 1 && n.level < 1.9],
   ["营养盐 · 有机物 · 沉积物", (n) => n.level < 1],
 ];
 const GROUP_ORDER = ["det", "nut", "pel", "mic", "htl", "ben"];
+/** Rough text width: CJK glyphs are one em, Latin and digits a little over half. */
+const textW = (t: string, size: number) => [...t].reduce((w, ch) => w + (ch.charCodeAt(0) > 0x2e80 ? size : size * 0.6), 0);
+/** Up to two lines that fit maxW; breaks at a space or a CJK boundary, ellipsis on overflow. */
+function wrap2(t: string, maxW: number, size: number): string[] {
+  if (textW(t, size) <= maxW) return [t];
+  const chars = [...t];
+  let i = 0, w = 0;
+  while (i < chars.length && w + textW(chars[i], size) <= maxW) w += textW(chars[i++], size);
+  const sp = chars.slice(0, i).lastIndexOf(" ");
+  const cut = sp > 2 ? sp : i;
+  const first = chars.slice(0, cut).join("").trim(), rest = chars.slice(cut).join("").trim();
+  if (textW(rest, size) <= maxW) return [first, rest];
+  let r = "";
+  for (const ch of rest) { if (textW(r + ch + "…", size) > maxW) break; r += ch; }
+  return [first, r + "…"];
+}
 const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-const NW = 150, NH = 44;
 
 function mergeNutrients(graph: { nodes: FWNode[]; edges: FWEdge[] }) {
   const nut = graph.nodes.filter((n) => n.role === "nutrient");
@@ -45,21 +60,35 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
 }) {
   const dark = useApp((s) => s.dark);
   const wrap = useRef<HTMLDivElement>(null);
-  const [W, setW] = useState(900);
+  const canvas = useRef<HTMLDivElement>(null);
+  // the layout is never narrower than 640 px; a narrower pane shows the whole graph scaled down instead of clipping it
+  const [boxW, setBoxW] = useState(900);
+  const W = Math.max(640, boxW), scale = Math.min(1, boxW / W);
+  const [availH, setAvailH] = useState(height);
   const [hover, setHover] = useState<string | null>(null);
   const [showWaste, setShowWaste] = useState(false);
   const [showUptake, setShowUptake] = useState(false);
   useEffect(() => {
-    const ro = new ResizeObserver(() => wrap.current && setW(Math.max(640, wrap.current.clientWidth)));
+    // the graph fills its pane: width from the wrapper, height from the canvas area left after the legend
+    const ro = new ResizeObserver(() => {
+      if (wrap.current) setBoxW(wrap.current.clientWidth);
+      if (canvas.current) setAvailH(Math.max(height, canvas.current.clientHeight / Math.min(1, (wrap.current?.clientWidth ?? 640) / 640)));
+    });
     if (wrap.current) ro.observe(wrap.current);
+    if (canvas.current) ro.observe(canvas.current);
     return () => ro.disconnect();
   }, []);
   const g = useMemo(() => mergeNutrients(graph), [graph]);
 
   const layout = useMemo(() => {
     const rows = ROWS.map(([label, f]) => ({ label, nodes: g.nodes.filter(f) })).filter((r) => r.nodes.length);
-    const left = 132, right = 24, top = 18, bottom = 18;
-    const rowH = Math.max(78, (height - top - bottom) / Math.max(1, rows.length));
+    // row names sit in the top-left corner of each band, so the nodes get the full width
+    const left = 14, right = 14, top = 34, bottom = 14;
+    const rowH = Math.max(78, (availH - top - bottom) / Math.max(1, rows.length));
+    const maxN = Math.max(1, ...rows.map((r) => r.nodes.length));
+    // nodes grow with the pane but always fit their row with a gap
+    const NW = Math.max(92, Math.min(220, (W - left - right) / maxN - 16));
+    const NH = Math.max(50, Math.min(64, rowH * 0.5));
     const pos: Record<string, { x: number; y: number }> = {};
     rows.forEach((r, ri) => {
       r.nodes.sort((a, b) => GROUP_ORDER.indexOf(a.group) - GROUP_ORDER.indexOf(b.group) || a.id.localeCompare(b.id));
@@ -69,8 +98,10 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
         pos[node.id] = { x: left + (span * (i + 0.5)) / n, y: top + rowH * (ri + 0.5) };
       });
     });
-    return { rows, pos, rowH, top, H: top + bottom + rowH * rows.length, left };
-  }, [g, W, height]);
+    return { rows, pos, rowH, top, H: top + bottom + rowH * rows.length, left, NW, NH };
+  }, [g, W, availH]);
+  const { NW, NH } = layout;
+  const fs = Math.min(1.12, NH / 50);
 
   const color = (role: string) => cssVar(ROLE_VAR[role] ?? "--fg-soft");
   const focus = hover ?? selected ?? null;
@@ -95,11 +126,12 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
 
   return (
     <div ref={wrap} className="fw-wrap">
+      <div ref={canvas} className="fw-canvas" style={{ minHeight: height }}>
       <div className="row" style={{ position: "absolute", right: 10, top: 6, gap: 14, zIndex: 2 }}>
         <Check checked={showUptake} onChange={setShowUptake}><span className="small muted">营养盐吸收</span></Check>
         <Check checked={showWaste} onChange={setShowWaste}><span className="small muted">排泄与碎屑流</span></Check>
       </div>
-      <svg width={W} height={layout.H} viewBox={`0 0 ${W} ${layout.H}`} onClick={() => onSelect?.(null)} style={{ display: "block" }}>
+      <svg width={W * scale} height={layout.H * scale} viewBox={`0 0 ${W} ${layout.H}`} onClick={() => onSelect?.(null)} style={{ display: "block", position: "absolute", inset: 0 }}>
         <defs>
           <filter id="fw-glow" x="-200%" y="-200%" width="500%" height="500%">
             <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="halo" />
@@ -114,7 +146,7 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
         {layout.rows.map((r, i) => (
           <g key={r.label}>
             <rect x={0} y={layout.top + i * layout.rowH} width={W} height={layout.rowH} fill={i % 2 ? "transparent" : cssVar("--bg-side")} opacity={0.7} />
-            <text x={14} y={layout.top + (i + 0.5) * layout.rowH} dominantBaseline="middle" fontSize={11.5} fill={cssVar("--fg-soft")} fontWeight={600}>{r.label}</text>
+            <text x={12} y={layout.top + i * layout.rowH + 15} fontSize={11} fill={cssVar("--fg-soft")} fontWeight={600}>{r.label}</text>
           </g>
         ))}
         {edges.map((e, i) => {
@@ -170,15 +202,19 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
                 <rect width={NW} height={NH} rx={7} fill={delta[n.var] >= 0 ? "#d6453c" : "#2a6fcb"} opacity={Math.min(0.45, 0.08 + Math.abs(delta[n.var]) / 60)} pointerEvents="none" />
               )}
               <rect width={5} height={NH} rx={2} fill={c} />
-              <text x={14} y={frac !== null ? 17 : NH / 2 + 1} dominantBaseline="middle" fontSize={12} fontWeight={600} fill={cssVar("--fg-strong")}>{n.label.length > 13 ? n.label.slice(0, 12) + "…" : n.label}</text>
+              {(() => {
+                const size = 12 * fs, lines = wrap2(n.label, NW - (delta && delta[n.var] !== undefined ? 70 : 22), size);
+                const lh = size * 1.25, y0 = frac !== null ? (NH - 12) / 2 - ((lines.length - 1) * lh) / 2 + 1 : NH / 2 - ((lines.length - 1) * lh) / 2 + 1;
+                return <text x={14} y={y0} dominantBaseline="middle" fontSize={size} fontWeight={600} fill={cssVar("--fg-strong")}>{lines.map((l, k) => <tspan key={k} x={14} dy={k ? lh : 0}>{l}</tspan>)}</text>;
+              })()}
               {delta && delta[n.var] !== undefined && (
-                <text x={NW - 8} y={NH / 2 + 1} textAnchor="end" dominantBaseline="middle" fontSize={12} fontWeight={700} fill={cssVar("--fg-strong")}>{delta[n.var] > 0 ? "+" : ""}{delta[n.var].toFixed(1)}%</text>
+                <text x={NW - 8} y={NH / 2 + 1} textAnchor="end" dominantBaseline="middle" fontSize={12 * fs} fontWeight={700} fill={cssVar("--fg-strong")}>{delta[n.var] > 0 ? "+" : ""}{delta[n.var].toFixed(1)}%</text>
               )}
               {frac !== null && !delta && (
                 <>
-                  <rect x={14} y={28} width={NW - 70} height={5} rx={2.5} fill={cssVar("--bg-sunk")} />
-                  <rect x={14} y={28} width={(NW - 70) * frac} height={5} rx={2.5} fill={c} />
-                  <text x={NW - 8} y={31} textAnchor="end" dominantBaseline="middle" fontSize={10.5} fill={cssVar("--fg-muted")}>{fmt(s!.value, 3)}</text>
+                  <rect x={14} y={NH - 13} width={Math.max(20, NW - 70)} height={5} rx={2.5} fill={cssVar("--bg-sunk")} />
+                  <rect x={14} y={NH - 13} width={Math.max(20, NW - 70) * frac} height={5} rx={2.5} fill={c} />
+                  <text x={NW - 8} y={NH - 10} textAnchor="end" dominantBaseline="middle" fontSize={10.5 * fs} fill={cssVar("--fg-muted")}>{fmt(s!.value, 3)}</text>
                 </>
               )}
               <title>{`${n.label}\n输出变量 ${n.var}${s ? `\n年均深度积分 ${fmt(s.value)} ${s.units}` : ""}`}</title>
@@ -186,7 +222,8 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
           );
         })}
       </svg>
-      <div className="fw-legend" style={{ position: "static", margin: "6px 12px 12px", maxWidth: "none", display: "inline-flex" }}>
+      </div>
+      <div className="fw-legend" style={{ position: "static", margin: 0, padding: "8px 14px 10px", maxWidth: "none", display: "flex", background: "none", border: 0, borderTop: "1px solid var(--border)", borderRadius: 0 }}>
         {[["nutrient", "营养盐"], ["phyto", "浮游植物"], ["bacteria", "细菌"], ["zoo", "浮游动物"], ["fish", "鱼类"], ["benthos", "底栖"], ["organic", "有机物"]].map(([r, l]) => (
           <span key={r}><span className="swatch" style={{ background: color(r) }} />{l}</span>
         ))}

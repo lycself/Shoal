@@ -2,6 +2,7 @@ import { useApp } from "../store";
 import { Plot, seriesColor } from "./Plot";
 import { Empty, Icon, Loading, Notice, cssVar, fmt, useAsync } from "./ui";
 import { api } from "../api";
+import { varLabel, varName } from "../varnames";
 
 const MONTHS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
 
@@ -24,17 +25,21 @@ export function ValidateTab({ pid, run }: { pid: string; run: any }) {
               {sd.max_drift_pct != null && sd.max_drift_pct >= 1 && <> <a className="link" onClick={() => setPage("site")}>去“站点与物理”增加预热年数 →</a>（研究用途建议 10–20 年；高营养级比低营养级慢得多）</>}
             </Notice>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)", gap: 16, marginTop: 10 }}>
-              <Plot height={300} data={sd.vars.map((x: any, i: number) => {
+              <Plot height={360} data={sd.vars.map((x: any, i: number) => {
                 const last = x.values[x.values.length - 1];
-                return { x: sd.years, y: x.values.map((y: number) => (last ? (y / last) * 100 : null)), type: "scatter", mode: "lines+markers", name: x.name, line: { color: seriesColor(i, dark), width: 1.8 }, marker: { size: 5 } };
-              })} layout={{ yaxis: { title: { text: "年均值 / 末年 (%)" } }, xaxis: { title: { text: "模拟年份" }, dtick: 1 }, margin: { t: 10 },
-                shapes: [{ type: "line", x0: sd.analysis_from - 0.5, x1: sd.analysis_from - 0.5, yref: "paper", y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--fg-soft") } }],
-                legend: { orientation: "v", x: 1.02, y: 1 } }} />
-              <div className="panel" style={{ overflow: "auto", maxHeight: 300 }}>
+                return { x: sd.years, y: x.values.map((y: number) => (last && y / last > 0 ? (y / last) * 100 : null)), type: "scatter", mode: "lines+markers", name: varLabel(x.name, x.long_name), line: { color: seriesColor(i, dark), width: 1.8 }, marker: { size: 5 }, hovertemplate: `${varLabel(x.name, x.long_name)}<br>%{x}：末年的 %{y:.1f}%<extra></extra>` };
+              })} layout={{ yaxis: { title: { text: "年均值 ÷ 末年 (%)，对数轴" }, type: "log", tickvals: [1, 3, 10, 30, 100, 300, 1000, 3000, 10000], ticktext: ["1", "3", "10", "30", "100", "300", "1000", "3000", "10000"] }, xaxis: { title: { text: "模拟年份", standoff: 6 }, dtick: 1 }, margin: { t: 26, b: 110 },
+                // the 100 % line is the steady state every curve should settle on; the dotted line splits spin-up from analysis
+                shapes: [{ type: "line", x0: sd.analysis_from - 0.5, x1: sd.analysis_from - 0.5, yref: "paper", y0: 0, y1: 1, line: { dash: "dot", color: cssVar("--fg-soft") } },
+                  { type: "line", xref: "paper", x0: 0, x1: 1, y0: 100, y1: 100, line: { width: 1, color: cssVar("--glow") } }],
+                annotations: [{ x: sd.analysis_from - 0.5, y: 1, yref: "paper", yanchor: "bottom", text: "← 预热期　｜　分析期 →", showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } },
+                  { xref: "paper", x: 1, xanchor: "right", y: 2, yanchor: "bottom", text: "100%：已稳定", showarrow: false, font: { size: 10.5, color: cssVar("--glow") } }],
+                legend: { orientation: "h", x: 0, y: -0.3, yanchor: "top", font: { size: 11 } } }} />
+              <div className="panel" style={{ overflow: "auto", maxHeight: 360 }}>
                 <table className="table">
                   <thead><tr><th>变量</th><th className="num">末两年变化</th></tr></thead>
                   <tbody>{sd.vars.map((x: any) => (
-                    <tr key={x.name}><td><span className="mono">{x.name}</span><div className="sub">{x.long_name}</div></td>
+                    <tr key={x.name}><td>{varName(x.name) ?? x.long_name}<div className="sub"><span className="mono">{x.name}</span>{varName(x.name) ? ` · ${x.long_name}` : ""}</div></td>
                       <td className="num" style={{ color: x.drift_pct == null ? undefined : Math.abs(x.drift_pct) < 1 ? "var(--ok)" : Math.abs(x.drift_pct) < 5 ? "var(--warn)" : "var(--danger)", fontWeight: 600 }}>{x.drift_pct == null ? "–" : `${x.drift_pct > 0 ? "+" : ""}${x.drift_pct}%`}</td></tr>
                   ))}</tbody>
                 </table>

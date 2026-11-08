@@ -300,7 +300,7 @@ export function MapCanvas({ box, points = [], cell, scale, range, onPick, marker
         {selected && cell && <div className="map-cell-selected" style={cellRect(selected)} />}
         {tip && <div className="map-tip" style={{ left: Math.min(tip.x + 14, W - 200), top: tip.y + 14 }}>{tip.lines.map((l, i) => <div key={i} className={i === 0 ? "t" : l.startsWith("点击") ? "h" : undefined}>{l}</div>)}</div>}
       </div>
-      <div className="row wrap" style={{ marginTop: 6, gap: 18, paddingLeft: M.l }}>
+      <div className="row wrap" style={{ marginTop: 6, gap: 18, paddingLeft: M.l, maxWidth: W, overflow: "hidden" }}>
         {hasValues && (
           <div className="colorbar">
             <span className="num">{fmt(vmin)}</span>

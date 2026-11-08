@@ -20,8 +20,11 @@ export function ShelfPlates({ study, results, configs = [], boxes = [] }: { stud
   const keys = Object.keys(meta);
   const cfgOf = (r: any) => configs.find((c) => c.id === r?.config_id);
   const [kind, setKind] = useState<"triple" | "pct">("triple");
-  const [metric, setMetric] = useState(keys.find((k) => /fish_ww|F1_c/.test(k)) ?? keys[0]);
   const [ref0, ref1] = referenceIndex(results.map((r) => configKind(cfgOf(r))));
+  // default to a metric both configurations on screen have (a fish-free baseline has no fish biomass), fish first
+  const hasIn = (r: any, k: string) => (r?.points ?? []).some((p: any) => p.metrics?.[k] != null);
+  const both = keys.filter((k) => hasIn(results[ref0], k) && hasIn(results[ref1], k));
+  const [metric, setMetric] = useState(both.find((k) => /fish_ww|F1_c/.test(k)) ?? both.find((k) => /^zoo_Z4|^zoo$/.test(k)) ?? both[0] ?? keys[0]);
   const [pick, setPick] = useState<[number, number] | null>(null);
   const [ia, ib] = pick ?? [ref0, ref1];
   const A = results[ia], B = results[ib];

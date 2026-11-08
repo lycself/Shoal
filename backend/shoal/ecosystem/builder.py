@@ -82,8 +82,10 @@ MIZER_DEFAULTS = {
 }
 
 PARAM_DOCS = {
-    # shown in the UI next to each HTL parameter
-    "m": ("死亡率", "d⁻¹"), "mu": ("排泄率（0 °C 参考）", "d⁻¹"), "r": ("摄食半饱和常数", "mmol C m⁻³"),
+    # shown in the UI next to each HTL parameter. The units are those of the reimplementation
+    # (kernel/e2e: r compared with column-mean food, mmol C m-3); htl_parameter_table() overrides r
+    # for the official engine (fish mmol N m-2 against column-integrated food, macrobenthos mmol N m-3)
+    "m": ("死亡率", "d⁻¹"), "mu": ("排泄率（0 °C 参考）", "d⁻¹"), "r": ("摄食半饱和常数（摄食达到最大一半时的食物量）", "mmol C m⁻³"),
     "r_ben": ("底栖饵料半饱和常数", "mmol C m⁻³"), "gamma": ("同化效率", "–"), "alpha_dom": ("未同化与死亡进入 DOM 的比例", "–"),
     "theta": ("排泄温度敏感性（活化能）", "eV"), "fishing": ("捕捞死亡率", "d⁻¹"), "c_ini": ("初始生物量", "mg C m⁻²"),
 }

@@ -4,7 +4,8 @@ import { MapCanvas } from "../components/MapCanvas";
 import { Plot, colorscaleFor, seriesColor } from "../components/Plot";
 import { SitePicker, siteNotes } from "../components/SitePicker";
 import { Term } from "../components/Term";
-import { Btn, Empty, Icon, Loading, Modal, Notice, Progress, Select, Seg, Split, StatusBadge, Tabs, fmtLatLon, useAsync, HelpLink, PanelToggle } from "../components/ui";
+import { Btn, Empty, Icon, Loading, Modal, Notice, Progress, Select, Seg, Split, StatusBadge, Tabs, cssVar, fmtLatLon, useAsync, HelpLink, PanelToggle } from "../components/ui";
+import { clineDepth, eventLayer, extremeEvents, smoothDays } from "../components/annotate";
 import { useApp } from "../store";
 
 const MONTHS = ["1月", "2月", "3月", "4月", "5月", "6月", "7月", "8月", "9月", "10月", "11月", "12月"];
@@ -30,7 +31,7 @@ export default function SitePage() {
         <div className="page-actions">
           <StatusBadge status={siteJob ? "building" : p.site_status} />
           <Btn icon="edit" onClick={() => { setMoveTo(null); setEdit(true); }}>更换站点</Btn>
-          <Btn icon="refresh" disabled={!!siteJob} onClick={async () => { await api.post(`/projects/${p.id}/site/build`); refreshProject(); }}>{p.site_status === "ready" ? "重新构建" : "构建站点"}</Btn>
+          <Btn icon="refresh" disabled={!!siteJob} onClick={async () => { if (p.site_status === "ready" && !confirm("重新下载并生成站点的气象、气候态和地形数据？已有的运行结果不受影响，但之后的新运行会用新数据。")) return; await api.post(`/projects/${p.id}/site/build`); refreshProject(); }}>{p.site_status === "ready" ? "重新构建" : "构建站点"}</Btn>
         </div>
       </div>
       {siteJob && (
@@ -86,21 +87,25 @@ export default function SitePage() {
 }
 
 function SimSettings() {
-  const { project, refreshProject, toast } = useApp();
+  const { project, refreshProject, toast, setDirty: markDirty } = useApp();
   const p = project!;
   const [s, setS] = useState<any>(p.simulation);
   const [dirty, setDirty] = useState(false);
-  useEffect(() => { setS(p.simulation); setDirty(false); }, [p.id, p.simulation]);
+  // a background job refreshes the project object; only a different project (or a clean form) resets the edits
+  useEffect(() => { setS(p.simulation); setDirty(false); }, [p.id]);
+  useEffect(() => { if (!dirty) setS(p.simulation); }, [p.simulation]);
+  useEffect(() => { markDirty("site-sim", dirty ? "站点页的模拟设置" : null); return () => markDirty("site-sim", null); }, [dirty]);
   const fy = (p.site_info || p.site).forcing_years || [2014, 2014];
   const total = s.mode === "repeat" ? (+s.years || 1) + (+s.spinup_years || 0) : (Math.min(s.period?.[1] ?? fy[1], fy[1]) - Math.max(s.period?.[0] ?? fy[0], fy[0]) + 1) + (+s.spinup_years || 0);
   const set = (k: string, v: any) => { setS({ ...s, [k]: v }); setDirty(true); };
-  const save = async () => { await api.patch(`/projects/${p.id}`, { simulation: s }); toast("模拟设置已保存（下次运行生效）", "ok"); refreshProject(); };
+  const save = async () => { await api.patch(`/projects/${p.id}`, { simulation: s }); setDirty(false); toast("模拟设置已保存（下次运行生效）", "ok"); refreshProject(); };
   const num = (k: string, label: string, unit?: string, opt?: any) => (
     <><span className="label"><Term k={label.replace(/^(温盐|营养盐) ?/, "")}>{label}</Term></span><span className="control"><input className="input num" type="number" value={s[k] ?? ""} onChange={(e) => set(k, e.target.value === "" ? null : +e.target.value)} {...opt} />{unit && <span className="unit">{unit}</span>}</span></>
   );
   return (
     <div style={{ borderTop: "1px solid var(--border)" }}>
-      <div className="tree-head">模拟设置<span className="actions"><span className="soft" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>{total} 个模拟年</span></span></div>
+      <div className="tree-head" style={{ position: "sticky", top: 0, zIndex: 2, background: "var(--bg-side)" }}>模拟设置<span className="actions"><span className="soft" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>{total} 个模拟年</span>
+        {dirty && <><span className="warn-text" style={{ textTransform: "none", letterSpacing: 0, fontWeight: 500 }}>未保存</span><Btn variant="primary" size="sm" icon="save" onClick={save}>保存</Btn></>}</span></div>
       <div style={{ padding: "4px 16px 16px" }}>
         <Seg value={s.mode} options={[["repeat", "重复同一年的气象"], ["period", "真实年份序列"]]} onChange={(v) => set("mode", v)} />
         <div className="form" style={{ gridTemplateColumns: "100px minmax(0,1fr)", marginTop: 12 }}>
@@ -127,10 +132,6 @@ function SimSettings() {
           </Select></span>
         </div>
         <div className="hint" style={{ marginTop: 6 }}>一维模型没有真实潮汐，用周期性的水平压强梯度模拟 M2 潮流带来的底层湍流混合。潮流越强，浅水越容易全年混合、不形成层化。</div>
-        <div className="row" style={{ marginTop: 12 }}>
-          <Btn variant="primary" size="sm" icon="save" disabled={!dirty} onClick={save}>保存设置</Btn>
-          {dirty && <span className="warn-text small">未保存</span>}
-        </div>
         <div className="hint" style={{ marginTop: 10, lineHeight: 1.6 }}>
           重复同一年气象：预热年数越多越接近稳态；快速试算可用 4 年预热，研究用途建议 10–20 年。真实年份序列：用于研究年际变化，前几年作为预热。
         </div>
@@ -139,23 +140,41 @@ function SimSettings() {
   );
 }
 
+/** Charts on this page fill the window height (the tab area starts about 220 px from the top). */
+const fillH = (min: number, offset = 240) => Math.max(min, (typeof window !== "undefined" ? window.innerHeight : 900) - offset);
+
 function MeteoChart({ m }: { m: any }) {
   const dark = useApp((s) => s.dark);
   const panels: [string, string, string, number][] = [["airt", "2 m 气温", "°C", 9], ["swr", "向下短波辐射", "W m⁻²", 1], ["wind", "10 m 风速", "m s⁻¹", 0], ["cloud", "云量", "比例", 4]];
   const n = panels.length, gap = 0.035, h = (1 - gap * (n - 1)) / n;
-  const data = panels.map(([k, name, , ci], i) => ({ x: m.date, y: m[k], name, type: "scatter", mode: "lines", line: { width: 1.1, color: seriesColor(ci, dark) }, xaxis: "x", yaxis: i ? `y${i + 1}` : "y", hovertemplate: `%{x}<br>${name} %{y}<extra></extra>` }));
-  const layout: any = { showlegend: false, margin: { l: 66, r: 20, t: 10, b: 36 }, xaxis: { anchor: `y${n}` }, hovermode: "x unified" };
+  // daily values as a faint trace, the 30-day running mean on top: the season reads at a glance, the weather stays visible
+  const data: any[] = [];
+  const annotations: any[] = [];
+  panels.forEach(([k, name, unit, ci], i) => {
+    const ya = i ? `y${i + 1}` : "y", c = seriesColor(ci, dark);
+    data.push({ x: m.date, y: m[k], name, type: "scatter", mode: "lines", line: { width: 1, color: c }, opacity: 0.35, xaxis: "x", yaxis: ya, hovertemplate: `%{x}<br>${name} %{y}<extra></extra>` });
+    data.push({ x: m.date, y: smoothDays(m.date, m[k], 30), name: `${name}（30 天平均）`, type: "scatter", mode: "lines", line: { width: 2.2, color: c }, xaxis: "x", yaxis: ya, hoverinfo: "skip" });
+    const evs = k === "airt" ? extremeEvents(m.date, m[k], "最热的一天", "最冷的一天", (d: string) => String(d).slice(0, 10))
+      : k === "wind" ? extremeEvents(m.date, m[k], "风最大（风暴）", undefined, (d: string) => String(d).slice(0, 10))
+      : k === "swr" ? extremeEvents(m.date, m[k], "日照最强", undefined, (d: string) => String(d).slice(0, 10)) : [];
+    const ev = eventLayer(evs.map((e) => ({ ...e, low: false })), { units: unit, yaxis: ya, digits: 3 });
+    ev.annotations.forEach((a: any, j: number) => { a.ay = j ? 26 : -22; a.ax = j ? -40 : 40; });
+    annotations.push(...ev.annotations);
+    if (ev.marker) data.push(ev.marker);
+  });
+  const layout: any = { showlegend: false, margin: { l: 66, r: 20, t: 10, b: 36 }, xaxis: { anchor: `y${n}` }, hovermode: "x unified", annotations };
   panels.forEach(([, name, unit], i) => {
     layout[i ? `yaxis${i + 1}` : "yaxis"] = { domain: [1 - (i + 1) * h - i * gap, 1 - i * gap - i * h], title: { text: `${name}<br><span style="font-size:10px">${unit}</span>` } };
   });
   return (
     <div className="col" style={{ gap: 8 }}>
       <div className="muted small">这里画的是 ERA5 气象再分析的日平均值。风把海水搅匀；阳光和气温决定海面得到或失去多少热量。两者一起决定水柱什么时候分层、春季藻华什么时候出现。</div>
-      <Plot height={620} data={data} layout={layout} />
+      <Plot height={fillH(620, 200)} data={data} layout={layout} />
     </div>
   );
 }
 
+const CLINE: Record<string, string> = { temperature: "温跃层", salinity: "盐跃层", nitrate: "营养跃层", phosphate: "营养跃层", silicate: "营养跃层", oxygen: "氧跃层" };
 function WoaView({ w, depth }: { w: any; depth?: number }) {
   const dark = useApp((s) => s.dark);
   const [v, setV] = useState("temperature");
@@ -165,6 +184,9 @@ function WoaView({ w, depth }: { w: any; depth?: number }) {
     phosphate: ["磷酸盐", "mmol P m⁻³", "N1_p"], silicate: ["硅酸盐", "mmol Si m⁻³", "N5_s"], oxygen: ["溶解氧", "mmol O₂ m⁻³", "O2_o"],
   };
   const z = useMemo(() => (w[v] ?? []).length ? w.depth.map((_: number, k: number) => w[v].map((prof: number[]) => prof[k])) : [], [w, v]);
+  // per month: the depth where the profile changes fastest (thermocline, halocline, nutricline, oxycline)
+  const cline = useMemo(() => (w[v] ?? []).map((prof: number[]) => clineDepth(w.depth, prof, v === "temperature" ? 0.03 : 0.08)), [w, v]);
+  const clineLabel = useMemo(() => { const k = cline.reduce((b: number, x: number | null, i: number) => (x !== null && (b < 0 || x < (cline[b] ?? Infinity)) ? i : b), -1); return k >= 0 ? { m: MONTHS[k], z: cline[k] } : null; }, [cline]);
   return (
     <div className="col" style={{ gap: 10 }}>
       <div className="row">
@@ -173,11 +195,13 @@ function WoaView({ w, depth }: { w: any; depth?: number }) {
         <span className="soft small grow">World Ocean Atlas 2023 的多年月平均剖面。模拟从它开始，之后也一直被它轻轻“拉住”（松弛），弥补一维模型没有海流补给的缺陷。</span>
       </div>
       {mode === "section" ? (
-        <Plot height={460} data={[{ type: "heatmap", x: MONTHS, y: w.depth, z, colorscale: colorscaleFor(meta[v][2], dark), colorbar: { title: { text: meta[v][1], side: "right" }, thickness: 12, len: 0.9 }, hovertemplate: "%{x} %{y} m<br>%{z:.3f}<extra></extra>", zsmooth: "best" },
-          { type: "contour", x: MONTHS, y: w.depth, z, showscale: false, contours: { coloring: "none", showlabels: true, labelfont: { size: 10, color: dark ? "#ddd" : "#333" } }, line: { color: dark ? "rgba(255,255,255,.45)" : "rgba(0,0,0,.35)", width: 0.8 }, hoverinfo: "skip" }]}
-          layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" } }, margin: { l: 60, r: 10, t: 14, b: 36 }, title: { text: `${meta[v][0]}（${meta[v][1]}）` } }} />
+        <Plot height={fillH(460)} data={[{ type: "heatmap", x: MONTHS, y: w.depth, z, colorscale: colorscaleFor(meta[v][2], dark), colorbar: { title: { text: meta[v][1], side: "right" }, thickness: 12, len: 0.9 }, hovertemplate: "%{x} %{y} m<br>%{z:.3f}<extra></extra>", zsmooth: "best" },
+          { type: "contour", x: MONTHS, y: w.depth, z, showscale: false, contours: { coloring: "none", showlabels: true, labelfont: { size: 10, color: dark ? "#ddd" : "#333" } }, line: { color: dark ? "rgba(255,255,255,.45)" : "rgba(0,0,0,.35)", width: 0.8 }, hoverinfo: "skip" },
+          ...(cline.some((x: number | null) => x !== null) ? [{ type: "scatter", mode: "lines+markers", x: MONTHS, y: cline, name: CLINE[v], connectgaps: false, line: { color: cssVar("--glow"), width: 2, dash: "dash" }, marker: { size: 6, color: cssVar("--glow") }, hovertemplate: `%{x} ${CLINE[v]} %{y:.0f} m<extra></extra>` }] : [])]}
+          layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" } }, margin: { l: 60, r: 10, t: 14, b: 36 }, title: { text: `${meta[v][0]}（${meta[v][1]}）` }, showlegend: false,
+            annotations: clineLabel ? [{ x: clineLabel.m, y: clineLabel.z, xref: "x", yref: "y", text: `<b>${CLINE[v]}</b><br><span style="font-size:10.5px;color:${cssVar("--fg-soft")}">上下变化最快的深度</span>`, showarrow: true, arrowhead: 0, arrowcolor: cssVar("--glow"), ax: 0, ay: 34, bgcolor: cssVar("--bg"), borderpad: 3, font: { size: 11.5, color: cssVar("--fg-strong") } }] : [] }} />
       ) : (
-        <Plot height={460} data={(w[v] ?? []).map((prof: number[], m: number) => ({
+        <Plot height={fillH(460)} data={(w[v] ?? []).map((prof: number[], m: number) => ({
           x: prof, y: w.depth, type: "scatter", mode: "lines", name: MONTHS[m], line: { width: 1.6, color: `hsl(${220 - (Math.cos(((m - 1) / 12) * 2 * Math.PI) * 0.5 + 0.5) * 200}, 65%, ${dark ? 62 : 45}%)` },
         }))} layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" } }, xaxis: { title: { text: meta[v][1] } }, legend: { orientation: "v", x: 1.02, y: 1 }, margin: { r: 90 } }} />
       )}
@@ -191,7 +215,7 @@ function GridView({ depth, nlev }: { depth: number; nlev: number }) {
   return (
     <div className="col" style={{ gap: 10 }}>
       <div className="muted small">模型把水柱从海面到海底分成 {nlev} 层（每层约 {h.toFixed(2)} m）。层分得越细，越能看清温跃层和次表层的叶绿素高值，但计算更慢。一般每层 1 m 左右就够了。</div>
-      <Plot height={460} data={[
+      <Plot height={fillH(460)} data={[
         { type: "bar", orientation: "h", y: centers, x: centers.map(() => h), marker: { color: "rgba(10,102,194,.25)", line: { color: "rgba(10,102,194,.8)", width: 0.6 } }, width: centers.map(() => h * 0.92), hovertemplate: "层中心 %{y:.2f} m<br>厚度 %{x:.2f} m<extra></extra>" },
       ]} layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" }, range: [depth, 0] }, xaxis: { title: { text: "层厚 (m)" }, range: [0, h * 1.6] }, showlegend: false, bargap: 0 }} />
     </div>

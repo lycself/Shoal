@@ -7,29 +7,25 @@ summary: 一个项目从建立到出图要走哪几步（项目、站点、食�
 
 # 软件使用说明：从项目到结果
 
-> 本章由 AI 撰写，待审核：公式和数值请对照原文核实。
-
 先设想一个具体任务：你想知道北海中部（56°N, 3°E）的鱼和底栖动物对浮游生物影响有多大，还想知道换一个低营养级模型，结论会不会变。Vijayakumaran et al. (2026) 做过类似的“三种宿主 × 五组实验”。要自己做一遍，需要准备什么？
 
 清单大致是这样的：一个能算水温和湍流的物理模型；逐小时的气象数据；温度、盐度和营养盐的气候态剖面（多年平均的垂直分布）；三种低营养级生态模型；一套鱼类和底栖动物模块；再加上 15 次运行和一堆画图脚本。Shoal 把这些都放进了浏览器里的几个页面。本章按“做一个项目”的顺序，把这些页面走一遍。
 
 ## 启动软件
 
-软件分三部分：
+**用桌面版（推荐）**：在 macOS、Windows 或 Linux 上安装 Shoal 桌面版，双击打开即可。计算内核已经编译好，打包在安装程序里，不需要装 Python 或编译工具。所有项目存在系统的应用数据目录里（macOS：~/Library/Application Support/Shoal；Windows：%LOCALAPPDATA%\\Shoal；Linux：~/.local/share/shoal）。
 
-| 部分 | 内容 | 位置 |
-|---|---|---|
-| 计算内核 | GOTM（一维水柱湍流模型）+ FABM（生态模块耦合框架）+ ERSEM + FABM-MIZER + E2E；ECOSMO 与 ERGOM 随 FABM 一起提供 | `kernel/`，由 `kernel/build.py` 编译（`pnpm kernel`） |
-| 后端 | FastAPI（Python），负责建站点、拼配置、调度运行、读 NetCDF 结果 | `backend/shoal/` |
-| 前端 | React 网页 | `frontend/` |
+打开后先到[设置页](app:settings)看一眼：上面会显示计算内核是否就绪，也可以在这里配置 AI 助手的接口（不配置也能用其他所有功能）。
 
-第一次使用时按下面三步来：
+**从源码运行（开发者）**：需要 Python 3.11 和 Node.js。在仓库根目录建好 `.venv`、装好依赖后运行 `pnpm kernel` 编译内核，再运行 `pnpm dev`，用浏览器打开 `http://localhost:5173`。完整步骤见仓库的 README。
 
-1. 在仓库根目录用 Python 3.11 运行 `python -m venv .venv`，按 README 装好 Python 依赖和编译工具（`pnpm check:env` 会逐项检查），然后编译内核：`pnpm kernel`。脚本会下载 GOTM、FABM、ERSEM、FABM-MIZER 的源码，把 `ersem`、`mizer`、`e2e` 三个模块库，连同随软件提供的官方 ECOSMO E2E v2.0 代码（`kernel/vendor/ecosmo-e2e`，鱼类模块默认用它），编进同一个 `gotm` 可执行文件；官方文件本身不改，脚本在副本上打一个修正补丁，修正项默认关闭、由配置打开（见第 7 章）。最后写出 `kernel.json`，记下编译结果。按论文公式重写的版本（`kernel/e2e`）也一起编进去，用来对照。
-2. 在仓库根目录运行 `pnpm install`，再运行 `pnpm dev`。这一步会同时启动后端（默认 `http://127.0.0.1:8765`）和前端。
-3. 用浏览器打开 `http://localhost:5173`。
+软件由三部分组成，知道这一点有助于理解后面的章节：
 
-在[设置页](app:settings)能看到内核有没有编译成功、`gotm` 在哪个路径，还能配置 AI 助手的接口。
+| 部分 | 做什么 |
+|---|---|
+| 计算内核 | GOTM（一维水柱湍流模型）+ FABM（把生态模块接进物理模型的框架）+ 生态模块：ERSEM、ECOSMO、ERGOM 三个低营养级宿主，以及 ECOSMO E2E 功能群和 FABM-MIZER 粒径谱两种鱼类模块 |
+| 计算服务 | 准备站点数据、生成配置、排队运行模型、读取结果 |
+| 界面 | 你现在看到的这些页面 |
 
 ## 工作流程总览
 

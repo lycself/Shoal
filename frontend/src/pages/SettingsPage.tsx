@@ -5,22 +5,25 @@ import { useApp } from "../store";
 import { UpdateSection } from "../components/AppUpdate";
 
 export default function SettingsPage() {
-  const { toast, kernel, theme, setTheme } = useApp();
+  const { toast, kernel, theme, setTheme, setDirty } = useApp();
   const s = useAsync(() => api.get("/settings"), []);
   const [form, setForm] = useState<any>(null);
   const [test, setTest] = useState<{ ok: boolean; text: string } | null>(null);
   const [testing, setTesting] = useState(false);
-  useEffect(() => { if (s.data) setForm(structuredClone(s.data)); }, [s.data]);
+  const [saved, setSaved] = useState<string>("");
+  useEffect(() => { if (s.data) { setForm(structuredClone(s.data)); setSaved(JSON.stringify(s.data)); } }, [s.data]);
+  const dirty = !!form && JSON.stringify(form) !== saved;
+  useEffect(() => { setDirty("settings", dirty ? "设置页" : null); return () => setDirty("settings", null); }, [dirty]);
   if (!form) return <Loading />;
   const a = form.assistant;
   const setA = (k: string, v: any) => setForm({ ...form, assistant: { ...a, [k]: v } });
-  const save = async () => { const r = await api.put("/settings", form); setForm(structuredClone(r)); toast("设置已保存（并行数在重启后端后生效）", "ok"); };
+  const save = async () => { const r = await api.put("/settings", form); setForm(structuredClone(r)); setSaved(JSON.stringify(r)); toast("设置已保存（并行数在重启后端后生效）", "ok"); };
   const sys = kernel?.system, k = kernel?.kernel;
   return (
     <div className="page" style={{ maxWidth: 960 }}>
       <div className="page-header">
-        <div><div className="page-title">设置</div><div className="page-hint">保存在工作区的 settings.json。</div></div>
-        <div className="page-actions"><Btn variant="primary" icon="save" onClick={save}>保存</Btn></div>
+        <div><div className="page-title">设置</div><div className="page-hint">保存在工作区的 settings.json。主题切换立即生效，其他设置点“保存”后生效。</div></div>
+        <div className="page-actions">{dirty && <span className="warn-text small">有未保存的修改</span>}<Btn variant={dirty ? "primary" : undefined} icon="save" disabled={!dirty} onClick={save}>保存</Btn></div>
       </div>
 
       <div className="section">

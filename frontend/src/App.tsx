@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useRef, useState } from "react";
 import { api, connectEvents, on, onConnection } from "./api";
-import { Icon, IconBtn, Logo, MenuEntry, MenuList, Modal, Progress, StatusBadge, Toasts, TooltipLayer } from "./components/ui";
+import { Icon, IconBtn, Loading, Logo, MenuEntry, MenuList, Modal, Progress, RightPane, StatusBadge, Toasts, TooltipLayer } from "./components/ui";
 import { Page, SIDE_COLLAPSED, SIDE_MAX, SIDE_MIN, useApp } from "./store";
 import HomePage from "./pages/HomePage";
 import SitePage from "./pages/SitePage";
@@ -34,6 +34,7 @@ export default function App() {
   const s = useApp();
   const { page, setPage, project, jobs, collapsed, panelOpen, setPanelOpen, assistantOpen, theme, setTheme } = s;
   const [conn, setConn] = useState("connecting");
+  const finished = useRef({ ok: 0, bad: 0 });
   const [dialog, setDialog] = useState<"about" | "keys" | null>(null);
   // sidebar width while its edge is being dragged (null = not dragging, use the stored width)
   const [liveSide, setLiveSide] = useState<number | null>(null);
@@ -56,6 +57,15 @@ export default function App() {
     window.addEventListener("mousemove", move);
     window.addEventListener("mouseup", up);
   };
+  // narrow windows: fold the main sidebar to its icon strip when the window becomes narrower than 1280 px
+  // (only on crossing, so a user who opens it again on a small screen keeps it open)
+  useEffect(() => {
+    let wide = window.innerWidth >= 1280;
+    if (!wide && !useApp.getState().collapsed) s.setCollapsed(true);
+    const on = () => { const w = window.innerWidth >= 1280; if (wide && !w && !useApp.getState().collapsed) s.setCollapsed(true); wide = w; };
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
   // clicking the page you are on while the sidebar is an icon strip opens it, as in AVAS
   const navTo = (p: Page) => { if (p === page && collapsed) s.setCollapsed(false); else setPage(p); };
 
@@ -74,6 +84,16 @@ export default function App() {
         s.upsertJob(j);
         if (j.status === "failed") s.toast(`${j.label}：失败 — ${String(j.error ?? "").slice(0, 160)}`, "bad");
         if (j.status === "done" && j.kind !== "run") s.toast(`${j.label}：完成`, "ok");
+        // runs come in batches: one message when the last queued run of the batch has finished
+        if (j.kind === "run" && ["done", "failed"].includes(j.status)) {
+          finished.current[j.status === "done" ? "ok" : "bad"]++;
+          const busy = Object.values(useApp.getState().jobs).some((x: any) => x.kind === "run" && ["queued", "running"].includes(x.status));
+          if (!busy) {
+            const { ok, bad } = finished.current;
+            finished.current = { ok: 0, bad: 0 };
+            if (ok) s.toast(`${ok} 次运行完成${bad ? `，${bad} 次失败` : ""}`, bad ? "bad" : "ok", { label: "查看结果", onClick: () => useApp.getState().setPage("results") });
+          }
+        }
         if (["done", "failed"].includes(j.status) && j.project === useApp.getState().projectId) s.refreshProject();
       }),
       on("project", () => s.refreshProject()),
@@ -110,12 +130,17 @@ export default function App() {
       { label: "新建项目…", icon: "new-folder", shortcut: "Ctrl+N", onClick: () => { setPage("home"); setTimeout(() => window.dispatchEvent(new Event("new-project")), 30); } },
       { label: "打开项目", icon: "folder-opened", disabled: !s.projects.length, submenu: s.projects.map((p) => ({ label: p.name, checked: p.id === project?.id, onClick: () => s.openProject(p.id) })) },
       { label: "项目概览", icon: "home", disabled: !project, onClick: () => setPage("home") },
+      { label: "关闭项目", icon: "close", disabled: !project, onClick: () => { setPage("home"); s.openProject(null); } },
+      { label: "把当前项目移到回收站…", icon: "trash", disabled: !project, onClick: async () => {
+        if (!project || !confirm(`将项目“${project.name}”移到回收站（workspace/trash）？可以从那里手动恢复。`)) return;
+        await api.del(`/projects/${project.id}`); s.toast("已移到回收站", "ok"); setPage("home"); await s.openProject(null); s.refreshProjects();
+      } },
       { type: "separator" },
       { label: "设置…", icon: "settings-gear", onClick: () => setPage("settings") },
     ] },
     { label: "运行", items: () => [
       { label: "运行实验…", icon: "play", disabled: !project, onClick: () => setPage("experiments") },
-      { label: "构建 / 更新站点数据", icon: "cloud-download", disabled: !project, onClick: async () => { await api.post(`/projects/${project!.id}/site/build`); s.refreshProject(); setPage("site"); } },
+      { label: "构建 / 更新站点数据", icon: "cloud-download", disabled: !project, onClick: async () => { if (project!.site_status === "ready" && !confirm("重新下载并生成站点的气象、气候态和地形数据？已有的运行结果不受影响。")) return; await api.post(`/projects/${project!.id}/site/build`); s.refreshProject(); setPage("site"); } },
       { label: "陆架集合（三维）…", icon: "globe", disabled: !project, onClick: () => setPage("shelf") },
       { type: "separator" },
       { label: `停止全部任务${active.length ? `（${active.length}）` : ""}`, icon: "debug-stop", disabled: !active.length, danger: true, onClick: stopAll },
@@ -134,8 +159,8 @@ export default function App() {
       { label: "入门教程", icon: "mortar-board", onClick: () => setPage("primer") },
       { label: "软件使用说明", icon: "book", onClick: () => setPage("primer", { chapter: "00-guide" }) },
       { label: "方法来源", icon: "note", submenu: [
-        { label: "Powley et al. 2026（ERSEM–MIZER）", onClick: () => setPage("primer", { chapter: "09-paper1" }) },
-        { label: "Vijayakumaran et al. 2026（ECOSMO E2E）", onClick: () => setPage("primer", { chapter: "10-paper2" }) },
+        { label: "鱼吃掉浮游生物后会差多少：单向与双向耦合", onClick: () => setPage("primer", { chapter: "09-paper1" }) },
+        { label: "换一个浮游生物模型，鱼和底栖还一样吗", onClick: () => setPage("primer", { chapter: "10-paper2" }) },
       ] },
       { label: "键盘快捷键", icon: "keyboard", onClick: () => setDialog("keys") },
       { type: "separator" },
@@ -181,11 +206,11 @@ export default function App() {
         <div className="sash" onMouseDown={dragSide} onDoubleClick={s.toggleCollapsed} data-tip="拖动调整侧栏宽度，拖到最窄只留图标；双击收起或展开" />
         <div className="workspace">
           <main className="editor">
-            {isProjectPage && !project ? (
+            {!project && s.projectLoading ? <Loading text="打开项目…" /> : isProjectPage && !project ? (
               <div className="empty"><Icon name="folder-opened" /><div className="title">没有打开的项目</div><button className="btn primary" onClick={() => setPage("home")}>新建或打开项目</button></div>
             ) : <Pg />}
           </main>
-          {assistantOpen && <AssistantPanel />}
+          <RightPane id="assistant" open={assistantOpen} onClose={s.toggleAssistant} initial={400} min={320} max={720} label="AI 助手" className="assist-rpane"><AssistantPanel /></RightPane>
         </div>
       </div>
 

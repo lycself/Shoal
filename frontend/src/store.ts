@@ -37,11 +37,16 @@ export interface Toast {
   id: number;
   text: string;
   kind?: "ok" | "bad" | "info";
+  action?: { label: string; onClick: () => void };
 }
 
 interface AppState {
   page: Page;
   setPage: (p: Page, opts?: { chapter?: string }) => void;
+  /** Pages with unsaved edits register here; leaving the page or the project asks first. */
+  dirty: Record<string, string>;
+  setDirty: (key: string, what: string | null) => void;
+  confirmLeave: () => boolean;
   chapter: string | null;
   projects: Project[];
   projectId: string | null;
@@ -52,7 +57,8 @@ interface AppState {
   assistantOpen: boolean;
   toggleAssistant: () => void;
   toasts: Toast[];
-  toast: (text: string, kind?: Toast["kind"]) => void;
+  toast: (text: string, kind?: Toast["kind"], action?: Toast["action"]) => void;
+  dismissToast: (id: number) => void;
   theme: "auto" | "light" | "dark";
   setTheme: (t: "auto" | "light" | "dark") => void;
   dark: boolean;
@@ -69,6 +75,8 @@ interface AppState {
   setSelectedRuns: (ids: string[]) => void;
   refreshProjects: () => Promise<void>;
   openProject: (id: string | null) => Promise<void>;
+  /** true while a project is being opened: pages show a spinner instead of "no project" or the welcome page */
+  projectLoading: boolean;
   refreshProject: () => Promise<void>;
   upsertJob: (j: Job) => void;
   setJobs: (js: Job[]) => void;
@@ -102,7 +110,17 @@ let toastSeq = 1;
 export const useApp = create<AppState>((set, get) => ({
   page: (lsGet("e2e.page", "home") as Page) || "home",
   chapter: lsGet("e2e.chapter", "") || null,
+  dirty: {},
+  setDirty: (key, what) => { const d = { ...get().dirty }; if (what) d[key] = what; else delete d[key]; set({ dirty: d }); },
+  confirmLeave: () => {
+    const items = Object.values(get().dirty);
+    if (!items.length) return true;
+    if (!window.confirm(`${items.join("、")}还有没保存的修改，离开会丢掉这些修改。确定离开吗？`)) return false;
+    set({ dirty: {} });
+    return true;
+  },
   setPage: (p, opts) => {
+    if (p !== get().page && !get().confirmLeave()) return;
     lsSet("e2e.page", p);
     if (opts?.chapter) lsSet("e2e.chapter", opts.chapter);
     set({ page: p, chapter: opts?.chapter ?? get().chapter });
@@ -120,11 +138,12 @@ export const useApp = create<AppState>((set, get) => ({
     set({ assistantOpen: v });
   },
   toasts: [],
-  toast: (text, kind = "info") => {
+  toast: (text, kind = "info", action) => {
     const id = toastSeq++;
-    set({ toasts: [...get().toasts, { id, text, kind }] });
-    setTimeout(() => set({ toasts: get().toasts.filter((t) => t.id !== id) }), kind === "bad" ? 8000 : 4000);
+    set({ toasts: [...get().toasts, { id, text, kind, action }] });
+    setTimeout(() => get().dismissToast(id), kind === "bad" || action ? 9000 : 4000);
   },
+  dismissToast: (id) => set({ toasts: get().toasts.filter((t) => t.id !== id) }),
   theme: (lsGet("e2e.theme2", "light") as any) || "light",
   setTheme: (t) => {
     lsSet("e2e.theme2", t);
@@ -159,17 +178,20 @@ export const useApp = create<AppState>((set, get) => ({
     set({ projects: ps });
     const cur = get().projectId;
     if ((!cur || !ps.find((p) => p.id === cur)) && ps.length) await get().openProject(ps[0].id);
-    else if (cur) await get().refreshProject();
+    else if (cur && ps.length) await get().refreshProject();
+    else set({ projectLoading: false });
   },
+  projectLoading: !!lsGet("e2e.project", ""),
   openProject: async (id) => {
+    if (id !== get().projectId && !get().confirmLeave()) return;
     lsSet("e2e.project", id ?? "");
-    set({ projectId: id, project: null, selectedRuns: [] });
+    set({ projectId: id, project: null, selectedRuns: [], projectLoading: !!id });
     if (id) {
       try {
         const p = await api.get<Project>(`/projects/${id}`);
-        set({ project: p });
+        if (get().projectId === id) set({ project: p, projectLoading: false });
       } catch {
-        set({ projectId: null });
+        set({ projectId: null, projectLoading: false });
       }
     }
   },
@@ -178,9 +200,9 @@ export const useApp = create<AppState>((set, get) => ({
     if (!id) return;
     try {
       const p = await api.get<Project>(`/projects/${id}`);
-      set({ project: p, revision: get().revision + 1 });
+      set({ project: p, revision: get().revision + 1, projectLoading: false });
     } catch {
-      /* deleted */
+      set({ projectLoading: false }); /* deleted */
     }
   },
   upsertJob: (j) => set({ jobs: { ...get().jobs, [j.id]: j } }),

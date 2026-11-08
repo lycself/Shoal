@@ -90,10 +90,10 @@ function Stratification() {
   }, [wind, q, loss]);
   const bloom = d.days.find((t) => t > 30 && d.mld[t] < d.crit[t]);
   return (
-    <LabShell title="混合层与临界深度：春季水华何时开始？" note="简化模型：加热期混合层由风生湍流与浮力通量平衡（Monin–Obukhov 尺度），冷却期对流加深；临界深度按 Sverdrup 思路随光照变化。混合层浅于临界深度时浮植净生长，水华开始。">
+    <LabShell title="混合层与临界深度：春季水华何时开始？" note="简化模型：海面受热时，风搅出的湍流要把轻的暖水往下压，浮力又把它往上托，两者打平的深度就是混合层底（这个深度叫 Monin–Obukhov 长度，风越大越深、加热越强越浅）；海面冷却时，表层水变重下沉，对流把混合层加深。临界深度按 Sverdrup 的思路随光照变化：混合层加深到这个深度时，整层浮游植物的光合作用刚好抵消呼吸和被吃掉的损失。混合层浅于临界深度时浮游植物净生长，水华开始。">
       <Slider label="10 m 风速" value={wind} min={2} max={16} onChange={setWind} unit="m/s" />
       <Slider label="热通量季节振幅" value={q} min={50} max={300} onChange={setQ} unit="W/m²" />
-      <Slider label="浮植损失（呼吸+摄食）" value={loss} min={0.02} max={0.5} onChange={setLoss} unit="d⁻¹" />
+      <Slider label="浮游植物损失（呼吸+摄食）" value={loss} min={0.02} max={0.5} onChange={setLoss} unit="d⁻¹" />
       <Plot height={280} data={[
         { x: d.days, y: d.mld, name: "混合层深度", type: "scatter", line: { color: cssVar("--accent"), width: 2.5 } },
         { x: d.days, y: d.crit, name: "临界深度", type: "scatter", line: { color: cssVar("--eco-phyto"), dash: "dash" } },
@@ -168,8 +168,8 @@ function FunctionalResponse() {
 
 // 4 ---------------------------------------------------------------- size preference
 const ERSEM_WINDOWS: [string, number, number, string][] = [
-  ["超微型藻 P3", 4.188e-15, 4.188e-12, cssVar("--eco-phyto")], ["微型藻 P2 / 鞭毛虫 Z6", 4.188e-12, 4.188e-9, "#5fae6e"],
-  ["硅藻 P1 / 小型藻 P4 / Z5", 4.188e-9, 4.188e-6, "#8bc28e"], ["中型浮游动物 Z4", 4.188e-6, 1e-3, cssVar("--eco-zoo")],
+  ["超微型浮游植物 P3", 4.188e-15, 4.188e-12, cssVar("--eco-phyto")], ["微型浮游植物 P2 / 异养鞭毛虫 Z6", 4.188e-12, 4.188e-9, "#5fae6e"],
+  ["硅藻 P1 / 小型浮游植物 P4 / 微型浮游动物 Z5", 4.188e-9, 4.188e-6, "#8bc28e"], ["中型浮游动物 Z4", 4.188e-6, 1e-3, cssVar("--eco-zoo")],
 ]; // design:allow-colour plot bands
 function SizePreference() {
   const [beta, setBeta] = useState(100);

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, on } from "../api";
 import { MapCanvas } from "../components/MapCanvas";
-import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Seg, Split, Stat, StatusBadge, Tabs, fmt, robustAbs, useAsync, HelpLink, PanelToggle } from "../components/ui";
+import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Seg, Split, Stat, StatusBadge, Tabs, fmt, fmtLat, fmtLon, robustAbs, useAsync, HelpLink, PanelToggle } from "../components/ui";
 import { ShelfEnsemble } from "../components/ShelfEnsemble";
 import { Shelf3DView, ShelfPlates, ShelfRegions } from "../components/ShelfViews";
 import { FigureReading, changeOfMeans, configKind, pairKeyOf, referenceIndex } from "../components/ShelfExplain";
@@ -236,8 +236,7 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
       <div className="toolbar">
         <b style={{ color: "var(--fg-strong)", fontSize: 14 }}>{study.name}</b>
         <StatusBadge status={st} />
-        <span className="soft small ellipsis">{study.box.join(" / ")} · {study.res}° · {study.min_depth}–{study.max_depth} m · {study.forcing_year} 年强迫 · {study.years} 年（末年分析）· {study.nlev} 层</span>
-        <span className="grow" />
+        <span className="soft small ellipsis" style={{ flex: "1 1 0", minWidth: 0 }} title="研究范围、网格、参与计算的水深、气象年份与模拟年数">{fmtLat(study.box[0], 0)}–{fmtLat(study.box[1], 0)}，{fmtLon(study.box[2], 0)}–{fmtLon(study.box[3], 0)} · 网格 {study.res}° · 水深 {study.min_depth}–{study.max_depth} m 的格点 · {study.forcing_year} 年气象 · 共 {study.years} 年（分析最后一年）· {study.nlev} 层</span>
         {!job && st !== "running" && <Btn size="sm" variant={study.status === "done" ? undefined : "primary"} icon={study.status === "done" ? "refresh" : "play"} onClick={async () => { if (study.status === "done" && !confirm("重新计算会覆盖现有结果，确定吗？")) return; await api.post(`/projects/${pid}/shelf/${sid}/start`); toast("已开始", "ok"); onChanged(); }}>{study.status === "done" ? "重新计算" : "开始计算"}</Btn>}
         {job && <Btn size="sm" icon="debug-stop" className="danger-text" onClick={() => api.post(`/jobs/${job.id}/cancel`)}>停止</Btn>}
         <IconBtn icon="trash" title="删除研究" danger onClick={async () => { if (confirm("删除该陆架研究及其全部输出？")) { await api.del(`/projects/${pid}/shelf/${sid}`); onDeleted(); } }} />

@@ -82,14 +82,33 @@ export function Seg<T extends string>({ value, options, onChange, size }: { valu
 }
 
 export function Tabs<T extends string>({ value, tabs, onChange, right, left }: { value: T; tabs: { id: T; label: string; icon?: string; hidden?: boolean; tip?: string }[]; onChange: (v: T) => void; right?: React.ReactNode; left?: React.ReactNode }) {
+  // when the labels don't fit, the other tabs shrink to their icons (name in the tooltip); the active one keeps its label
+  const ref = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+  const need = useRef(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const check = () => {
+      if (!compact && el.scrollWidth > el.clientWidth + 1) { need.current = el.scrollWidth; setCompact(true); }
+      else if (compact && el.clientWidth >= need.current) setCompact(false);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [compact, tabs.length]);
   return (
-    <div className="tabs">
+    <div className={`tabs ${compact ? "compact" : ""}`} ref={ref}>
       {left && <div className="tabs-left">{left}</div>}
-      {tabs.filter((t) => !t.hidden).map((t) => (
-        <div key={t.id} className={`tab ${value === t.id ? "active" : ""}`} data-tip={t.tip} onClick={() => onChange(t.id)}>
-          {t.icon && <Icon name={t.icon} />}{t.label}
-        </div>
-      ))}
+      {tabs.filter((t) => !t.hidden).map((t) => {
+        const iconOnly = compact && t.icon && value !== t.id;
+        return (
+          <div key={t.id} className={`tab ${value === t.id ? "active" : ""}`} data-tip={iconOnly ? `${t.label}${t.tip ? `：${t.tip}` : ""}` : t.tip} onClick={() => onChange(t.id)}>
+            {t.icon && <Icon name={t.icon} />}{!iconOnly && t.label}
+          </div>
+        );
+      })}
       <div className="tabs-fill" />
       {right && <div className="row" style={{ paddingRight: 8 }}>{right}</div>}
     </div>
@@ -185,7 +204,9 @@ export function Toasts() {
       {toasts.map((t) => (
         <div key={t.id} className={`toast ${t.kind ?? ""}`}>
           <Icon name={t.kind === "ok" ? "pass" : t.kind === "bad" ? "error" : "info"} />
-          <div>{t.text}</div>
+          <div className="grow">{t.text}</div>
+          {t.action && <a className="toast-action" onClick={() => { t.action!.onClick(); useApp.getState().dismissToast(t.id); }}>{t.action.label}</a>}
+          <button className="toast-close" title="关闭" onClick={() => useApp.getState().dismissToast(t.id)}><Icon name="close" /></button>
         </div>
       ))}
     </div>
@@ -312,6 +333,44 @@ export function Split({ id, initial = 280, min = 200, max = 520, side, children,
         data-tip={sp.collapsed ? `${label}已收起：向右拖动或双击这里展开` : `拖动调整${label}宽度，拖到很窄或双击收起`} />
       <div className="split-main">{children}</div>
     </div>
+  );
+}
+
+/**
+ * Right-hand side panel (assistant, reading notes): slides open and closed by width, drags on its left edge to
+ * resize, dragging it narrow closes it, double-clicking the edge closes it; the width is remembered.
+ */
+export function RightPane({ id, open, onClose, initial = 380, min = 280, max = 680, label, className = "", children }: { id: string; open: boolean; onClose: () => void; initial?: number; min?: number; max?: number; label: string; className?: string; children: React.ReactNode }) {
+  const key = `e2e.pane.${id}`;
+  const clamp = (x: number) => Math.max(min, Math.min(max, x));
+  const [w, setW] = useState(() => { try { return clamp(Number(localStorage.getItem(key)) || initial); } catch { return initial; } });
+  const [live, setLive] = useState<number | null>(null);
+  const drag = (e: React.MouseEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const x0 = e.clientX, w0 = w;
+    let last = w0;
+    document.body.classList.add("dragging");
+    const move = (ev: MouseEvent) => { last = w0 - (ev.clientX - x0); setLive(Math.max(0, Math.min(max, last))); };
+    const up = () => {
+      document.body.classList.remove("dragging");
+      window.removeEventListener("mousemove", move);
+      window.removeEventListener("mouseup", up);
+      setLive(null);
+      if (last < min / 2) onClose();
+      else { const v = clamp(last); setW(v); try { localStorage.setItem(key, String(Math.round(v))); } catch { /* ignore */ } }
+    };
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+  };
+  const width = live ?? (open ? w : 0);
+  return (
+    <>
+      {open && <div className="sash" onMouseDown={drag} onDoubleClick={onClose} data-tip={`拖动调整${label}宽度，拖到很窄或双击收起`} />}
+      <div className={`rpane ${className} ${live == null ? "animate" : ""} ${!open && live == null ? "closed" : ""}`} style={{ width }} aria-hidden={!open} aria-label={label}>
+        <div className="rpane-inner" style={{ width: Math.max(live ?? 0, w) }}>{children}</div>
+      </div>
+    </>
   );
 }
 

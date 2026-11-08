@@ -14,10 +14,10 @@ from .builder import build_fabm_yaml, normalize_spec
 ERSEM_NODES = {
     "N3": (0, "nut", "硝酸盐 N3", "nutrient"), "N4": (0, "nut", "铵盐 N4", "nutrient"),
     "N1": (0, "nut", "磷酸盐 N1", "nutrient"), "N5": (0, "nut", "硅酸盐 N5", "nutrient"),
-    "P1": (1, "pel", "硅藻 P1", "phyto"), "P2": (1, "pel", "微型藻 P2", "phyto"),
-    "P3": (1, "pel", "超微型藻 P3", "phyto"), "P4": (1, "pel", "小型藻 P4", "phyto"),
+    "P1": (1, "pel", "硅藻 P1", "phyto"), "P2": (1, "pel", "微型浮游植物 P2", "phyto"),
+    "P3": (1, "pel", "超微型浮游植物 P3", "phyto"), "P4": (1, "pel", "小型浮游植物 P4", "phyto"),
     "B1": (1.5, "mic", "细菌 B1", "bacteria"),
-    "Z6": (2, "pel", "纳米鞭毛虫 Z6", "zoo"), "Z5": (2, "pel", "小型浮游动物 Z5", "zoo"),
+    "Z6": (2, "pel", "异养鞭毛虫 Z6", "zoo"), "Z5": (2, "pel", "微型浮游动物 Z5", "zoo"),
     "Z4": (2.5, "pel", "中型浮游动物 Z4", "zoo"),
     "R1": (0.5, "det", "溶解有机物 R1–R3", "organic"), "R6": (0.5, "det", "颗粒有机物 R4/R6/R8", "organic"),
     "Q6": (0, "ben", "沉积有机物 Q6", "benthic"),
@@ -26,7 +26,7 @@ ECOSMO_NODES = {
     "ECO/no3": (0, "nut", "硝酸盐", "nutrient"), "ECO/nh4": (0, "nut", "铵盐", "nutrient"),
     "ECO/pho": (0, "nut", "磷酸盐", "nutrient"), "ECO/sil": (0, "nut", "硅酸盐", "nutrient"),
     "ECO/dia": (1, "pel", "硅藻", "phyto"), "ECO/fla": (1, "pel", "鞭毛藻", "phyto"),
-    "ECO/microzoo": (2, "pel", "小型浮游动物", "zoo"), "ECO/mesozoo": (2.5, "pel", "中型浮游动物", "zoo"),
+    "ECO/microzoo": (2, "pel", "微型浮游动物", "zoo"), "ECO/mesozoo": (2.5, "pel", "中型浮游动物", "zoo"),
     "ECO/det": (0.5, "det", "碎屑", "organic"), "ECO/dom": (0.5, "det", "溶解有机物", "organic"),
     "ECO/sed1": (0, "ben", "沉积有机物", "benthic"),
 }

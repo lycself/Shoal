@@ -6,7 +6,7 @@ import { Btn, Empty, Icon, IconBtn, Loading, Notice, Select, Seg, Split, Switch,
 import { HOST_LABEL, HTL_LABEL, useApp } from "../store";
 
 const HTL_NAMES: Record<string, string> = { MB: "大型底栖动物 MB", F1: "鱼 1 · 浮游食性", F2: "鱼 2 · 底栖 / 鱼食性" };
-const PREY_LABEL: Record<string, string> = { det: "碎屑", sed: "沉积有机物", dom: "溶解有机物", Pf: "鞭毛藻 / 小型藻", Pd: "硅藻", Zs: "小型浮游动物", Zl: "中型浮游动物", MB: "大型底栖动物", F1: "鱼 1" };
+const PREY_LABEL: Record<string, string> = { det: "碎屑", sed: "沉积有机物", dom: "溶解有机物", Pf: "鞭毛藻 / 小型浮游植物", Pd: "硅藻", Zs: "微型浮游动物", Zl: "中型浮游动物", MB: "大型底栖动物", F1: "鱼 1" };
 const HTL_ICON: Record<string, string> = { none: "circle-large-outline", e2e: "organization", mizer: "graph-scatter" };
 
 export default function FoodWebPage() {
@@ -23,6 +23,7 @@ export default function FoodWebPage() {
     return g;
   }, [configs.data]);
   const add = async () => {
+    if (!useApp.getState().confirmLeave()) return;
     const c = await api.post(`/projects/${p.id}/configs`, { name: "新配置", description: "", spec: { host: "ersem", htl: { kind: "none" } } });
     configs.reload(); setSel(c.id);
   };
@@ -44,7 +45,7 @@ export default function FoodWebPage() {
                   <Icon name={open[h] === false ? "chevron-right" : "chevron-down"} />{HOST_LABEL[h]}<span className="soft" style={{ marginLeft: "auto", fontWeight: 500 }}>{cs.length}</span>
                 </div>
                 {open[h] !== false && cs.map((c) => (
-                  <div key={c.id} className={`tree-item ${c.id === sel ? "active" : ""}`} onClick={() => setSel(c.id)} title={c.description}>
+                  <div key={c.id} className={`tree-item ${c.id === sel ? "active" : ""}`} onClick={() => { if (c.id !== sel && useApp.getState().confirmLeave()) setSel(c.id); }} title={c.description}>
                     <Icon name={HTL_ICON[c.spec.htl.kind]} />
                     <div className="grow">
                       <div className="ellipsis">{c.name}</div>
@@ -68,6 +69,8 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
   const p = project!;
   const [c, setC] = useState<any>(cfg);
   const [dirty, setDirty] = useState(false);
+  const markDirty = useApp((s) => s.setDirty);
+  useEffect(() => { markDirty("foodweb", dirty ? `配置“${c.name}”` : null); return () => markDirty("foodweb", null); }, [dirty, c.name]);
   const [graph, setGraph] = useState<any>(null);
   const [yaml, setYaml] = useState<string | null>(null);
   const [tab, setTab] = useState<"graph" | "comp" | "params" | "yaml">("graph");
@@ -92,7 +95,11 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
   };
   const run = async () => {
     if (dirty) await save();
-    try { await api.post(`/projects/${p.id}/runs`, { items: [{ config_id: c.id, label: c.name }] }); toast("已加入运行队列", "ok"); setPage("experiments"); }
+    // a single run belongs to no experiment: show it in the full run list, where it actually appears
+    try {
+      await api.post(`/projects/${p.id}/runs`, { items: [{ config_id: c.id, label: c.name }] });
+      toast(`“${c.name}”已加入运行队列`, "ok", { label: "查看运行", onClick: () => { setPage("experiments"); setTimeout(() => window.dispatchEvent(new CustomEvent("experiments-select", { detail: "__all__" })), 60); } });
+    }
     catch (e: any) { toast(e.message, "bad"); }
   };
   return (
@@ -103,10 +110,15 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
         <div className="divider" />
         <Btn variant="primary" size="sm" icon="save" disabled={!dirty} onClick={() => save()}>保存</Btn>
         <Btn size="sm" icon="copy" onClick={() => save(true)}>另存为</Btn>
-        <Btn size="sm" icon="play" className="success" onClick={run}>运行</Btn>
+        <Btn size="sm" icon="play" onClick={run}>运行</Btn>
         <span className="grow" />
         <span className="soft small">{HOST_LABEL[spec.host]} · {HTL_LABEL[spec.htl.kind]}</span>
-        <IconBtn icon="trash" title="删除配置" danger onClick={async () => { if (confirm("删除该配置？")) { await api.del(`/projects/${p.id}/configs/${c.id}`); onDeleted(); } }} />
+        <IconBtn icon="trash" title="删除配置" danger onClick={async () => {
+          const exps = await api.get<any[]>(`/projects/${p.id}/experiments`).catch(() => []);
+          const used = exps.filter((e: any) => e.items?.some((it: any) => it.config_id === c.id)).map((e: any) => `“${e.name}”`);
+          if (!confirm(used.length ? `配置“${c.name}”被实验 ${used.join("、")} 使用。删除后这些实验里会少一项（已有运行结果保留）。确定删除吗？` : `删除配置“${c.name}”？已有运行结果保留。`)) return;
+          try { await api.del(`/projects/${p.id}/configs/${c.id}`); setDirty(false); toast("已删除配置", "ok"); onDeleted(); } catch (e: any) { toast(`删除失败：${e.message}`, "bad"); }
+        }} />
       </div>
       <Tabs value={tab} onChange={setTab} tabs={[
         { id: "graph", label: "食物网", icon: "type-hierarchy" },
@@ -116,7 +128,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
       ]} />
       <div className="split-scroll" style={tab === "graph" ? { padding: 0 } : { padding: "18px 22px" }}>
         {tab === "graph" && (graph ? (
-          <div className="col" style={{ gap: 0 }}>
+          <div className="fw-fill">
             <FoodWebGraph graph={graph} onSelect={setNodeSel} selected={nodeSel} />
             {nodeSel && <NodeInfo graph={graph} id={nodeSel} />}
           </div>
@@ -244,8 +256,8 @@ function E2EParams({ spec, defaults, upd }: { spec: any; defaults: any; upd: (fn
   return (
     <div className="col" style={{ gap: 22, maxWidth: 1100 }}>
       {defaults.engine === "official"
-        ? <Notice kind="plain">默认值取自官方 ECOSMO E2E v2.0 发布的 {HOST_LABEL[spec.host]} 算例。半饱和常数按氮计，代码内部乘 79.6 换算成碳。鱼的半饱和常数和整个水柱的食物总量比较，单位是每平方米（mmol N m⁻²），论文表中写的 mmol C m⁻³ 是标错了；大型底栖动物的和海底最底层的浓度比较（mmol N m⁻³）。修改过的值以蓝框和粗体显示。</Notice>
-        : <Notice kind="plain">默认值来自 Vijayakumaran et al. (2026) 表 1–3（{HOST_LABEL[spec.host]} 列）。θ 与 γ<sub>MB</sub> 文献未给出，为本软件的默认值；修改过的值以蓝框和粗体显示。</Notice>}
+        ? <Notice kind="plain">默认值取自官方 ECOSMO E2E v2.0 发布的 {HOST_LABEL[spec.host]} 算例。半饱和常数（摄食达到最大值一半时的食物量）按氮计，代码内部乘 79.6 换算成碳。鱼的半饱和常数和整个水柱的食物总量比较，单位是每平方米（mmol N m⁻²），论文表和代码注释里写的“每立方米”是标注错误，计算本身没有问题；大型底栖动物的和海底最底层的浓度比较（mmol N m⁻³）。修改过的值以蓝框和粗体显示。</Notice>
+        : <Notice kind="plain">默认值按 {HOST_LABEL[spec.host]} 宿主取值。这个重写版本里，半饱和常数按碳计（mmol C m⁻³），和水柱平均的食物浓度比较，与官方代码的单位不同。θ 与 γ<sub>MB</sub> 文献未给出，为本软件的默认值；修改过的值以蓝框和粗体显示。<span className="soft">（参数来源：Vijayakumaran 等 2026，表 1–3）</span></Notice>}
       {(["MB", "F1", "F2"] as const).filter((k) => enabled[k]).map((k) => {
         const user = spec.htl.e2e.params?.[k] ?? {};
         const set = (key: string, v: number | undefined) => upd((s) => { s.htl.e2e.params ??= {}; s.htl.e2e.params[k] ??= {}; if (v === undefined) delete s.htl.e2e.params[k][key]; else s.htl.e2e.params[k][key] = v; });
@@ -281,7 +293,7 @@ function E2EParams({ spec, defaults, upd }: { spec: any; defaults: any; upd: (fn
 }
 
 const MIZER_DOC: Record<string, [string, string]> = {
-  gamma: ["体积搜索率前因子 γ", "m³ yr⁻¹ g⁻ᵠ"], q: ["搜索率质量指数 q", "–"], beta: ["最佳捕食者/饵料质量比 β", "–"], sigma: ["饵料偏好宽度 σ", "ln 单位"],
+  gamma: ["体积搜索率前因子 γ", "m³ yr⁻¹ g⁻q"], q: ["搜索率质量指数 q", "–"], beta: ["最佳捕食者/饵料质量比 β", "–"], sigma: ["饵料偏好宽度 σ", "ln 单位"],
   alpha: ["同化效率 α", "–"], alpha_eg: ["排遗比例", "–"], z0pre: ["背景死亡率前因子", "yr⁻¹"], z0exp: ["背景死亡率指数", "–"], w_s: ["衰老死亡起始质量", "g"],
   z_s: ["衰老死亡指数", "–"], z_spre: ["衰老死亡前因子", "yr⁻¹"], R_relax: ["补充量松弛速率", "d⁻¹"], F: ["捕捞死亡率 F", "yr⁻¹"], w_minF: ["可捕最小质量 w_f", "g"],
   fishing_type: ["捕捞方式（1 = 刀刃）", ""], T_ref: ["参考温度", "°C"], E_a: ["活化能", "eV"], w_min: ["卵质量", "g"], w_inf: ["最大粒径级", "g"], nclass: ["粒径级数", ""],

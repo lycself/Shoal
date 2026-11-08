@@ -226,7 +226,7 @@ function NewProject({ onClose, initial }: { onClose: () => void; initial?: { lat
             <label className="row soft small" style={{ gap: 6, fontWeight: 400, cursor: "pointer" }}><input type="checkbox" checked={offline} onChange={(e) => setOffline(e.target.checked)} />没有网络：使用离线算例</label></div>
           {offline
             ? <div className="soft" style={{ padding: "40px 0", lineHeight: 1.7 }}>使用 GOTM 官方算例（北海北部 59.33°N 1.28°E，110 m，1998 年）自带的气象与剖面，不需要下载任何数据，适合课堂演示或无网络环境。</div>
-            : <SitePicker lat={loc.lat} lon={loc.lon} onChange={(lat, lon, n) => setLoc({ lat, lon, label: n ?? "" })} height={330} />}
+            : <SitePicker lat={loc.lat} lon={loc.lon} onChange={(lat, lon, n) => setLoc({ lat, lon, label: n ?? "" })} height={440} />}
           {!offline && <div className="row wrap" style={{ gap: 12, marginTop: 10 }}>
             <span className="opt">站点名称<input className="input sm" value={loc.label} placeholder={fmtLatLon(loc.lat, loc.lon, 1)} onChange={(e) => setLoc({ ...loc, label: e.target.value })} style={{ width: 200 }} /></span>
             <span className="opt">气象年份<input className="input num sm" type="number" value={years[0]} onChange={(e) => setYears([+e.target.value, years[1]])} style={{ width: 70 }} />–<input className="input num sm" type="number" value={years[1]} onChange={(e) => setYears([years[0], +e.target.value])} style={{ width: 70 }} /></span>

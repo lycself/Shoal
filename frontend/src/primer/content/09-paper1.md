@@ -1,13 +1,11 @@
 ---
 id: 09-paper1
-title: 方法来源：耦合方式（Powley et al. 2026）
+title: 鱼吃掉浮游生物后会差多少：单向与双向耦合
 order: 9
 summary: 西北欧陆架上 1981–2017 年的 NEMO–FABM–ERSEM–MIZER 双向耦合模拟：问了什么、模型怎么搭、三组模拟、关键数字（鱼类生物量与渔获、中型浮游动物 −17%、季节时间、碳循环与海气 CO₂）、局限，以及在本软件里怎样重做。
 ---
 
-# 方法来源：耦合方式（Powley et al. 2026）
-
-> 本章由 AI 撰写，待审核：公式和数值请对照原文核实。
+# 鱼吃掉浮游生物后会差多少：单向与双向耦合
 
 **Powley, H. R., Millington, R., Artioli, Y., Wilson, R. J., Bruggeman, J. (2026).** Challenging one-way fish modelling: two-way coupling reveals critical marine ecosystem dynamics. *Progress in Oceanography* 243, 103701.
 
@@ -21,7 +19,7 @@ summary: 西北欧陆架上 1981–2017 年的 NEMO–FABM–ERSEM–MIZER 双�
 
 论文称之为一条“从光子到渔业”的完整模型链，从阳光驱动浮游植物一路算到渔获：
 
-- NEMO 3.6（AMM7 区域）：海洋水动力模型。范围 40–65°N、20°W–12°E，分辨率约 7 km，垂向 51 层 z\*-s 坐标；ERA5 逐小时大气强迫，GLORYS 提供物理边界，WOA 提供营养盐与氧边界，GLODAP 提供碳酸盐边界，另有河流和大气氮沉降；
+- NEMO 3.6（AMM7 区域）：海洋水动力模型。AMM7 是 Atlantic Margin Model 的缩写，指 NEMO 在西北欧陆架的区域配置。范围 40–65°N、20°W–12°E，分辨率约 7 km，垂向 51 层 z\*-s 坐标（层面既随海面起伏整体伸缩，又贴着海底地形走，类似 σ 坐标，所以浅海和深海都分成同样多的层）；ERA5 逐小时大气强迫，GLORYS 提供物理边界，WOA 提供营养盐与氧边界，GLODAP 提供碳酸盐边界，另有河流和大气氮沉降；
 - ERSEM：低营养级生态模型。4 类浮游植物、3 类浮游动物、细菌、3 类 DOM、3 类 POM，追踪 C/N/P/Si/O 五种元素，带底栖子模型，总碱度作为预报变量（随时间计算，而不是固定值）；
 - FABM-MIZER：群落粒径谱鱼类模型，按体重把鱼分成 100 档，$10^{-3}$–$10^{6}$ g。它按二维（整根水柱总量）运行，并假设鱼的垂直分布和浮游生物猎物相同（[第 6 章](chapter:06-size-spectrum)）；
 - FABM：把上面三者接在一起，每个时间步（5 分钟）交换一次物质。计算在英国 ARCHER2 超算上完成。

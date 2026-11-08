@@ -24,7 +24,7 @@ const DEEP: [number, string][] = [[0, "#fbfdff"], [0.25, "#b7d8ef"], [0.5, "#5ea
 const NUTRI: [number, string][] = [[0, "#fbf9ff"], [0.25, "#d4c8f7"], [0.5, "#9a83ea"], [0.75, "#6040c4"], [1, "#2d1a74"]]; // design:allow-colour colormap
 const MATTER: [number, string][] = [[0, "#fdf6ee"], [0.3, "#e9c79e"], [0.6, "#b98656"], [1, "#5b3a1e"]]; // design:allow-colour colormap
 const DIV_L: [number, string][] = [[0, "#2166ac"], [0.25, "#92bedd"], [0.5, "#f7f7f5"], [0.75, "#e5917a"], [1, "#b2182b"]]; // design:allow-colour colormap
-const DIV_D: [number, string][] = [[0, "#4c9be8"], [0.25, "#2b5e8c"], [0.5, "#14212e"], [0.75, "#a3493a"], [1, "#ff7b63"]]; // design:allow-colour colormap
+const DIV_D: [number, string][] = [[0, "#4c9be8"], [0.25, "#2b5e8c"], [0.5, "#26282c"], [0.75, "#a3493a"], [1, "#ff7b63"]]; // design:allow-colour colormap
 const VIRIDIS_D: [number, string][] = [[0, "#2b2050"], [0.25, "#414a8c"], [0.5, "#2b8f8b"], [0.75, "#73c54c"], [1, "#f2e650"]]; // design:allow-colour colormap
 
 /** Dark-theme variant of a white-based sequential scale: low values sink into the panel instead of glaring white. */
@@ -36,7 +36,7 @@ function at(scale: [number, string][], t: number) {
 }
 const darkCache = new Map<[number, string][], [number, string][]>();
 function toDark(scale: [number, string][]): [number, string][] {
-  if (!darkCache.has(scale)) darkCache.set(scale, [[0, mix("#101b26", at(scale, 0.8), 0.18)], [0.3, at(scale, 0.85)], [0.6, at(scale, 0.55)], [0.85, at(scale, 0.3)], [1, mix(at(scale, 0.12), "#ffffff", 0.3)]]);
+  if (!darkCache.has(scale)) darkCache.set(scale, [[0, mix("#1d1f23", at(scale, 0.8), 0.18)], [0.3, at(scale, 0.85)], [0.6, at(scale, 0.55)], [0.85, at(scale, 0.3)], [1, mix(at(scale, 0.12), "#ffffff", 0.3)]]);
   return darkCache.get(scale)!;
 }
 
@@ -56,8 +56,8 @@ export function colorscaleFor(v: string, dark = false, diverging = false): [numb
 export function themeLayout(dark: boolean, extra: any = {}): any {
   const fg = cssVar("--fg") || (dark ? "#cdd1d7" : "#2f3640");
   const soft = cssVar("--fg-muted");
-  const grid = cssVar("--plot-grid") || (dark ? "#1b2a3a" : "#eceef1");
-  const line = cssVar("--plot-line") || (dark ? "#34485e" : "#b4bcc6");
+  const grid = cssVar("--plot-grid") || (dark ? "#2e3035" : "#eceef1");
+  const line = cssVar("--plot-line") || (dark ? "#4a4e56" : "#b4bcc6");
   const axis = { gridcolor: grid, linecolor: line, zerolinecolor: line, tickcolor: line, showline: true, mirror: true, ticks: "outside", ticklen: 4, automargin: true, title: { font: { size: 12, color: soft } } };
   const base: any = {
     paper_bgcolor: "rgba(0,0,0,0)",

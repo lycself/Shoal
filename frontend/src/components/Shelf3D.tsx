@@ -108,7 +108,7 @@ export function Shelf3D({ box, points, cell, scale, range, units, height = 560, 
     sea.position.y = 0.001;
     sea.userData.terrain = true;
     scene.add(sea);
-    const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, 0.0001, d)), new THREE.LineBasicMaterial({ color: dark ? 0x34485e : 0xb4bcc6 }));
+    const frame = new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(w, 0.0001, d)), new THREE.LineBasicMaterial({ color: dark ? 0x555a63 : 0xb4bcc6 }));
     frame.userData.terrain = true;
     scene.add(frame);
     state.current.dirty = true;
@@ -173,7 +173,7 @@ export function Shelf3D({ box, points, cell, scale, range, units, height = 560, 
   };
   return (
     <div style={{ position: "relative" }}>
-      <div ref={host} style={{ width: "100%", height, borderRadius: 6, overflow: "hidden", background: dark ? "var(--figure-bg), var(--bg-sunk)" : "#f3f6f9", cursor: hovered.current && onPick ? "pointer" : "grab" }}
+      <div ref={host} style={{ width: "100%", height, borderRadius: 6, overflow: "hidden", background: dark ? "var(--figure-bg), #16181b" : "#f3f6f9", cursor: hovered.current && onPick ? "pointer" : "grab" }}
         onMouseMove={onMove} onMouseDown={(e) => { down.current = { x: e.clientX, y: e.clientY }; }} onMouseUp={onUp} onMouseLeave={() => { setHover(null); setTip(null); }} />
       {tip && <div className="map-tip" style={{ left: tip.x + 12, top: tip.y + 12 }}>{tip.text}</div>}
       <div className="row" style={{ position: "absolute", left: 10, bottom: 10, gap: 14 }}>

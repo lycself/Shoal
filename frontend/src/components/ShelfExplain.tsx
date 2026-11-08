@@ -44,20 +44,20 @@ export function referenceIndex(kinds: ConfigKind[]): [number, number] {
 
 // ------------------------------------------------------------------ what each quantity is
 const INFO: Record<string, { what: string; pattern?: string }> = {
-  phyto: { what: "整根水柱里浮游植物的碳总量（深度积分），相当于海洋食物网里的“草”。", pattern: "主要由光照、营养盐供应和垂向混合决定：营养盐补充多、层化适中的海区更高。" },
-  zoo: { what: "整根水柱里浮游动物的碳总量，是浮游植物与鱼之间的中间环节。" },
+  phyto: { what: "整根水柱里浮游植物的生物量（深度积分，以碳计），相当于海洋食物网里的“草”。ERGOM 用氮记账，这里按 Redfield 比例（每 1 mol 氮对应 6.625 mol 碳）换算成碳，便于和其他宿主比较。", pattern: "主要由光照、营养盐供应和垂向混合决定：营养盐补充多、层化适中的海区更高。" },
+  zoo: { what: "整根水柱里浮游动物的生物量（以碳计；ERGOM 由氮按 Redfield 比例换算），是浮游植物与鱼之间的中间环节。" },
   zoo_Z4_c: { what: "中型浮游动物（桡足类等，约 0.2–2 mm）的碳总量。它们是鱼最主要的食物，也吃微型浮游动物。" },
-  zoo_Z5_c: { what: "微型浮游动物（纤毛虫等，约 20–200 µm）的碳总量。它们吃小型浮游植物和鞭毛虫，自己又被中型浮游动物吃。" },
-  zoo_Z6_c: { what: "异养鞭毛虫（约 2–20 µm）的碳总量。它们吃细菌和最小的浮游植物，被微型浮游动物吃。" },
+  zoo_Z5_c: { what: "微型浮游动物（纤毛虫等，约 20–200 µm）的碳总量。它们吃较小的浮游植物和异养鞭毛虫，自己又被中型浮游动物吃。" },
+  zoo_Z6_c: { what: "异养鞭毛虫（自己不进行光合作用的鞭毛虫，约 2–20 µm）的碳总量。它们吃细菌和超微型浮游植物（< 2 µm），被微型浮游动物吃。" },
   chl: { what: "叶绿素的深度积分，是卫星海色观测能看到的浮游植物色素量。" },
   npp: { what: "净初级生产：浮游植物一年里通过光合作用固定、扣除自身呼吸后的碳，是整个食物网的能量来源。", pattern: "由光照和营养盐共同决定；浅海营养盐容易被混合带回表层，通常更高。" },
   fish_ww: { what: "MIZER 粒径谱上全部鱼的总湿重（每平方米多少克）。", pattern: "在本模型里，鱼的多少取决于它能吃到的浮游生物，因此空间格局通常与浮游动物相似。" },
   landings: { what: "渔获量：按设定的捕捞死亡率每年从鱼群中捕走的湿重。它与可捕的（较大的）鱼成正比。" },
-  fish_c_size1: { what: "体重较小的鱼的生物量（粒径谱最小的一段）。" },
-  fish_c_size2: { what: "中等体重的鱼的生物量。" },
-  fish_c_size3: { what: "体重较大的鱼的生物量（粒径谱最大的一段）。" },
+  fish_c_size1: { what: "体重小于 10 g 的鱼的生物量（鱼苗和幼鱼）。" },
+  fish_c_size2: { what: "体重小于 80 g 的鱼的生物量（包含上一档；80 g 也是默认的捕捞下限）。" },
+  fish_c_size3: { what: "体重小于 1 kg 的鱼的生物量（包含前两档，接近群落总量）。" },
   co2: { what: "一年的海气 CO₂ 通量：正值表示海洋吸收 CO₂，负值表示海洋向大气释放。", pattern: "受温度（溶解度）、生物生产（吸收）与呼吸分解（释放）共同影响。" },
-  sst: { what: "表层水温的年平均。", pattern: "由太阳辐射、海气热交换和纬度决定，南暖北冷。" },
+  sst: { what: "表层水温的年平均。", pattern: "由太阳辐射、海气热交换和纬度决定：低纬暖、高纬冷。" },
   sbt: { what: "底层水温的年平均。", pattern: "层化海区底层夏季不升温，因此比浅水混合区更冷。" },
   F1_c: { what: "E2E 鱼 1（浮游食性鱼，如鲱、鲭）的生物量。" },
   F2_c: { what: "E2E 鱼 2（底栖与鱼食性鱼，如鳕、鲽）的生物量。" },
@@ -74,13 +74,13 @@ type Ctx = { chg: Record<string, number | null> }; // % change of area means, ke
 const sgn = (x: number | null | undefined, tol = 2) => (x == null ? 0 : x > tol ? 1 : x < -tol ? -1 : 0);
 
 export const PAIR_INTRO: Record<string, string> = {
-  "oneway>twoway": "两种配置只差一件事：双向耦合中，鱼吃掉的浮游生物真的从 ERSEM 中扣除，鱼的粪便、排泄和呼吸也回到水里；同时 ERSEM 原来用来代表“看不见的捕食者”的闭合项（中型浮游动物的种内捕食和基础死亡）被关掉。单向耦合中，鱼吃多少都不影响浮游生物。",
-  "oneway>twoway-keep": "两种配置只差一件事：双向耦合中，鱼吃掉的浮游生物真的从 ERSEM 中扣除，鱼的粪便、排泄和呼吸也回到水里；单向耦合中，鱼吃多少都不影响浮游生物。（这里双向耦合仍保留了中型浮游动物的闭合死亡项，鱼的捕食是额外叠加的损失。）",
+  "oneway>twoway": "两种配置的区别在于：双向耦合中，鱼吃掉的浮游生物真的从 ERSEM 中扣除，鱼的粪便、排泄和呼吸也回到水里；同时 ERSEM 原来用来代表“看不见的捕食者”的闭合项（中型浮游动物的种内捕食和基础死亡）被关掉。单向耦合中，鱼吃多少都不影响浮游生物。",
+  "oneway>twoway-keep": "两种配置的区别在于：双向耦合中，鱼吃掉的浮游生物真的从 ERSEM 中扣除，鱼的粪便、排泄和呼吸也回到水里；单向耦合中，鱼吃多少都不影响浮游生物。（这里双向耦合仍保留了中型浮游动物的闭合死亡项，鱼的捕食是额外叠加的损失。）",
   "ltl>twoway": "基准只有低营养级（没有鱼）；比较配置加入了会吃浮游生物、并把排泄和呼吸返回水体的鱼，同时去掉了中型浮游动物的闭合死亡项。",
   "ltl>twoway-keep": "基准只有低营养级（没有鱼）；比较配置加入了会吃浮游生物、并把排泄和呼吸返回水体的鱼，原有的中型浮游动物死亡项保留，鱼的捕食是叠加的额外损失。",
   "ltl>oneway": "单向耦合中鱼不影响浮游生物，所以浮游生物与只有低营养级的基准应完全相同；差别只会出现在鱼相关的指标上。",
   "ltl>ltl": "两个运行都只有低营养级，差别在低营养级自身的参数（例如浮游动物死亡率）。这类实验用来判断：加入鱼的效果，能不能简单地用“提高浮游动物死亡率”来代替。",
-  "ltl>e2e": "基准只有低营养级；比较配置加入了 E2E 功能群（鱼 1、鱼 2、大型底栖），它们的捕食、粪便、死亡和排泄都反馈给宿主模型（修正版还包括呼吸放出的碳和消耗的氧）。",
+  "ltl>e2e": "基准只有低营养级；比较配置加入了 E2E 功能群（鱼 1、鱼 2、大型底栖），它们的捕食、粪便、死亡和排泄都反馈给宿主模型（若选了收支闭合的修正版，还包括呼吸放出的碳和消耗的氧）。",
 };
 
 export function mechanism(key: string, pair: string, d: number | null, ctx: Ctx): string | null {
@@ -89,7 +89,12 @@ export function mechanism(key: string, pair: string, d: number | null, ctx: Ctx)
   const s = sgn(d);
   const z4 = sgn(cc.zoo_Z4_c), z5 = sgn(cc.zoo_Z5_c);
   const feedback = pair.startsWith("oneway>twoway") || pair.startsWith("ltl>twoway") || pair === "ltl>e2e";
-  if (key === "sst" || key === "sbt") return "两个配置的温度完全相同：本模型中生物不反馈物理场，物理强迫一模一样，所以其他指标的差异全部来自生态过程。";
+  if (key === "sst" || key === "sbt") {
+    if (d == null) return null;
+    return Math.abs(d) < 1e-6
+      ? "两个配置的温度完全相同：本模型中生物不反馈物理场，物理强迫一模一样，所以其他指标的差异全部来自生态过程。"
+      : "两个配置的温度不同。本模型中生物不反馈物理场，所以温差来自物理设置本身（例如强迫年份、网格或物理参数不同），其他指标的差异也会包含这部分影响，不能只归因于生态过程。";
+  }
   if (pair === "ltl>oneway" && !/fish|landings/.test(key)) return s === 0 ? "与预期一致：单向耦合的鱼不改变浮游生物。" : "单向耦合本不应改变浮游生物；出现差异请检查两个配置的低营养级设置是否相同。";
   if (!feedback) return null;
   switch (key) {
@@ -102,7 +107,9 @@ export function mechanism(key: string, pair: string, d: number | null, ctx: Ctx)
     case "zoo_Z5_c":
       if (z4 < 0 && s > 0) return "这是典型的营养级联：中型浮游动物变少 → 它对微型浮游动物的捕食减轻 → 微型浮游动物增加。";
       if (z4 > 0 && s < 0) return "营养级联：中型浮游动物变多 → 吃掉更多微型浮游动物。";
-      return "微型浮游动物同时受中型浮游动物捕食和鱼的直接捕食影响，两者方向不同时变化较小。";
+      if (z4 < 0 && s < 0) return "微型浮游动物也减少：鱼的直接捕食超过了中型浮游动物减少带来的捕食减轻。";
+      if (s === 0) return "微型浮游动物同时受中型浮游动物捕食和鱼的直接捕食影响，两者方向不同时变化较小。";
+      return null;
     case "zoo_Z6_c":
       if (z5 > 0 && s < 0) return "级联继续往下传：微型浮游动物变多 → 吃掉更多异养鞭毛虫 → 异养鞭毛虫减少。食物链上相隔一级的类群往往反向变化。";
       if (z5 < 0 && s > 0) return "级联往下传：微型浮游动物变少 → 异养鞭毛虫被吃得少而增加。";
@@ -110,12 +117,16 @@ export function mechanism(key: string, pair: string, d: number | null, ctx: Ctx)
     case "zoo":
       return "浮游动物总量是各类群之和；当各类群反向变化时（营养级联），总量的变化比单个类群小得多。";
     case "phyto": case "chl": case "npp":
-      if (s === 0) return "浮游植物几乎不变：中型浮游动物的变化与微型浮游动物的变化对浮游植物的摄食压力方向相反，大体抵消；而且光照和营养盐才是浮游植物的主要限制。顶层的扰动传到食物链底部时已经很弱。";
-      return s > 0 ? "浮游植物增加：对浮游植物的总摄食压力下降，或鱼的排泄把更多营养盐还给水体。" : `浮游植物减少：小型植食者（微型浮游动物）增加后吃掉更多小型藻类${pair.includes("twoway") ? "；MIZER 的鱼也直接摄食较大的藻类" : ""}。`;
+      if (s === 0) return z4 !== 0 && z4 === -z5
+        ? "浮游植物几乎不变：中型浮游动物和微型浮游动物反向变化，对浮游植物的摄食压力大体抵消；而且光照和营养盐才是浮游植物的主要限制。顶层的扰动传到食物链底部时已经很弱。"
+        : "浮游植物几乎不变：光照和营养盐才是浮游植物的主要限制，顶层的扰动传到食物链底部时已经很弱。";
+      return s > 0 ? "浮游植物增加：对浮游植物的总摄食压力下降，或鱼的排泄把更多营养盐还给水体。" : `浮游植物减少：${z5 > 0 ? "微型浮游动物增加后吃掉更多较小的藻类" : "对浮游植物的总摄食压力上升"}${pair.includes("twoway") ? "；MIZER 的鱼也直接摄食较大的藻类" : ""}。`;
     case "fish_ww": case "fish_c_size1": case "fish_c_size2": case "fish_c_size3": case "F1_c": case "F2_c":
       if (pair.startsWith("oneway>twoway")) {
         if (s < 0) return "鱼变少：单向耦合中鱼吃掉的食物不会减少，相当于食物取之不尽，会高估鱼；双向耦合中被吃掉的就真的没了，食物（尤其中型浮游动物）减少，鱼的增长受到限制。这正是“反馈”带来的密度制约。";
-        if (s > 0) return "鱼变多：闭合项被关掉后，某些季节鱼能吃到的浮游动物反而更多。";
+        if (s > 0) return pair === "oneway>twoway-keep"
+          ? "鱼变多：鱼的排泄和粪便让部分季节的浮游生物变多，鱼能吃到的反而更多。"
+          : "鱼变多：闭合项被关掉后，某些季节鱼能吃到的浮游动物反而更多。";
         return "鱼几乎不变：食物减少的影响较弱。";
       }
       return null;
@@ -191,7 +202,7 @@ export function FigureReading({ metric, label, unit, mode, pairs, nameA, nameB, 
     const reg = regionStats(ok, regionerFor(boxes, ok), (p) => p.a as number);
     if (reg.length >= 2) {
       const hi = reg[0], lo = reg[reg.length - 1];
-      facts.push(<>区域平均最高的是 <b>{hi.name}</b>（{fmt(hi.m)} {unit}），最低的是 <b>{lo.name}</b>（{fmt(lo.m)} {unit}），相差 {fmt(hi.m / (lo.m || NaN))} 倍。</>);
+      facts.push(<>区域平均最高的是 <b>{hi.name}</b>（{fmt(hi.m)} {unit}），最低的是 <b>{lo.name}</b>（{fmt(lo.m)} {unit}）{lo.m > 0 ? `，相差 ${fmt(hi.m / lo.m)} 倍` : ""}。</>);
     }
     const withD = ok.filter((p) => p.depth != null);
     const r = pearson(withD.map((p) => p.depth as number), withD.map((p) => p.a as number));
@@ -223,12 +234,13 @@ export function FigureReading({ metric, label, unit, mode, pairs, nameA, nameB, 
     } else {
       facts.push(<>以 <b>{nameA}</b> 为基准，<b>{nameB}</b> 的陆架平均值从 {fmt(ma)} 变为 {fmt(mb)} {unit}（{signed ? `差 ${fmt(mb - ma)} ${unit}` : <b>{sp(d)}</b>}）。</>);
       const flat = both.length - down - up;
-      facts.push(<>{both.length} 根水柱中 <b>{down}</b> 根下降、<b>{up}</b> 根上升{flat > 0 ? `、${flat} 根变化不到 1%` : ""}{Math.abs(d) < 3 && !signed ? "，整体变化很小。" : down > 0.85 * both.length || up > 0.85 * both.length ? "：几乎所有水柱都朝同一个方向变化，说明这是模型机制造成的，不是个别格点的偶然波动。" : "：有升有降，不同海区的反应不一样。"}</>);
+      facts.push(<>{both.length} 根水柱中 <b>{down}</b> 根下降、<b>{up}</b> 根上升{flat > 0 ? `、${flat} 根变化不到 1%` : ""}{Math.abs(d) < 3 && !signed ? "，整体变化很小。" : down > 0.85 * both.length || up > 0.85 * both.length ? "：几乎所有水柱都朝同一个方向变化，说明这是全陆架一致的系统性响应。" : "：有升有降，不同海区的反应不一样。"}</>);
       if (!signed && Math.abs(d) >= 3) {
         const reg = regionStats(both, regionerFor(boxes, both), (p) => p.a as number, (p) => p.b as number).filter((r) => r.n >= 3).sort((x, y) => (x.c ?? 0) - (y.c ?? 0));
         if (reg.length >= 2) {
           const strong = d < 0 ? reg[0] : reg[reg.length - 1], weak = d < 0 ? reg[reg.length - 1] : reg[0];
-          facts.push(<>变化最大的区域是 <b>{strong.name}</b>（{sp(strong.c!, 0)}），最小的是 <b>{weak.name}</b>（{sp(weak.c!, 0)}）。</>);
+          const flip = (weak.c ?? 0) * d < 0; // the weakest region moved the other way
+          facts.push(<>{d < 0 ? "降幅最大" : "增幅最大"}的区域是 <b>{strong.name}</b>（{sp(strong.c!, 0)}），{flip ? (d < 0 ? "反而上升" : "反而下降") : (d < 0 ? "降幅最小" : "增幅最小")}的是 <b>{weak.name}</b>（{sp(weak.c!, 0)}）。</>);
         }
       }
       if (mode === "pct" && !signed && isFinite(median(per))) facts.push(<>逐格点百分比的中位数为 {sp(median(per))}；地图上个别格点很大的百分比往往来自基准值很小的水柱。</>);
@@ -278,23 +290,26 @@ function regionStats(pairs: Pair[], rOf: (p: Pair) => string | null, fa: (p: Pai
 /** One-paragraph synthesis across all panels of the percent-change overview (paper 1, Fig. 5). */
 export function cascadeText(chgIn: Record<string, number | null>): string | null {
   const chg = canonChg(chgIn);
-  const z4 = sgn(chg.zoo_Z4_c), z5 = sgn(chg.zoo_Z5_c), z6 = sgn(chg.zoo_Z6_c), ph = sgn(chg.phyto, 3);
+  const z4 = sgn(chg.zoo_Z4_c), z5 = sgn(chg.zoo_Z5_c), z6 = sgn(chg.zoo_Z6_c);
   if (!(z4 !== 0 && z5 === -z4)) return null;
-  return `变化沿食物链一正一负交替：中型浮游动物${z4 < 0 ? "减少" : "增加"} → 微型浮游动物${z5 > 0 ? "增加" : "减少"}${z6 === -z5 && z6 !== 0 ? ` → 异养鞭毛虫${z6 < 0 ? "减少" : "增加"}` : ""}。这就是营养级联：捕食者变少，它的猎物就变多，猎物的猎物又变少。${ph === 0 ? "传到浮游植物时效应已基本抵消，所以浮游植物几乎不变。" : ""}`;
+  const phFlat = chg.phyto != null && sgn(chg.phyto, 3) === 0;
+  return `变化沿食物链一正一负交替：中型浮游动物${z4 < 0 ? "减少" : "增加"} → 微型浮游动物${z5 > 0 ? "增加" : "减少"}${z6 === -z5 && z6 !== 0 ? ` → 异养鞭毛虫${z6 < 0 ? "减少" : "增加"}` : ""}。这就是营养级联：${z4 < 0 ? "捕食者变少，它的猎物就变多，猎物的猎物又变少" : "捕食者变多，它的猎物就变少，猎物的猎物又变多"}。${phFlat ? "传到浮游植物时效应已基本抵消，所以浮游植物几乎不变。" : ""}`;
 }
 
 export function CascadeSummary({ chg, labels, pairKey, nameA, nameB }: { chg: Record<string, number | null>; labels: Record<string, string>; pairKey?: string; nameA: string; nameB: string }) {
   const keys = ["zoo_Z4_c", "zoo_Z5_c", "zoo_Z6_c", "phyto", "npp", "fish_ww", "landings"].filter((k) => chg[k] != null);
   const parts = keys.map((k) => `${(labels[k] ?? k).trim()} ${sp(chg[k]!)}`);
-  const z4 = sgn(chg.zoo_Z4_c), z5 = sgn(chg.zoo_Z5_c), z6 = sgn(chg.zoo_Z6_c), ph = sgn(chg.phyto, 3);
+  const cc = canonChg(chg);
+  const z4 = sgn(cc.zoo_Z4_c), z5 = sgn(cc.zoo_Z5_c), z6 = sgn(cc.zoo_Z6_c);
   const cascade = z4 !== 0 && z5 === -z4;
+  const phFlat = cc.phyto != null && sgn(cc.phyto, 3) === 0, nppFlat = cc.npp != null && sgn(cc.npp, 3) === 0;
   return (
     <div className="reading reading-wide">
       <h4>这组图说明了什么</h4>
       <p>以 <b>{nameA}</b> 为基准，<b>{nameB}</b> 的陆架平均变化：{parts.join("，")}。</p>
-      {cascade && <p>变化沿食物链<b>一正一负交替</b>：中型浮游动物{z4 < 0 ? "减少" : "增加"} → 微型浮游动物{z5 > 0 ? "增加" : "减少"}{z6 === -z5 && z6 !== 0 ? ` → 异养鞭毛虫${z6 < 0 ? "减少" : "增加"}` : ""}，这就是<b>营养级联</b>：捕食者变少，它的猎物就变多，猎物的猎物又变少。{ph === 0 ? "传到浮游植物时效应已基本抵消，所以浮游植物和初级生产几乎不变。" : ""}</p>}
+      {cascade && <p>变化沿食物链<b>一正一负交替</b>：中型浮游动物{z4 < 0 ? "减少" : "增加"} → 微型浮游动物{z5 > 0 ? "增加" : "减少"}{z6 === -z5 && z6 !== 0 ? ` → 异养鞭毛虫${z6 < 0 ? "减少" : "增加"}` : ""}，这就是<b>营养级联</b>：{z4 < 0 ? "捕食者变少，它的猎物就变多，猎物的猎物又变少。" : "捕食者变多，它的猎物就变少，猎物的猎物又变多。"}{phFlat ? `传到浮游植物时效应已基本抵消，所以浮游植物${nppFlat ? "和初级生产" : ""}几乎不变。` : ""}</p>}
       {pairKey && PAIR_INTRO[pairKey] && <p>{PAIR_INTRO[pairKey]}</p>}
-      {pairKey?.startsWith("oneway>twoway") && sgn(chg.fish_ww) < 0 && <p>鱼本身也变少了：单向耦合假设鱼吃不完食物，双向耦合中鱼会把自己的食物吃少，从而限制自身增长。换句话说，不考虑反馈的“离线”鱼类模型在这里高估了鱼类生物量和渔获。可以与 Powley 等 (2026) 图 5 的陆架结果对照。</p>}
+      {pairKey?.startsWith("oneway>twoway") && sgn(chg.fish_ww) < 0 && <p>鱼本身也变少了：单向耦合假设鱼吃不完食物，双向耦合中鱼会把自己的食物吃少，从而限制自身增长。换句话说，不考虑反馈的“离线”鱼类模型在这里高估了鱼类生物量{sgn(chg.landings) < 0 ? "和渔获" : ""}。<span className="soft">（方法参考：Powley 等 2026）</span></p>}
       <p className="soft">每个面板的色标固定为 ±40%，便于在指标之间比较；红色为增加，蓝色为减少。</p>
     </div>
   );

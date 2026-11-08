@@ -131,7 +131,6 @@ export default function PrimerPage() {
               <div className="learn-kicker">第 {cur.order} 章 · {part}</div>
               <h1 className="page-title" style={{ fontSize: 24 }}>{cur.title}</h1>
               <div className="row" style={{ marginTop: 8 }}>
-                <span className="learn-status"><Icon name="warning" />AI 撰写，待审核</span>
                 {cur.summary && <span className="soft small ellipsis">{cur.summary}</span>}
                 <span className="grow" />
                 <Btn size="sm" icon="sparkle" onClick={() => askTutor(`请讲解入门教程“${cur.title}”这一章：核心概念、关键方程，以及它们在 Shoal 里对应的设置和结果。`)}>问讲解员</Btn>

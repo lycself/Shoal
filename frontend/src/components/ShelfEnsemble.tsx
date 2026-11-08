@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useApp } from "../store";
 import { DEPTH_BANDS } from "./ShelfExplain";
-import { Empty, Select, cssVar, fmt } from "./ui";
+import { Empty, Select, cssVar, fmt, fmtLatLon } from "./ui";
 
 const LABEL: Record<string, string> = { temp: "表层温度", F1_c: "鱼 1 生物量", F2_c: "鱼 2 生物量", MB_c: "大型底栖生物量", fish_c_tot: "鱼类群落湿重", Z4_c: "中型浮游动物（深度积分）", ECO_mesozoo: "中型浮游动物", ergom_zz: "浮游动物" };
 const UNIT: Record<string, string> = { temp: "°C" };
@@ -163,7 +163,7 @@ export function ShelfEnsemble({ results }: { results: any[] }) {
           {hc && (
             <g pointerEvents="none">
               <rect x={left + 8} y={top + 4} width={250} height={40} rx={5} fill={cssVar("--bg-tooltip")} stroke={cssVar("--border-strong")} />
-              <text x={left + 18} y={top + 20} fontSize={12} fontWeight={600} fill={cssVar("--fg-strong")}>{hc.lat.toFixed(1)}°N {hc.lon.toFixed(1)}°E · 水深 {hc.depth?.toFixed(0)} m</text>
+              <text x={left + 18} y={top + 20} fontSize={12} fontWeight={600} fill={cssVar("--fg-strong")}>{fmtLatLon(hc.lat, hc.lon, 1)} · 水深 {hc.depth?.toFixed(0)} m</text>
               <text x={left + 18} y={top + 36} fontSize={11} fill={soft}>全年 {fmt(Math.min(...hc.ys), 3)} – {fmt(Math.max(...hc.ys), 3)} {unit}，峰值在 {MONTHS[hc.ys.indexOf(Math.max(...hc.ys))]}</text>
             </g>
           )}
