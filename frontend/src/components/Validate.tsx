@@ -54,8 +54,8 @@ export function ValidateTab({ pid, run }: { pid: string; run: any }) {
                 { type: "scatterpolar", r: [1], theta: [0], mode: "markers+text", text: ["WOA"], textposition: "top right", marker: { size: 11, color: cssVar("--fg-strong"), symbol: "star" }, name: "参考（WOA23）" },
                 ...vd.vars.map((x: any, i: number) => ({ type: "scatterpolar", r: [x.stats.sd_ratio], theta: [Math.acos(Math.max(-1, Math.min(1, x.stats.r ?? 0))) * 180 / Math.PI], mode: "markers", name: x.label, hovertemplate: `${x.label}<br>r = ${fmt(x.stats.r)}<br>σm/σo = ${fmt(x.stats.sd_ratio)}<extra></extra>`, marker: { size: 12, line: { width: 1, color: dark ? "#111" : "#fff" }, color: seriesColor(i, dark) } })),
               ]} layout={{ showlegend: true, legend: { orientation: "h", y: -0.12, x: 0, font: { size: 11 } }, margin: { l: 40, r: 30, t: 34, b: 10 },
-                polar: { sector: [0, 90], bgcolor: "rgba(0,0,0,0)", radialaxis: { range: [0, Math.max(1.6, ...vd.vars.map((x: any) => (x.stats.sd_ratio ?? 0) * 1.1))], title: { text: "σ模式 / σ观测" }, gridcolor: dark ? "#2e3035" : "#e3e6ea" },
-                  angularaxis: { direction: "clockwise", rotation: 90, tickvals: [0, 25.8, 45.6, 63.3, 72.5, 84.3, 90], ticktext: ["1", "0.9", "0.7", "0.45", "0.3", "0.1", "0"], gridcolor: dark ? "#2e3035" : "#e3e6ea" } },
+                polar: { sector: [0, 90], bgcolor: "rgba(0,0,0,0)", radialaxis: { range: [0, Math.max(1.6, ...vd.vars.map((x: any) => (x.stats.sd_ratio ?? 0) * 1.1))], title: { text: "σ模式 / σ观测" }, gridcolor: cssVar("--plot-grid") },
+                  angularaxis: { direction: "clockwise", rotation: 90, tickvals: [0, 25.8, 45.6, 63.3, 72.5, 84.3, 90], ticktext: ["1", "0.9", "0.7", "0.45", "0.3", "0.1", "0"], gridcolor: cssVar("--plot-grid") } },
                 annotations: [{ text: "相关系数", x: 0.85, y: 0.95, xref: "paper", yref: "paper", showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } }], title: { text: "Taylor 图（月 × 深度）" } }} />
               <div className="panel" style={{ overflow: "auto" }}>
                 <table className="table dense">

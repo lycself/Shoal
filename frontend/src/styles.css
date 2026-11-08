@@ -63,6 +63,10 @@
   --map-contour: rgba(40, 90, 120, 0.25);
   --map-grid: rgba(60, 70, 80, 0.16);
 
+  --plot-grid: #eceef1;
+  --plot-line: #b4bcc6;
+  --glow: #0b8f8f;          /* flow particles, callout leaders */
+  --figure-bg: none;        /* dark theme lights figures from above */
   --scrollbar: rgba(100, 110, 120, 0.35);
   --scrollbar-hover: rgba(100, 110, 120, 0.6);
 
@@ -73,34 +77,35 @@
 }
 
 :root[data-theme="dark"] {
+  /* deep-sea navy: the chrome stays flat and quiet, only the data layers glow */
   color-scheme: dark;
-  --bg: #1e1f22;
-  --bg-side: #191a1d;
-  --bg-bar: #191a1d;
-  --bg-sunk: #16171a;
-  --bg-hover: #2a2c31;
-  --bg-active: #33363c;
-  --bg-input: #26282c;
-  --bg-tooltip: #25272b;
-  --border: #2c2e33;
-  --border-strong: #3d4047;
-  --shadow-pop: 0 8px 28px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
-  --fg-strong: #eceef1;
-  --fg: #cdd1d7;
-  --fg-muted: #9aa1ab;
-  --fg-soft: #6c7480;
-  --icon: #b9bec6;
+  --bg: #0f1923;
+  --bg-side: #0b141d;
+  --bg-bar: #0b141d;
+  --bg-sunk: #08111a;
+  --bg-hover: #172534;
+  --bg-active: #1d2f42;
+  --bg-input: #122030;
+  --bg-tooltip: #142333;
+  --border: #1a2938;
+  --border-strong: #2a3d51;
+  --shadow-pop: 0 8px 28px rgba(0, 6, 14, 0.6), 0 1px 3px rgba(0, 6, 14, 0.4);
+  --fg-strong: #e8eef4;
+  --fg: #c4cfda;
+  --fg-muted: #8d9eb0;
+  --fg-soft: #66788d;
+  --icon: #aebdcb;
   --accent: #3d8bfd;
   --accent-hover: #5a9cff;
-  --accent-soft: #1b2f4a;
+  --accent-soft: #14304e;
   --accent-line: #2d5a92;
   --on-accent: #ffffff;
   --ok: #4cc072;
-  --ok-soft: #173322;
+  --ok-soft: #12301f;
   --warn: #e0a935;
-  --warn-soft: #3a2f14;
+  --warn-soft: #362c12;
   --danger: #f2655f;
-  --danger-soft: #3d1c1b;
+  --danger-soft: #3a1b1d;
   --running: #1f6fd1;
   --eco-phys: #ff7b6e;
   --eco-nut: #a58bff;
@@ -111,14 +116,18 @@
   --eco-organic: #b0a796;
   --eco-bact: #f06595;
   --eco-carbon: #adb5bd;
-  --map-land: #2d2c29;
-  --map-land-edge: #5a5446;
-  --map-sea-shallow: #1b2a33;
-  --map-sea-deep: #24506a;
+  --map-land: #222a31;
+  --map-land-edge: #48566a;
+  --map-sea-shallow: #112536;
+  --map-sea-deep: #1c4c6d;
   --map-contour: rgba(140, 200, 230, 0.22);
-  --map-grid: rgba(200, 210, 220, 0.12);
-  --scrollbar: rgba(160, 170, 180, 0.3);
-  --scrollbar-hover: rgba(160, 170, 180, 0.55);
+  --map-grid: rgba(180, 210, 235, 0.12);
+  --plot-grid: #1b2a3a;
+  --plot-line: #34485e;
+  --glow: #6fd3e6;
+  --figure-bg: radial-gradient(120% 90% at 70% 0%, rgba(61, 139, 253, 0.10), transparent 60%), radial-gradient(80% 70% at 0% 100%, rgba(111, 211, 230, 0.05), transparent 70%);
+  --scrollbar: rgba(150, 175, 200, 0.28);
+  --scrollbar-hover: rgba(150, 175, 200, 0.5);
 }
 
 /* ------------------------------------------------------------------ base */
@@ -511,7 +520,7 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .action-tile .d { display: block; font-size: 12px; color: var(--fg-muted); margin-top: 1px; }
 
 /* food web */
-.fw-wrap { position: relative; width: 100%; height: 100%; min-height: 380px; }
+.fw-wrap { position: relative; width: 100%; height: 100%; min-height: 380px; background: var(--figure-bg); }
 .fw-node { cursor: pointer; }
 .fw-node rect.body { fill: var(--bg); stroke: var(--border-strong); }
 .fw-node:hover rect.body { stroke: var(--accent); }
@@ -519,6 +528,9 @@ textarea.input { height: auto; padding: 7px 9px; resize: vertical; line-height: 
 .fw-node text { font-family: var(--font); }
 .fw-legend { position: absolute; left: 12px; bottom: 10px; background: var(--bg-tooltip); border: 1px solid var(--border); border-radius: 6px; padding: 6px 10px; font-size: 11.5px; color: var(--fg-muted); display: flex; flex-wrap: wrap; gap: 4px 12px; max-width: 70%; }
 .fw-legend span { display: inline-flex; align-items: center; gap: 5px; }
+
+/* shelf ensemble */
+.ens-wrap { width: 100%; background: var(--figure-bg); border-radius: 6px; }
 
 /* map */
 .map-frame { position: relative; display: inline-block; }

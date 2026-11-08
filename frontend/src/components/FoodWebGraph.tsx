@@ -14,6 +14,7 @@ const ROWS: [string, (n: FWNode) => boolean][] = [
   ["营养盐 · 有机物 · 沉积物", (n) => n.level < 1],
 ];
 const GROUP_ORDER = ["det", "nut", "pel", "mic", "htl", "ben"];
+const reducedMotion = () => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const NW = 150, NH = 44;
 
 function mergeNutrients(graph: { nodes: FWNode[]; edges: FWEdge[] }) {
@@ -78,6 +79,19 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
   const maxBy: Record<string, number> = {};
   if (state) for (const n of g.nodes) { const v = state[n.var]?.value; if (v && v > 0) maxBy[n.role] = Math.max(maxBy[n.role] ?? 0, v); }
   const edges = g.edges.filter((e) => (e.kind !== "waste" || showWaste) && (e.kind !== "uptake" || showUptake));
+  // Feeding pressure of a link: preference a × prey biomass (a Holling type-II intake is proportional to it at low prey).
+  // Without a run (the configuration page) only the preference is known, so a alone sets it.
+  const pressure = useMemo(() => {
+    const raw = edges.map((e) => {
+      if (e.kind !== "htl" && e.kind !== "ltl") return 0;
+      const prey = state?.[nodeById[e.from]?.var ?? ""]?.value;
+      return state ? (prey && prey > 0 ? e.w * prey : 0) : e.w;
+    });
+    // biomasses span orders of magnitude: compress with a square root so mid-sized links stay visible
+    const top = Math.max(1e-12, ...raw.map(Math.sqrt));
+    return raw.map((x) => Math.sqrt(x) / top);
+  }, [edges, state]);
+  const motion = !reducedMotion();
 
   return (
     <div ref={wrap} className="fw-wrap">
@@ -87,6 +101,10 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
       </div>
       <svg width={W} height={layout.H} viewBox={`0 0 ${W} ${layout.H}`} onClick={() => onSelect?.(null)} style={{ display: "block" }}>
         <defs>
+          <filter id="fw-glow" x="-200%" y="-200%" width="500%" height="500%">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="2.4" result="halo" />
+            <feMerge><feMergeNode in="halo" /><feMergeNode in="halo" /><feMergeNode in="SourceGraphic" /></feMerge>
+          </filter>
           {["phyto", "zoo", "fish", "benthos", "organic", "nutrient", "bacteria", "benthic"].map((r) => (
             <marker key={r} id={`ar-${r}`} viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" markerUnits="userSpaceOnUse" orient="auto-start-reverse">
               <path d="M0 1L9 5L0 9z" fill={color(r)} />
@@ -116,11 +134,25 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
           const role = waste ? "organic" : uptake ? "nutrient" : tgt?.role ?? "zoo";
           const wd = waste || uptake ? 1.2 : 0.9 + 3.2 * Math.min(1, e.w);
           const on = linked(e);
+          const pr = pressure[i];
+          const flows = motion && on && pr > 0.04;
+          // 1–4 particles per link; stronger links carry more and faster ones
+          const nP = flows ? Math.max(1, Math.round(1 + 3 * pr)) : 0;
+          const dur = 5.5 - 3 * pr;
           return (
-            <path key={i} d={d} fill="none" stroke={color(role)} strokeWidth={wd} strokeOpacity={on ? (focus ? 0.95 : 0.55) : 0.07}
-              strokeDasharray={waste || e.feedback === false ? "5 4" : undefined} markerEnd={on ? `url(#ar-${role})` : undefined} strokeLinecap="round">
-              <title>{`${src?.label ?? e.from} → ${tgt?.label ?? e.to}${e.kind === "htl" || e.kind === "ltl" ? `\n偏好 a = ${e.w}${e.sigma ? `，摄食率 σ = ${e.sigma} d⁻¹` : ""}` : ""}${e.feedback === false ? "\n单向耦合：鱼类不改变饵料" : ""}`}</title>
-            </path>
+            <g key={i}>
+              {dark && on && pr > 0.04 && <path d={d} fill="none" stroke={color(role)} strokeWidth={wd + 6} strokeOpacity={focus ? 0.16 : 0.07} strokeLinecap="round" pointerEvents="none" />}
+              <path d={d} fill="none" stroke={color(role)} strokeWidth={wd} strokeOpacity={on ? (focus ? 0.95 : flows ? 0.42 : 0.55) : 0.07}
+                strokeDasharray={waste || e.feedback === false ? "5 4" : undefined} markerEnd={on && (!flows || focus) ? `url(#ar-${role})` : undefined} strokeLinecap="round">
+                <title>{`${src?.label ?? e.from} → ${tgt?.label ?? e.to}${e.kind === "htl" || e.kind === "ltl" ? `\n偏好 a = ${e.w}${e.sigma ? `，摄食率 σ = ${e.sigma} d⁻¹` : ""}` : ""}${state && pr > 0 ? `\n相对摄食压力 ${(pr * 100).toFixed(0)}%（偏好 × 饵料生物量）` : ""}${e.feedback === false ? "\n单向耦合：鱼类不改变饵料" : ""}`}</title>
+              </path>
+              {Array.from({ length: nP }, (_, k) => (
+                <circle key={k} r={1.6 + 1.4 * pr} fill={color(role)} stroke={dark ? "rgba(255,255,255,.85)" : "none"} strokeWidth={0.6} opacity={0} pointerEvents="none" filter={dark ? "url(#fw-glow)" : undefined}>
+                  <animateMotion dur={`${dur}s`} begin={`${(-k * dur) / nP - (i % 7) * 0.37}s`} repeatCount="indefinite" path={d} keyPoints="0;1" keyTimes="0;1" calcMode="linear" />
+                  <animate attributeName="opacity" dur={`${dur}s`} begin={`${(-k * dur) / nP - (i % 7) * 0.37}s`} repeatCount="indefinite" values="0;0.95;0.95;0" keyTimes="0;0.12;0.85;1" />
+                </circle>
+              ))}
+            </g>
           );
         })}
         {g.nodes.map((n) => {
@@ -158,7 +190,7 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
         {[["nutrient", "营养盐"], ["phyto", "浮游植物"], ["bacteria", "细菌"], ["zoo", "浮游动物"], ["fish", "鱼类"], ["benthos", "底栖"], ["organic", "有机物"]].map(([r, l]) => (
           <span key={r}><span className="swatch" style={{ background: color(r) }} />{l}</span>
         ))}
-        <span>线宽 ∝ 摄食偏好 · 虚线 = 废物流 / 单向耦合{state ? " · 条形 = 年均生物量（同类相对）" : ""}</span>
+        <span>线宽 ∝ 摄食偏好 · {motion ? `流动的光点 = 能量从被吃者流向捕食者，${state ? "越密越快表示摄食压力（偏好 × 饵料生物量）越大" : "越密越快表示偏好越强"} · ` : ""}虚线 = 废物流 / 单向耦合{state ? " · 条形 = 年均生物量（同类相对）" : ""}</span>
       </div>
     </div>
   );

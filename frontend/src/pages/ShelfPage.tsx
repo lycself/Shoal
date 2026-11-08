@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { api, on } from "../api";
 import { MapCanvas } from "../components/MapCanvas";
 import { Btn, Check, Empty, Icon, IconBtn, Loading, Modal, Notice, Progress, Select, Seg, Split, Stat, StatusBadge, Tabs, fmt, robustAbs, useAsync, HelpLink, PanelToggle } from "../components/ui";
+import { ShelfEnsemble } from "../components/ShelfEnsemble";
 import { Shelf3DView, ShelfPlates, ShelfRegions } from "../components/ShelfViews";
 import { FigureReading, changeOfMeans, configKind, pairKeyOf, referenceIndex } from "../components/ShelfExplain";
 import { CellPanel } from "../components/CellPanel";
@@ -179,7 +180,7 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
   const [cmp, setCmp] = useState<"value" | "diff" | "pct">("value");
   const [metric, setMetric] = useState("");
   const [month, setMonth] = useState(0);
-  const [view, setView] = useState<"map" | "plates" | "regions" | "3d">("map");
+  const [view, setView] = useState<"map" | "plates" | "regions" | "3d" | "ensemble">("map");
   const [cellSel, setCellSel] = useState<{ point: { lat: number; lon: number }; at: { clientX: number; clientY: number } } | null>(null);
   const [readOpen, toggleRead] = useReadingOpen();
   const cfgOf = (r: any) => (cfgs.data ?? []).find((c) => c.id === r?.config_id);
@@ -252,10 +253,12 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
             { id: "plates", label: "图版", icon: "files", tip: "两种配置并排对比的多面板图" },
             { id: "regions", label: "区域统计", icon: "table", tip: "按海区或水深分区的平均值" },
             { id: "3d", label: "三维视图", icon: "globe", tip: "立体地形和水柱，直观看出哪里浅、哪里深" },
+            { id: "ensemble", label: "逐月走势", icon: "pulse", tip: "每根水柱一条线，看各处的季节变化有多一致、按水深分区落在哪里" },
           ]} />
           {cellSel && view === "map" && <CellPanel at={cellSel.at} point={cellSel.point} results={results} ci={ci} cj={cmp !== "value" ? cj : (results.length > 1 ? cj : undefined)} metric={metric.startsWith("monthly:") ? "fish_ww" : metric} boxes={boxes.data ?? []} onClose={() => setCellSel(null)} />}
           {view === "plates" && <div className="split-scroll" style={{ padding: 16 }}><ShelfPlates study={study} results={results} configs={cfgs.data ?? []} boxes={boxes.data ?? []} /></div>}
           {view === "regions" && <div className="split-scroll" style={{ padding: 16 }}><ShelfRegions pid={pid} sid={sid} study={study} configs={cfgs.data ?? []} results={results} /></div>}
+          {view === "ensemble" && <div className="split-scroll" style={{ padding: 16 }}><ShelfEnsemble results={results} /></div>}
           {view === "3d" && <div className="split-scroll" style={{ padding: 16 }}><Shelf3DView study={study} results={results} boxes={boxes.data ?? []} configs={cfgs.data ?? []} /></div>}
           {view === "map" && <>
           <div className="optbar">

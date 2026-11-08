@@ -347,10 +347,22 @@ function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVar
   const mldNow = d.mld?.series?.[0]?.values?.[ti];
   const fishS = d.fish?.series?.[0];
   const zooRel = keys!.zoo ? rel("zoo") : [];
-  const SVG_H = 520, top = 30, bot = 34, colX = 70, colW = 120;
+  const SVG_H = 520, top = 30, bot = 34, rulerX = 50, colX = 62, colW = 104, COL_W = 380;
   const yOf = (z: number) => top + (z / H) * (SVG_H - top - bot);
   // fish drawn at depths of high food (zooplankton), size ∝ local share
   const fishMarks = zooRel.map((w: number, i: number) => ({ w, z: depth[i] })).filter((f: any, i: number) => i % Math.max(1, Math.round(depth.length / 14)) === 0 && f.w > 0.25);
+  // features of today's column, each read straight off the profiles drawn beside it
+  const callouts: Callout[] = [];
+  if (mldNow !== undefined && mldNow !== null) callouts.push({ z: Math.min(H, mldNow), title: "混合层底", sub: "风和降温把海水搅匀到这里", value: `${mldNow.toFixed(0)} m` });
+  let gMax = 0, gZ = 0;
+  for (let i = 1; i < depth.length; i++) {
+    const g = (temps[i - 1] - temps[i]) / Math.max(1e-6, depth[i] - depth[i - 1]);
+    if (g > gMax) { gMax = g; gZ = (depth[i - 1] + depth[i]) / 2; }
+  }
+  if (gMax > 0.05) callouts.push({ z: gZ, title: "温跃层", sub: "温度下降最快，上下层很难交换", value: `${gZ.toFixed(0)} m · ${gMax.toFixed(2)} °C/m` });
+  const ph = keys!.phyto ? col("phyto") : [];
+  const phMax = Math.max(0, ...ph.filter((x: any) => x !== null));
+  if (phMax > 0) { const k = ph.indexOf(phMax); callouts.push({ z: depth[k], title: "浮游植物最多处", sub: k <= 1 ? "就在海面：光和营养盐都够" : "表层营养盐被吃光，藻类沉到有营养盐的深处", value: `${depth[k].toFixed(0)} m`, color: cssVar("--eco-phyto") }); }
   const series = [
     { k: "nut", name: `营养盐 ${keys!.nut}`, c: "--eco-nut", w: 1.6, dash: "solid" },
     { k: "phyto", name: `浮游植物 ${keys!.phyto}`, c: "--eco-phyto", w: 2.6, dash: "solid" },
@@ -367,8 +379,8 @@ function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVar
         <span className="soft small ellipsis" style={{ maxWidth: 220 }}>{run.label}</span>
       </div>
       <div className="split-scroll" style={{ padding: "10px 14px" }}>
-        <div style={{ display: "grid", gridTemplateColumns: "250px minmax(0,1fr)", gap: 16 }}>
-          <svg viewBox={`0 0 250 ${SVG_H}`} style={{ width: 250 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "380px minmax(0,1fr)", gap: 12 }}>
+          <svg viewBox={`0 0 ${COL_W} ${SVG_H}`} style={{ width: COL_W }}>
             <text x={colX + colW / 2} y={10} textAnchor="middle" fontSize={11} fill={cssVar("--fg-muted")} fontWeight={600}>水柱 · 温度 · 鱼类示意</text>
             {depth.map((z, i) => {
               const z0 = i === 0 ? 0 : (depth[i - 1] + z) / 2, z1 = i === depth.length - 1 ? H : (z + depth[i + 1]) / 2;
@@ -376,23 +388,21 @@ function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVar
               return <rect key={i} x={colX} y={yOf(z0)} width={colW} height={Math.max(0.6, yOf(z1) - yOf(z0) + 0.6)} fill={sampleScale(colorscaleFor("temp"), f)} />;
             })}
             {mldNow !== undefined && mldNow !== null && (
-              <g>
-                <line x1={colX - 6} x2={colX + colW + 6} y1={yOf(Math.min(H, mldNow))} y2={yOf(Math.min(H, mldNow))} stroke={dark ? "#fff" : "#111"} strokeDasharray="4 3" strokeWidth={1.2} />
-                <text x={colX + colW + 10} y={yOf(Math.min(H, mldNow)) + 4} fontSize={10.5} fill={cssVar("--fg-muted")}>混合层 {mldNow.toFixed(0)} m</text>
-              </g>
+              <line x1={colX} x2={colX + colW} y1={yOf(Math.min(H, mldNow))} y2={yOf(Math.min(H, mldNow))} stroke={dark ? "#fff" : "#111"} strokeDasharray="4 3" strokeWidth={1.2} />
             )}
             {fishS && fishMarks.map((f: any, i: number) => (
-              <path key={i} d={FISH_PATH} transform={`translate(${colX + 18 + ((i * 37) % (colW - 40))},${yOf(f.z) - 2}) scale(${0.7 + 0.8 * f.w})`} fill={cssVar("--eco-fish")} opacity={0.85} />
+              <path key={i} d={FISH_PATH} transform={`translate(${colX + 14 + ((i * 37) % (colW - 34))},${yOf(f.z) - 2}) scale(${0.7 + 0.8 * f.w})`} fill={cssVar("--eco-fish")} opacity={0.85} />
             ))}
             <rect x={colX} y={SVG_H - bot} width={colW} height={10} fill={cssVar("--eco-benthos")} opacity={0.75} />
             <rect x={colX} y={top} width={colW} height={SVG_H - top - bot} fill="none" stroke={cssVar("--border-strong")} />
-            {[0, 0.25, 0.5, 0.75, 1].map((f) => <g key={f}><line x1={colX - 4} x2={colX} y1={yOf(f * H)} y2={yOf(f * H)} stroke={cssVar("--border-strong")} /><text x={colX - 7} y={yOf(f * H) + 3.5} textAnchor="end" fontSize={10} fill={cssVar("--fg-soft")}>{(f * H).toFixed(0)}</text></g>)}
-            <text x={18} y={(SVG_H) / 2} fontSize={10.5} fill={cssVar("--fg-soft")} transform={`rotate(-90 18 ${SVG_H / 2})`} textAnchor="middle">深度 (m)</text>
+            <DepthRuler x={rulerX} H={H} yOf={yOf} />
+            <text x={12} y={SVG_H / 2} fontSize={10.5} fill={cssVar("--fg-soft")} transform={`rotate(-90 12 ${SVG_H / 2})`} textAnchor="middle">深度 (m)</text>
             <text x={colX + colW / 2} y={SVG_H - 6} textAnchor="middle" fontSize={10.5} fill={cssVar("--fg-soft")}>海底 · 底栖</text>
             <defs><linearGradient id="tg" x1="0" x2="1">{colorscaleFor("temp").map(([o, c]) => <stop key={o} offset={o} stopColor={c} />)}</linearGradient></defs>
             <rect x={colX} y={17} width={colW} height={5} rx={1} fill="url(#tg)" />
             <text x={colX - 4} y={22} textAnchor="end" fontSize={9.5} fill={cssVar("--fg-soft")}>{tmin.toFixed(0)}°</text>
             <text x={colX + colW + 4} y={22} fontSize={9.5} fill={cssVar("--fg-soft")}>{tmax.toFixed(0)}°C</text>
+            <DepthCallouts x={colX + colW} yOf={yOf} top={top} bottom={SVG_H - bot} items={callouts} />
           </svg>
           <div className="col" style={{ gap: 6 }}>
             <Plot height={SVG_H} data={[
@@ -409,7 +419,7 @@ function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVar
         {fishS && !fishS.missing && (
           <Plot height={190} data={[
             { x: fishS.time, y: fishS.values, type: "scatter", mode: "lines", line: { color: cssVar("--eco-fish"), width: 1.8 }, fill: "tozeroy", fillcolor: "rgba(24,100,171,.08)", name: "鱼类" },
-          ]} layout={{ title: { text: `鱼类生物量 ${fishVar}（${d.fish.units}）` }, margin: { t: 30, b: 30 }, showlegend: false,
+          ]} layout={{ title: { text: `鱼类生物量 ${fishVar}（${d.fish.units}）` }, margin: { t: 30, b: 30 }, showlegend: false, yaxis: { type: "linear", rangemode: "tozero" }, xaxis: { type: "date" },
             shapes: [{ type: "line", x0: d.temp.time[ti], x1: d.temp.time[ti], yref: "paper", y0: 0, y1: 1, line: { color: cssVar("--danger"), width: 1.5, dash: "dot" } }] }} />
         )}
         <div className="reading-cols" style={{ marginTop: 12 }}>
@@ -417,6 +427,56 @@ function ColumnTab({ pid, run, allVars, start }: { pid: string; run: any; allVar
         </div>
       </div>
     </>
+  );
+}
+
+/** A ruler like a survey tape: a minor tick every step, a labelled major tick every five. */
+function niceStep(H: number) {
+  const raw = H / 40, p = 10 ** Math.floor(Math.log10(raw));
+  return [1, 2, 5, 10].map((m) => m * p).find((x) => x >= raw) ?? 10 * p;
+}
+function DepthRuler({ x, H, yOf }: { x: number; H: number; yOf: (z: number) => number }) {
+  const step = niceStep(H);
+  const ticks: number[] = [];
+  for (let z = 0; z <= H + 1e-6; z += step) ticks.push(+z.toFixed(6));
+  const c = cssVar("--fg-soft");
+  return (
+    <g>
+      <line x1={x} x2={x} y1={yOf(0)} y2={yOf(H)} stroke={c} strokeOpacity={0.5} />
+      {ticks.map((z, i) => {
+        const major = i % 5 === 0;
+        return (
+          <g key={i}>
+            <line x1={x - (major ? 9 : 4)} x2={x} y1={yOf(z)} y2={yOf(z)} stroke={c} strokeOpacity={major ? 0.9 : 0.45} />
+            {major && <text x={x - 12} y={yOf(z) + 3.5} textAnchor="end" fontSize={10} fill={c}>{+z.toFixed(1)}</text>}
+          </g>
+        );
+      })}
+    </g>
+  );
+}
+
+interface Callout { z: number; title: string; sub: string; value: string; color?: string }
+/** Labels pinned to depths with elbow leader lines; labels are pushed apart so they never overlap. */
+function DepthCallouts({ x, yOf, top, bottom, items }: { x: number; yOf: (z: number) => number; top: number; bottom: number; items: Callout[] }) {
+  const GAP = 62, lx = x + 22;
+  const sorted = [...items].sort((a, b) => a.z - b.z).map((c) => ({ ...c, y0: yOf(c.z), y: yOf(c.z) }));
+  for (let i = 1; i < sorted.length; i++) sorted[i].y = Math.max(sorted[i].y, sorted[i - 1].y + GAP);
+  const over = sorted.length ? sorted[sorted.length - 1].y - (bottom - 30) : 0;
+  if (over > 0) for (let i = sorted.length - 1; i >= 0; i--) sorted[i].y = Math.max(top + 4, i === sorted.length - 1 ? sorted[i].y - over : Math.min(sorted[i].y, sorted[i + 1].y - GAP));
+  const glow = cssVar("--glow");
+  return (
+    <g>
+      {sorted.map((c, i) => (
+        <g key={i}>
+          <circle cx={x} cy={c.y0} r={2.2} fill={c.color ?? glow} />
+          <path d={`M${x},${c.y0} H${x + 8} L${lx - 4},${c.y} H${lx + 132}`} fill="none" stroke={c.color ?? glow} strokeOpacity={0.75} strokeWidth={1} />
+          <text x={lx} y={c.y - 5} fontSize={12} fontWeight={600} fill={cssVar("--fg-strong")}>{c.title}</text>
+          <text x={lx} y={c.y + 11} fontSize={9.5} fill={cssVar("--fg-soft")}>{c.sub.length > 15 ? <><tspan x={lx}>{c.sub.slice(0, 15)}</tspan><tspan x={lx} dy={12}>{c.sub.slice(15)}</tspan></> : c.sub}</text>
+          <text x={lx} y={c.y + (c.sub.length > 15 ? 38 : 26)} fontSize={11} className="mono" fill={c.color ?? glow}>{c.value}</text>
+        </g>
+      ))}
+    </g>
   );
 }
 
@@ -437,9 +497,22 @@ function SeriesTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; 
         traces.push({ x: s.doy, y: s.max, type: "scatter", mode: "lines", line: { width: 0 }, showlegend: false, hoverinfo: "skip" });
         traces.push({ x: s.doy, y: s.min, type: "scatter", mode: "lines", line: { width: 0 }, fill: "tonexty", fillcolor: c + "22", showlegend: false, hoverinfo: "skip" });
       }
-      traces.push({ x: s.doy, y: s.mean, type: "scatter", mode: "lines", name: s.label, line: { color: c, width: 2.2 } });
+      const solo = (data.data as any).series.filter((x: any) => !x.missing).length === 1;
+      traces.push({ x: s.doy, y: s.mean, type: "scatter", mode: "lines", name: s.label, line: { color: c, width: 2.2 }, ...(solo ? { fill: "tozeroy", fillcolor: c + "18" } : {}) });
     } else traces.push({ x: s.time, y: s.values, type: "scatter", mode: "lines", name: s.label, line: { color: c, width: 1.6 } });
   });
+  const first = kind === "annual" ? (data.data as any)?.series?.find((x: any) => !x.missing) : null;
+  const events = first ? annualEvents(v, first.doy, first.mean) : [];
+  const glow = cssVar("--glow");
+  if (events.length) traces.push({ x: events.map((e) => e.doy), y: events.map((e) => e.y), type: "scatter", mode: "markers", marker: { size: 7, color: glow, line: { width: 1.5, color: cssVar("--bg") } }, hoverinfo: "skip", showlegend: false });
+  const units = (data.data as any)?.units ?? "";
+  const ys = ((data.data as any)?.series ?? []).filter((x: any) => !x.missing).flatMap((x: any) => kind === "annual" ? [...x.mean, ...(x.years > 1 ? [...x.min, ...x.max] : [])] : x.values).filter((y: any) => y !== null && isFinite(y)) as number[];
+  const [ylo, yhi] = ys.length ? extent(ys) : [0, 1];
+  const annotations = events.map((e, i) => ({
+    // labels sit on the page colour so a curve passing behind never cuts through the text
+    x: e.doy, y: e.y, xref: "x", yref: "y", showarrow: true, arrowhead: 0, arrowwidth: 1, arrowcolor: glow, ax: i > 0 && !e.low ? 60 : 0, ay: e.low ? -34 : -(36 + (i % 2) * 22), borderpad: 3,
+    text: `<b>${e.title}</b><br><span style="font-size:10.5px;color:${cssVar("--fg-soft")}">${doyLabel(e.doy)} · ${fmt(e.y, 3)} ${units}</span>`, align: "center", font: { size: 12, color: cssVar("--fg-strong") }, bgcolor: cssVar("--bg"),
+  }));
   return (
     <>
       <div className="optbar">
@@ -455,11 +528,37 @@ function SeriesTab({ pid, runs, v, curVar, start }: { pid: string; runs: any[]; 
         <ReadingToggle open={open} toggle={toggle} />
       </div>
       {data.loading ? <Loading /> : (
-        <FigAside open={open} toggle={toggle} figure={<Plot fill data={traces} layout={{ xaxis: kind === "annual" ? { ...MONTH_AXIS, title: { text: "年内日序" } } : { title: { text: "时间" } }, yaxis: { title: { text: (data.data as any)?.units ?? "" } }, hovermode: "x unified", margin: { t: 16 } }} />}
+        <FigAside open={open} toggle={toggle} figure={<Plot fill data={traces} layout={{ xaxis: kind === "annual" ? { ...MONTH_AXIS, title: { text: "年内日序" } } : { title: { text: "时间" } }, yaxis: { title: { text: units }, ...(events.length ? { range: [ylo - 0.04 * (yhi - ylo), yhi + 0.24 * (yhi - ylo)] } : {}) }, hovermode: "x unified", margin: { t: 16 }, annotations }} />}
           reading={<SeriesReading data={data.data} kind={kind} v={v} label={curVar?.long_name || v} mode={curVar?.depth ? mode : "integral"} repeat={repeat} />} />
       )}
     </>
   );
+}
+
+/** Seasonal events read off an annual cycle (highest, lowest, a clear second peak), named by what the variable is. */
+interface SeasonEvent { doy: number; y: number; title: string; low?: boolean }
+const SEASON = (doy: number) => { const m = Math.floor(((doy - 1) / 365) * 12) + 1; return m >= 3 && m <= 5 ? "春季" : m <= 8 && m >= 6 ? "夏季" : m >= 9 && m <= 11 ? "秋季" : "冬季"; };
+function doyLabel(doy: number) { const d = new Date(Date.UTC(2001, 0, Math.round(doy))); return `${d.getUTCMonth() + 1}月${d.getUTCDate()}日`; }
+function annualEvents(v: string, doy: number[], y: (number | null)[]): SeasonEvent[] {
+  const pts = doy.map((d, i) => ({ d, y: y[i] })).filter((p) => p.y !== null && isFinite(p.y as number)) as { d: number; y: number }[];
+  if (pts.length < 20) return [];
+  const hi = pts.reduce((a, b) => (b.y > a.y ? b : a)), lo = pts.reduce((a, b) => (b.y < a.y ? b : a));
+  const r = hi.y - lo.y;
+  if (!(r > 0) || r < 1e-3 * Math.abs(hi.y)) return [];
+  const phyto = /^(P[1-4]_|ECO_(fla|dia|bg)|.*[Cc]hl|ergom_(pp|ff|bb))/.test(v), zoo = /^(Z[4-6]_|ECO_(meso|micro)zoo|ergom_zz)/.test(v);
+  const fish = /^(F1|F2|fish|MB)/.test(v), temp = /^temp/.test(v), nut = /^(N[1-5]_|ECO_(no3|nh4|pho|sil)|ergom_(nn|aa|po))/.test(v);
+  const peakName = (d: number) => phyto ? `${SEASON(d)}水华` : zoo ? `浮游动物${SEASON(d)}高峰` : fish ? "鱼类最多" : temp ? "全年最暖" : nut ? "营养盐最高" : "全年最高";
+  const out: SeasonEvent[] = [{ doy: hi.d, y: hi.y, title: peakName(hi.d) }];
+  // a second peak: a local maximum at least 30 % of the range above the minimum and 20 days from the main one
+  let second: { d: number; y: number } | null = null;
+  for (let i = 3; i < pts.length - 3; i++) {
+    const p = pts[i];
+    if (Math.abs(p.d - hi.d) < 20 || p.y < lo.y + 0.3 * r) continue;
+    if (pts.slice(i - 3, i + 4).every((q) => q.y <= p.y) && (!second || p.y > second.y)) second = p;
+  }
+  if (second) out.push({ doy: second.d, y: second.y, title: phyto || zoo ? `第二次高峰（${SEASON(second.d)}）` : "第二个高点" });
+  if (temp || nut) out.push({ doy: lo.d, y: lo.y, title: temp ? "全年最冷" : "被藻类耗尽", low: true });
+  return out.sort((a, b) => a.doy - b.doy);
 }
 
 // ----------------------------------------------------------------- profile
