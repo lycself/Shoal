@@ -42,7 +42,7 @@ def validation(run_dir: Path, run: dict, site_dir: Path) -> dict:
     k = len(dz)
     host = run["spec"]["host"]
     out = {"available": True, "depth": dz, "vars": [], "window": [str(ds["time"].values[0])[:10], str(ds["time"].values[-1])[:10]],
-           "note": "注意：模拟过程中一直在把温盐和营养盐往 WOA23 的平均值上拉（松弛），所以两者接近是意料之中的，这只能算“自洽检查”。要真正检验模型，需要用当地的现场观测数据。"}
+           "note": "注意：模拟过程中温盐和营养盐持续向 WOA23 气候态松弛，因此两者吻合度较高属于预期结果，主要用于检验模型自洽性；独立验证需对比现场观测资料。"}
     for key, (name, factor) in WOA_MAP[host].items():
         if key not in woa or name not in ds:
             continue
@@ -99,7 +99,7 @@ def spinup(run_dir: Path, run: dict) -> dict:
                             "values": [_r(v) for v in vals], "drift_pct": _r(drift, 3)})
     worst = max((abs(v["drift_pct"]) for v in out["vars"] if v["drift_pct"] is not None), default=None)
     out["max_drift_pct"] = _r(worst, 3)
-    out["verdict"] = None if worst is None else ("已经稳定：最后两年的变化不到 1%" if worst < 1 else "接近稳定：最后两年还有 1–5% 的变化，用于研究建议再多预热几年" if worst < 5 else "还没有稳定：最后两年的变化超过 5%，结果仍受初始值影响，请增加预热年数")
+    out["verdict"] = None if worst is None else ("已达稳态：最后两年年均值变化小于 1%" if worst < 1 else "接近稳态：最后两年仍有 1–5% 的年际变化，研究用途建议适当延长预热年数" if worst < 5 else "尚未达到稳态：最后两年变化超过 5%，结果仍受初始条件影响，请增加预热年数")
     return out
 
 
@@ -168,6 +168,6 @@ def shelf_regions(results: list[dict], res: float) -> dict:
             table[reg] = {"n": d["n"], "area_km2": round(d["area"]), "mean": {m: _r(d["wsum"][m] / d["sum"][m]) for m in d["wsum"]}}
         out["configs"].append({"config_name": cfg["config_name"], "config_id": cfg["config_id"], "table": table})
         out["metrics"].update(cfg.get("meta", {}))
-    out["note"] = ("区域按 Powley et al. (2026) 的划分取近似矩形；数值是按面积加权的平均值。" if scheme == "boxes"
-                   else "研究区不在西北欧陆架，所以按水深分区（任何海区都适用）；数值是按面积加权的平均值。")
+    out["note"] = ("区域划分采用 Powley et al. (2026) 分区的近似矩形；表中数值为按格点面积加权的区域平均值。" if scheme == "boxes"
+                   else "研究区位于西北欧陆架以外，按水深带分区统计；表中数值为按格点面积加权的区域平均值。")
     return out

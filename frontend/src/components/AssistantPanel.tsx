@@ -57,7 +57,7 @@ export default function AssistantPanel() {
     const id = convRef.current ?? Math.random().toString(16).slice(2, 12);
     convRef.current = id; setConv(id);
     clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => { setBusy(false); setItems((x) => [...x, { kind: "err", text: "等了 3 分钟还没有回复：AI 服务可能太慢或连接中断。可以再问一次，或到设置里测试连接。" }]); }, 180000);
+    timer.current = window.setTimeout(() => { setBusy(false); setItems((x) => [...x, { kind: "err", text: "等待超过 3 分钟仍未收到回复：AI 服务响应过慢或连接已断开。请重试，或在设置页检查接口连接。" }]); }, 180000);
     try {
       const r = await api.post("/assistant/chat", { conv: id, message: msg, context: { project_id: st.projectId, page: st.page, selected_run_ids: st.selectedRuns } });
       if (r.error) { setItems((x) => [...x, { kind: "err", text: r.error }]); setBusy(false); clearTimeout(timer.current); }
@@ -74,14 +74,14 @@ export default function AssistantPanel() {
       <div className="assist-log" ref={log}>
         {!items.length && !ready && (
           <div className="col" style={{ gap: 10 }}>
-            <b style={{ color: "var(--fg-strong)" }}>先接上一个 AI 服务</b>
-            <div className="muted small" style={{ lineHeight: 1.7 }}>助手需要一个大模型接口才能回答。到设置里填写接口地址、模型名和 API Key（OpenAI 兼容的服务都可以；本机运行的模型不需要 Key），保存后回到这里就能提问。</div>
-            <div><Btn size="sm" icon="settings-gear" onClick={() => setPage("settings")}>去设置 AI 服务</Btn></div>
+            <b style={{ color: "var(--fg-strong)" }}>尚未配置 AI 服务</b>
+            <div className="muted small" style={{ lineHeight: 1.7 }}>使用助手前需先配置兼容 OpenAI 接口的模型服务。可在设置页填写接口地址、模型名称与 API Key（本地运行的模型无需填写 Key），保存后即可在此提问。</div>
+            <div><Btn size="sm" icon="settings-gear" onClick={() => setPage("settings")}>配置 AI 服务</Btn></div>
           </div>
         )}
         {!items.length && ready && (
           <div className="col" style={{ gap: 10 }}>
-            <div className="muted small" style={{ lineHeight: 1.6 }}>我可以解释模型原理与方法来源、读取你的项目和结果、检索入门教程、启动模拟，并对配置提出修改建议（需你批准）。</div>
+            <div className="muted small" style={{ lineHeight: 1.6 }}>可协助解释模型机制与文献方法、读取当前项目配置与运行结果、检索入门教程、启动模拟，或生成配置修改提案（经确认后生效）。</div>
             {SUGGEST.map(([ic, s]) => <button key={s} className="suggest" onClick={() => send(s)}>{s}</button>)}
           </div>
         )}
@@ -90,7 +90,7 @@ export default function AssistantPanel() {
             {it.kind === "bot" ? <Markdown text={it.text!} /> : it.kind === "tool" ? <><Icon name="tools" />{it.text}</> : it.text}
           </div>
         ))}
-        {busy && <div className="msg tool row"><Icon name="loading" spin /><span className="grow">思考中…</span><a className="small" onClick={() => { setBusy(false); clearTimeout(timer.current); }}>不等了</a></div>}
+        {busy && <div className="msg tool row"><Icon name="loading" spin /><span className="grow">思考中…</span><a className="small" onClick={() => { setBusy(false); clearTimeout(timer.current); }}>取消等待</a></div>}
       </div>
       <div className="assist-input">
         <textarea className="input" value={text} disabled={!ready} placeholder={ready ? "提问（Enter 发送，Shift+Enter 换行）" : "配置 AI 服务后可以提问"} onChange={(e) => setText(e.target.value)}

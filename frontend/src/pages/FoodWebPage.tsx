@@ -168,10 +168,10 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                         options={[...(hosts?.e2e_engines?.official_available ? [["official", "官方代码", "verified"]] : []), ["reimplementation", "按论文方程重写", "beaker"]] as any} />
                     </span>
                     <span /><span className="hint">{engine === "official"
-                      ? "ECOSMO E2E v2.0 作者发布的 Fortran 代码，参数取自其发布的算例。鱼是随深度分布的浓度，跟着饵料走。"
+                      ? "ECOSMO E2E v2.0 作者发布的开源 Fortran 代码，默认参数取自其官方算例。鱼类状态量为各水层浓度，并按猎物垂向分布分配新增生物量。"
                       : hosts?.e2e_engines?.official_available
-                        ? "本软件按论文方程自己写的版本，只用于和官方代码对照：结果与官方代码有明显差别（见教程“模型的局限”）。"
-                        : "内核里没有官方代码，只能用本软件按论文方程重写的版本。重新编译内核（pnpm kernel）就会把官方代码一起编进去。"}</span>
+                        ? "根据论文文字方程独立编写的对照实现，仅供方法学对比（半饱和常数单位理解与官方代码不同，详见教程“模型的局限与结果检验清单”）。"
+                        : "内核中未包含官方代码，仅可使用按论文方程重写的版本。重新编译内核（pnpm kernel）即可编入官方代码。"}</span>
                     {engine === "official" && (
                       <>
                         <span className="label">物质收支</span>
@@ -182,23 +182,23 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
                             : <span className="soft">内核编译于修正补丁之前，重新运行 pnpm kernel 后可选修正版</span>}
                         </span>
                         <span /><span className="hint">{spec.htl.e2e.corrected
-                          ? "改正官方代码里 5 处让物质凭空消失、凭空产生或方向弄反的地方（见教程“按吃什么、住哪里分组：E2E 功能群”），其余公式和参数不变。鱼和底栖动物不再让宿主里的元素凭空增减，鱼呼吸消耗氧气。第一年结果与论文几乎相同，多年后硅酸盐和硅藻明显更多。"
-                          : "逐行运行作者发布的代码，ERSEM 宿主下能重现论文的参考结果。但代码里鱼的一部分粪便和尸体凭空消失，呼吸放出的碳不回到水里，鱼呼吸反而产生氧气，硅被不断扣掉（多年后硅酸盐减半）。研究物质循环或浮游植物时请选修正版。"}</span>
+                          ? "修复官方代码中 5 处违反质量守恒或耗氧方向的编码错误（详见教程“E2E 功能群”一章），其余公式与参数不变。第 1 年结果与官方原代码几乎一致，长期运行后硅酸盐与硅藻不再异常流失。"
+                          : "逐行运行作者发布的原始代码，在 ERSEM 宿主下可复现论文参考输出；但原始代码中水层鱼类的 DOM 排泄项丢失、呼吸碳未进入 DIC、呼吸耗氧符号写反，且硅按固定比例扣除导致长期运行后硅酸盐显著流失。分析物质循环或浮游植物群落时建议选用修正版。"}</span>
                       </>
                     )}
                   </>
                 )}
                 {spec.htl.kind === "mizer" && (
                   <>
-                    <span className="label">鱼会不会影响食物</span>
+                    <span className="label">高营养级反馈</span>
                     <span className="control"><Seg value={spec.htl.mizer.feedback ? "two" : "one"} options={[["two", "双向（有反馈）"], ["one", "单向（无反馈 / 离线）"]]} onChange={(v) => upd((s) => { s.htl.mizer.feedback = v === "two"; })} /></span>
-                    <span /><span className="hint"><Term k="单向耦合">单向</Term>：鱼照常吃、照常长，但吃掉的不从浮游生物里扣，粪便和排泄也不回到水里。<Term k="双向耦合">双向</Term>：鱼和它的食物互相影响，更接近真实情况。</span>
+                    <span /><span className="hint"><Term k="单向耦合">单向</Term>：鱼类读取浮游生物生长，但不扣除被捕食的猎物，也不写回排泄与呼吸通量。<Term k="双向耦合">双向</Term>：鱼类捕食实时消耗浮游生物，排泄与呼吸通量实时返回宿主。</span>
                   </>
                 )}
               </div>
             </div>
             <div className="section">
-              <div className="section-header"><Icon name="symbol-misc" /><h3>浮游动物的额外死亡（<Term k="闭合项" />）</h3></div>
+              <div className="section-header"><Icon name="symbol-misc" /><h3>浮游动物闭合死亡率（<Term k="闭合项" />）</h3></div>
               <div className="form">
                 <span className="label">浮游动物死亡率</span>
                 <span className="control"><input className="input num" style={{ maxWidth: 120 }} type="number" step="0.05" value={spec.ltl.zoo_mortality_factor} onChange={(e) => upd((s) => { s.ltl.zoo_mortality_factor = +e.target.value; })} /><span className="unit">× 宿主默认值</span></span>
@@ -218,7 +218,7 @@ function ConfigEditor({ cfg, onSaved, onDeleted }: { cfg: any; onSaved: (c: any)
             <Overrides spec={spec} upd={upd} />
           </div>
         )}
-        {tab === "params" && (spec.htl.kind === "none" ? <Empty icon="circle-large-outline" title="没有高营养级模块">这个配置里没有鱼。模型用一个额外的浮游动物死亡率代替没有画出来的捕食者。想加入鱼，到“组成”页添加功能群（E2E）或粒径谱（MIZER）。</Empty>
+        {tab === "params" && (spec.htl.kind === "none" ? <Empty icon="circle-large-outline" title="没有高营养级模块">当前配置仅包含低营养级宿主，高营养级捕食由浮游动物闭合死亡率隐式代表。如需引入显式鱼类或底栖动物，请在“组成”标签页选择 E2E 功能群或 MIZER 粒径谱。</Empty>
           : spec.htl.kind === "e2e" ? <E2EParams spec={spec} defaults={defaults} upd={upd} /> : <MizerParams spec={spec} defaults={defaults} upd={upd} />)}
         {tab === "yaml" && <pre style={{ margin: 0, padding: 14, background: "var(--bg-sunk)", borderRadius: 8, border: "1px solid var(--border)", overflow: "auto" }}>{yaml ?? "生成中…"}</pre>}
       </div>
@@ -258,8 +258,8 @@ function E2EParams({ spec, defaults, upd }: { spec: any; defaults: any; upd: (fn
   return (
     <div className="col" style={{ gap: 22, maxWidth: 1100 }}>
       {defaults.engine === "official"
-        ? <Notice kind="plain">默认值取自官方 ECOSMO E2E v2.0 发布的 {HOST_LABEL[spec.host]} 算例。半饱和常数（摄食达到最大值一半时的食物量）按氮计，代码内部乘 79.6 换算成碳。鱼的半饱和常数和整个水柱的食物总量比较，单位是每平方米（mmol N m⁻²），论文表和代码注释里写的“每立方米”是标注错误，计算本身没有问题；大型底栖动物的和海底最底层的浓度比较（mmol N m⁻³）。修改过的值以蓝框和粗体显示。</Notice>
-        : <Notice kind="plain">默认值按 {HOST_LABEL[spec.host]} 宿主取值。这个重写版本里，半饱和常数按碳计（mmol C m⁻³），和水柱平均的食物浓度比较，与官方代码的单位不同。θ 与 γ<sub>MB</sub> 文献未给出，为本软件的默认值；修改过的值以蓝框和粗体显示。<span className="soft">（参数来源：Vijayakumaran 等 2026，表 1–3）</span></Notice>}
+        ? <Notice kind="plain">默认值取自官方 ECOSMO E2E v2.0 发布的 {HOST_LABEL[spec.host]} 算例。半饱和常数按氮输入，代码内部乘以 79.6 换算为碳：鱼类半饱和常数与水柱积分猎物量比较，实际量纲为 mmol N m⁻²（论文表格与代码注释误标为每立方米）；大型底栖动物半饱和常数与最底层浓度比较（mmol N m⁻³）。已修改的参数以蓝框粗体标出。</Notice>
+        : <Notice kind="plain">默认值按 {HOST_LABEL[spec.host]} 宿主取值。在重写对照版中，半饱和常数按体积浓度（mmol C m⁻³）与水柱平均猎物浓度比较，与官方代码的量纲约定不同。θ 与 γ<sub>MB</sub> 文献未给出，采用软件默认值；已修改的参数以蓝框粗体标出。<span className="soft">（参数来源：Vijayakumaran 等 2026，表 1–3）</span></Notice>}
       {(["MB", "F1", "F2"] as const).filter((k) => enabled[k]).map((k) => {
         const user = spec.htl.e2e.params?.[k] ?? {};
         const set = (key: string, v: number | undefined) => upd((s) => { s.htl.e2e.params ??= {}; s.htl.e2e.params[k] ??= {}; if (v === undefined) delete s.htl.e2e.params[k][key]; else s.htl.e2e.params[k][key] = v; });
@@ -328,7 +328,7 @@ function Overrides({ spec, upd }: { spec: any; upd: (fn: (s: any) => void) => vo
   return (
     <div className="section">
       <div className="section-header"><Icon name="json" /><h3>高级参数覆盖</h3></div>
-      <div className="section-desc">高级用法：按路径改写模型设置文件 fabm.yaml 里的任何一个参数，例如 <code>instances/P1/parameters/sum</code>（硅藻的最大生长率）。不确定时不要改。</div>
+      <div className="section-desc">按 YAML 路径直接覆盖 fabm.yaml 中的任意模块参数，例如 <code>instances/P1/parameters/sum</code>（硅藻最大生长率）。</div>
       <div className="panel" style={{ overflow: "hidden" }}>
         <table className="table">
           <thead><tr><th>路径</th><th className="num">值</th><th style={{ width: 40 }} /></tr></thead>

@@ -29,34 +29,34 @@ const RULES: [RegExp, Cat][] = [
 export function varCat(name: string): Cat { return RULES.find(([rx]) => rx.test(name))?.[1] ?? "other"; }
 
 const CAT: Record<Cat, { what: string; season?: string }> = {
-  temp: { what: "海水温度。它决定水的密度：暖水轻、冷水重，所以温度的上下差异直接决定水柱是否分层。", season: "表层温度随太阳辐射变化，但峰值比夏至晚 1–2 个月：海水热容量大，要经过整个夏天才升到最高。" },
-  salt: { what: "盐度。在没有河流和平流的一维模型中，主要由向气候态的松弛维持，变化很小。" },
-  nitrate: { what: "硝酸盐，浮游植物最主要的氮源。", season: "冬季混合把底层的硝酸盐带上来，表层最高；春季藻华后表层迅速被吃光。" },
-  ammonium: { what: "铵盐，由浮游动物排泄和细菌分解产生，是“再生”的氮，浮游植物也能直接吸收。", season: "藻华之后、分解旺盛的季节较高。" },
-  phosphate: { what: "磷酸盐，浮游植物必需的磷源。", season: "与硝酸盐类似：冬季高、春夏被表层浮游植物耗尽。" },
-  silicate: { what: "硅酸盐，硅藻造壳必需。", season: "春季硅藻最先把它耗尽，所以硅藻的藻华往往最早结束，之后由不需要硅的鞭毛藻接替。" },
-  oxygen: { what: "溶解氧。表层与大气交换并有光合作用产氧；底层只有分解耗氧。", season: "冷水能溶解更多氧，冬季整柱较高；层化季节底层得不到补充，逐渐下降。" },
-  dic: { what: "溶解无机碳（主要是 CO₂ 的各种形态）。光合作用消耗它，呼吸和分解产生它。" },
-  diatoms: { what: "硅藻：较大的浮游植物，需要硅，生长快，是春季藻华的主角。", season: "早春光照增强、层化刚建立、营养盐最充足时最先爆发。" },
-  flagellates: { what: "微型浮游植物（2–20 µm，以鞭毛藻为主；ECOSMO 和 ERGOM 里叫鞭毛藻）：不需要硅，在低营养盐环境中竞争力强。", season: "硅藻退场后的夏季更重要。" },
-  pico: { what: "超微型浮游植物（< 2 µm）：个体最小，在营养盐贫乏的夏季表层占优。" },
-  largephyto: { what: "小型浮游植物（20–200 µm，如甲藻）：不需要硅，个体较大，夏季层化后较常见。" },
-  cyano: { what: "蓝藻：可以固氮，在温暖、氮缺乏的夏季占优（波罗的海尤其明显）。" },
-  chl: { what: "叶绿素：浮游植物的光合色素，卫星海色观测看到的就是它。" },
-  mesozoo: { what: "中型浮游动物（桡足类等，约 0.2–2 mm）：鱼最主要的食物。", season: "峰值通常比浮游植物晚几周：先有食物，捕食者才跟着多起来。" },
-  microzoo: { what: "微型浮游动物（纤毛虫等，约 20–200 µm）：吃较小的浮游植物和异养鞭毛虫，又被中型浮游动物吃。", season: "能很快跟上较小藻类的增长。" },
-  hnf: { what: "异养鞭毛虫（自己不进行光合作用的鞭毛虫，约 2–20 µm）：吃细菌和超微型浮游植物，是“微食物环”（细菌和小生物之间的物质循环）的一环。" },
-  zoo: { what: "浮游动物：连接浮游植物与鱼的中间环节。", season: "峰值通常比浮游植物晚几周。" },
-  bacteria: { what: "细菌：分解溶解有机物，把营养盐重新释放到水中。" },
-  dom: { what: "溶解有机物：浮游生物渗出和分解产生，是细菌的食物。有的几天内就被吃掉（易降解），有的要几个月到几年（半难降解）；ERSEM 用 R1–R3 区分，Q1 是海底沉积物里的溶解有机物。" },
-  detritus: { what: "颗粒碎屑：死亡的浮游生物和粪便。它们下沉，在途中和海底被分解成营养盐。", season: "藻华之后增加，并逐渐沉向底层。" },
-  fish: { what: "鱼的生物量。鱼要经历多个世代才能对环境变化作出完整响应，所以变化比浮游生物慢得多。" },
-  benthos: { what: "大型底栖动物（贝类、多毛类等）：以沉降到海底的有机物为食。", season: "在春华后的沉降高峰之后增加。" },
-  meiobenthos: { what: "小型底栖动物（线虫、桡足类等，体长不到 1 mm）：生活在沉积物里，吃细菌和沉积有机物。", season: "跟着沉降到海底的有机物变化。" },
-  mld: { what: "表层混合层深度：从海面向下被风和冷却充分搅匀的那一层有多厚。", season: "冬季深（风大、表层冷却下沉），夏季浅（表层增温形成稳定的“盖子”）。" },
-  mixing: { what: "湍流扩散系数等混合强度指标：数值越大，上下层交换越快。" },
-  buoyancy: { what: "浮力频率平方 N²：层化强度，越大越稳定。上轻下重的密度差越大，N² 越大，湍流越难把上下层搅混。", season: "夏季跃层处最大，冬季整柱接近 0。" },
-  forcing: { what: "气象强迫（来自 ERA5 再分析）：风、气温、辐射等，驱动整个物理过程。" },
+  temp: { what: "海水温度。温度决定海水密度（暖水轻、冷水重），上下温差直接影响水柱是否分层。", season: "表层温度随太阳辐射变化，但因海水热容量大，峰值通常比夏至滞后 1–2 个月。" },
+  salt: { what: "盐度。在没有径流和平流的一维水柱模型中，盐度主要由向气候态的松弛维持，季节变化较小。" },
+  nitrate: { what: "硝酸盐，浮游植物最主要的无机氮来源。", season: "冬季垂向混合将底层硝酸盐带回表层，浓度达到全年最高；春季藻华爆发后，表层硝酸盐被迅速消耗。" },
+  ammonium: { what: "铵盐，由浮游动物排泄和细菌矿化产生，属于再生氮源，可被浮游植物优先吸收。", season: "通常在藻华消退后、有机物分解旺盛的季节较高。" },
+  phosphate: { what: "磷酸盐，浮游植物生长必需的无机磷来源。", season: "季节变化与硝酸盐类似：冬季混合期偏高，春夏季被表层浮游植物大量吸收。" },
+  silicate: { what: "硅酸盐，硅藻形成硅质壳体必需的营养盐。", season: "春季硅藻大量繁殖时会率先耗尽表层硅酸盐，导致硅藻水华结束，随后由不需要硅的鞭毛藻接替。" },
+  oxygen: { what: "溶解氧。表层有海气交换和光合作用产氧，底层则以有机物分解耗氧为主。", season: "冬季水温低、溶解度高且整柱混合，溶解氧普遍较高；夏秋季层化阻断上下交换，底层溶解氧逐渐下降。" },
+  dic: { what: "溶解无机碳（CO₂、HCO₃⁻ 和 CO₃²⁻ 的总和）。光合作用消耗溶解无机碳，呼吸与矿化则释放溶解无机碳。" },
+  diatoms: { what: "硅藻：个体较大的浮游植物，生长迅速但依赖硅酸盐，是温带海区春季藻华的主要类群。", season: "早春光照增强、层化初建且营养盐充足时最先爆发。" },
+  flagellates: { what: "微型浮游植物（2–20 µm，以鞭毛藻为主；在 ECOSMO 与 ERGOM 中统称鞭毛藻）：不需要硅酸盐，在低营养盐环境下更具竞争优势。", season: "常在春季硅藻水华消退后的夏季占优。" },
+  pico: { what: "超微型浮游植物（< 2 µm）：个体最小，比表面积大，在夏季表层寡营养水体中占优。" },
+  largephyto: { what: "小型浮游植物（20–200 µm，如甲藻）：不需要硅酸盐，个体较大，常见于夏季层化水体。" },
+  cyano: { what: "蓝藻：具有固氮能力，在温暖且无机氮耗尽的夏季表层占优（波罗的海尤为典型）。" },
+  chl: { what: "叶绿素 a：浮游植物的主要光合色素，也是卫星水色遥感直接观测的生物量指标。" },
+  mesozoo: { what: "中型浮游动物（桡足类等，约 0.2–2 mm）：浮游食性鱼类的主要饵料。", season: "生物量峰值通常比浮游植物滞后数周。" },
+  microzoo: { what: "微型浮游动物（纤毛虫等，约 20–200 µm）：摄食较小粒径的浮游植物和异养鞭毛虫，同时被中型浮游动物捕食。", season: "世代周期短，能较快响应小型藻类的增长。" },
+  hnf: { what: "异养鞭毛虫（约 2–20 µm）：摄食细菌和超微型浮游植物，是微食物环的关键中间类群。" },
+  zoo: { what: "浮游动物：连接初级生产者与鱼类的中间营养级。", season: "生物量峰值通常比浮游植物滞后数周。" },
+  bacteria: { what: "异养细菌：吸收并分解溶解有机物，将无机营养盐重新释放回水体（再矿化）。" },
+  dom: { what: "溶解有机物：由浮游生物渗出、排泄和细胞裂解产生，供细菌吸收利用。按降解速率可分为易降解、半易降解和半难降解组分（ERSEM 以 R1–R3 区分，Q1 为沉积物间隙水中的溶解有机物）。" },
+  detritus: { what: "颗粒有机碎屑：主要来自死亡浮游生物与粪便颗粒，在沉降过程中及到达海底后被细菌分解为无机营养盐。", season: "春季藻华后显著增加，并向深层沉降。" },
+  fish: { what: "鱼类生物量。由于鱼类世代周期长，对环境与饵料变化的完整响应通常需要数年。" },
+  benthos: { what: "大型底栖动物（双壳类、多毛类等）：栖息于海底，以沉降的颗粒有机物为食。", season: "通常在春季藻华沉降高峰之后增长。" },
+  meiobenthos: { what: "小型底栖动物（线虫、底栖桡足类等，体长 < 1 mm）：栖息于沉积物间隙，摄食细菌和沉积有机物。", season: "随沉降到海底的有机物质通量变化。" },
+  mld: { what: "表层混合层深度：受风应力和海面冷却驱动、垂向混合均匀的表层水体厚度。", season: "冬季风浪大且表层冷却对流，混合层较深；夏季表层受热增温，混合层变浅。" },
+  mixing: { what: "湍流扩散系数与湍流动能等垂向混合指标：数值越大，上下水层的物质与热量交换越快。" },
+  buoyancy: { what: "浮力频率平方 N²：衡量水柱层化稳定度的指标。上下密度差越大，N² 越大，湍流越难穿透跃层。", season: "夏季在温跃层处达到最大，冬季整柱混合时接近 0。" },
+  forcing: { what: "大气强迫场（ERA5 再分析数据）：包括风速、气温、短波辐射、气压、湿度与降水，用于驱动海气界面的动量与热通量。" },
   other: { what: "模型输出变量。" },
 };
 const NUTRIENT = new Set<Cat>(["nitrate", "phosphate", "silicate"]);
@@ -193,7 +193,7 @@ export function HovReading({ panels, mld, v, label, diff }: { panels: any[]; mld
     const dT = sS - sB;
     if (finite(dT)) facts.push(dT > 2 ? <>夏季（{se.sl}）表层 {fmt(sS)} °C、底层 {fmt(sB)} °C，相差 <b>{dT.toFixed(1)} °C</b>：温跃层把水柱分成了上下两层。</> : <>夏季表底温差只有 {dT.toFixed(1)} °C：潮流和风把整根水柱搅得比较均匀。</>);
     if (finite(wS - wB) && Math.abs(wS - wB) < 0.5) facts.push(<>冬季（{se.wl}）表底温差不到 0.5 °C：冬季风大、表层冷却下沉，整柱充分混合。</>);
-    why.push(<>表层吸收太阳热量后变轻，像盖子一样浮在冷而重的底层水上；风和潮流的搅拌不足以打破这个密度差时，就形成温跃层。秋季降温和风暴使表层变重，跃层逐渐下移直到消失。</>);
+    why.push(<>表层受热增温后密度降低，浮在冷而重的底层水之上；当风浪和潮流混合不足以打破这一密度梯度时，便形成温跃层。秋季降温和大风使表层密度增大、混合加深，跃层随之逐渐下移直至消失。</>);
   } else if (NUTRIENT.has(cat)) {
     if (finite(wS) && finite(sS) && wS > 0) {
       const r = sS / wS, rp = Math.round(r * 100);
@@ -202,8 +202,8 @@ export function HovReading({ panels, mld, v, label, diff }: { panels: any[]; mld
         : r <= 1 ? <>表层夏季（{fmt(sS)}）仍有冬季（{fmt(wS)}）的 {rp}%：营养盐没有被耗尽，浮游植物更可能受光照限制。</>
         : <>表层夏季（{fmt(sS)}）反而比冬季（{fmt(wS)}）高，是冬季的 {rp}%：这里没有“冬季积累、夏季耗尽”的典型循环，营养盐没有被耗尽，浮游植物更可能受光照限制。</>);
     }
-    if (finite(sB) && finite(sS) && sB > 1.5 * sS) facts.push(<>同期底层保持 {fmt(sB)} {u}，是表层的 {fmt(sB / Math.max(sS, 1e-9))} 倍：营养盐被“锁”在跃层以下，要等秋冬混合才回到表层。</>);
-    why.push(<>浮游植物只能在有光的上层生长，它们吸收营养盐后死亡下沉，把营养盐带到深处分解释放。层化期间上下几乎不交换，于是上层越来越“饿”，下层越积越多。</>);
+    if (finite(sB) && finite(sS) && sB > 1.5 * sS) facts.push(<>同期底层保持 {fmt(sB)} {u}，是表层的 {fmt(sB / Math.max(sS, 1e-9))} 倍：营养盐留在跃层以下，要等秋冬混合才回到表层。</>);
+    why.push(<>浮游植物集中在真光层内吸收营养盐，死亡形成的有机碎屑下沉到深层后经细菌矿化重新释放无机盐。层化期间垂向交换受阻，导致表层营养盐持续耗竭、底层不断累积。</>);
   } else if (cat === "oxygen") {
     if (finite(wB) && finite(sB) && wB > 0) facts.push(sB < 0.9 * wB ? <>底层溶解氧从冬季 {fmt(wB)} 降到夏季 <b>{fmt(sB)}</b> {u}（下降 {Math.round((1 - sB / wB) * 100)}%）。</> : <>底层溶解氧夏季（{fmt(sB)}）与冬季（{fmt(wB)}）接近：底层没有明显耗氧。</>);
     why.push(<>表层与大气交换并有光合作用产氧；层化后底层被隔开，沉下来的有机物分解持续耗氧却得不到补充。陆架海夏季底层缺氧就是这样形成的。冷水溶解氧更多，所以冬季整柱也偏高。</>);
@@ -288,9 +288,9 @@ export function SeriesReading({ data, kind, v, label, mode, repeat }: { data: an
       : <>峰值在夏季而不是典型的春华，可能有两种原因：水柱层化时，跃层附近同时有光和营养盐，浮游植物在次表层就地生长并积累；水柱全年混合时，浮游植物主要受光照限制，光最强的夏季长得最快。到“时间–深度”页看混合层深度和有没有次表层最大值，就能分辨是哪一种。</>);
     else why.push(<>峰值出现在 {peakMonth} 月：浮游植物的生长同时受光照和营养盐限制，峰值落在两者都较充足的时段。</>);
   } else if (CAT[cat].season) why.push(<>{CAT[cat].season}</>);
-  if (/^F[12]_c$/.test(v) && northSea) why.push(<>北海站点可以拿拖网调查来检验鱼 1、鱼 2 的季节变化：国际底拖网调查（IBTS）记录了单位捕捞努力量渔获（CPUE），即每拖一小时网捕到多少鱼。已有的北海一维模拟与它比较时，鱼 1 在夏季开始上升，生物量高于鱼 2。<span className="soft">（观测对照参考：Vijayakumaran 等 2026）</span></>);
+  if (/^F[12]_c$/.test(v) && northSea) why.push(<>北海站点可与国际底拖网调查（IBTS）的单位捕捞努力量渔获（CPUE）季节变化对照：在北海中部一维模拟中，浮游食性的鱼 1 在夏季随浮游动物增长而上升，且生物量高于鱼 2。<span className="soft">（Vijayakumaran 等 2026）</span></>);
   return <Reading what={<><b>{label}</b>（{modeTxt[mode] ?? mode}）：{CAT[cat].what}</>} facts={facts} why={why}
-    how={kind === "annual" ? "横轴是一年中的日期，粗线是分析时段各年同一天的平均，阴影是各年的最小–最大范围；每种颜色是一个运行。" : "横轴是完整的模拟时间，包括预热年份；可以看出模型是否逐年稳定下来。"} />;
+    how={kind === "annual" ? "横轴是一年中的日期，粗线是分析时段各年同一天的平均，阴影是各年的最小–最大范围；每种颜色代表一次运行。" : "横轴是完整的模拟时间，包括预热年份；可以看出模型是否逐年稳定下来。"} />;
 }
 
 // ------------------------------------------------------------------ vertical profiles
@@ -308,19 +308,19 @@ export function ProfileReading({ data, v, label }: { data: any; v: string; label
     const kmax = x.indexOf(hi);
     let shape: string;
     if (!vv.length) continue;
-    if ((hi - lo) / Math.max(Math.abs(m), 1e-12) < 0.1) shape = "上下几乎一样（充分混合）";
+    if ((hi - lo) / Math.max(Math.abs(m), 1e-12) < 0.1) shape = "上下几乎一致（充分混合）";
     else if (kmax !== si && kmax !== bi && d[kmax] > 3 && hi > 1.2 * x[si] && hi > 1.2 * x[bi]) shape = `中间高，最大值在约 ${d[kmax].toFixed(0)} m（次表层最大值）`;
     else if (x[si] > x[bi]) shape = `表层高（${fmt(x[si])}）、底层低（${fmt(x[bi])}）`;
     else shape = `底层高（${fmt(x[bi])}）、表层低（${fmt(x[si])}）`;
     facts.push(<><b>{pr.month} 月</b>：{shape}。</>);
   }
   const why: ReactNode[] = [];
-  if (cat === "temp") why.push(<>冬季剖面竖直（混合），夏季上暖下冷、中间温度急变的一段就是温跃层。</>);
-  if (NUTRIENT.has(cat)) why.push(<>夏季表层营养盐被浮游植物吃光，底层因分解而积累，所以剖面“上低下高”；冬季混合后又变竖直。</>);
-  if (PHYTO.has(cat)) why.push(<>浮游植物需要光（上面多）和营养盐（下面多），夏季两者在跃层附近兼得，常出现次表层最大值。</>);
-  if (cat === "oxygen") why.push(<>层化季节底层得不到大气补氧，分解持续耗氧，剖面“上高下低”。</>);
+  if (cat === "temp") why.push(<>冬季剖面垂向均匀（混合），夏季呈上暖下冷结构，中间温度急剧变化的层段即为温跃层。</>);
+  if (NUTRIENT.has(cat)) why.push(<>夏季表层营养盐被浮游植物消耗，底层因有机物矿化而积累，剖面呈上低下高；冬季混合后恢复垂向均匀。</>);
+  if (PHYTO.has(cat)) why.push(<>浮游植物生长同时受光照（上层强）和营养盐（下层高）控制，夏季常在两者兼备的跃层附近形成次表层最大值。</>);
+  if (cat === "oxygen") why.push(<>层化季节底层与大气隔绝且持续分解耗氧，剖面呈上高下低。</>);
   return <Reading what={<><b>{label}</b>：{CAT[cat].what}</>} facts={facts} why={why}
-    how={`纵轴是深度（向下越深），横轴是浓度（${u}）；每种线型是一个月份（分析时段的月平均），颜色区分运行。比较冬季和夏季的剖面，最能看出层化的作用。`} />;
+    how={`纵轴是深度（向下越深），横轴是浓度（${u}）；每种线型代表一个月份（分析时段的月平均），颜色区分不同运行。对比冬夏两季剖面可以直观看到层化的影响。`} />;
 }
 
 // ------------------------------------------------------------------ column animation (state at one instant)
@@ -365,33 +365,33 @@ export function SpectrumReading({ ds, wMinF }: { ds: any[]; wMinF?: number }) {
   if (finite(a.slope)) facts.push(<>{a.l}：1–1000 g 范围内谱斜率约 <b>{a.slope.toFixed(2)}</b>（{a.slope < -1.3 ? "比 −1 陡：大鱼相对较少" : a.slope > -0.7 ? "比 −1 平缓：大鱼相对较多" : "接近 −1"}）；≥ {wfTxt} 的可捕鱼约占总生物量的 {Math.round((a.big / Math.max(a.all, 1e-12)) * 100)}%。</>);
   if (finite(a.all) && a.all > 0 && a.big / a.all < 0.05) facts.push(<>可捕的大鱼（≥ {wfTxt}）几乎没有：MIZER 从很小的鱼苗开始，大鱼要经过多年生长才会出现。预热只有一两年时，谱的大端偏低主要反映“还没长大”，而不是生态结论；研究用途请增加预热年数。</>);
   stats.slice(1).forEach((b) => facts.push(<>{b.l}：斜率 {b.slope.toFixed(2)}，可捕鱼生物量 {sp(pct(a.big, b.big))}，总生物量 {sp(pct(a.all, b.all))}。</>));
-  return <Reading what="群落粒径谱：把所有鱼按个体体重分档，看每个体重档有多少生物量。它不分物种，只关心“多大”，因为在海洋里“谁吃谁”主要由个体大小决定。"
+  return <Reading what="群落粒径谱：将鱼类群落按个体体重分档，统计各体重区间的生物量密度。MIZER 不区分物种，而是按个体大小刻画捕食与生长过程。"
     facts={facts}
-    why={[<>斜率 −1（双对数坐标下）表示每个对数体重区间的生物量大致相等，这是经典的 Sheldon 谱。能量每向上传一级只有一小部分被转化，所以大鱼通常更少；捕捞会额外移除大鱼，使谱的大端变陡。</>,
-      <>双向耦合时鱼会把自己的食物吃少，粒径谱整体降低；单向耦合时食物不受鱼的影响，谱往往偏高。<span className="soft">（方法参考：Powley 等 2026）</span></>]}
+    why={[<>双对数坐标下斜率约为 −1 时，各对数体重区间的总生物量大致相等（经典 Sheldon 谱）。能量沿粒径谱向上传递时存在代谢和同化损耗，因此大个体数量远少于小个体；渔业捕捞进一步移除大个体，使大粒径端斜率变陡。</>,
+      <>双向耦合下鱼类摄食会压低饵料生物量，粒径谱整体下移；单向耦合下饵料不受鱼类捕食影响，粒径谱往往偏高。<span className="soft">（Powley 等 2026）</span></>]}
     how={`横轴是个体湿重（对数坐标），纵轴是单位体重区间的生物量密度（对数坐标）；红色虚线是捕捞下限（${wfTxt}），右侧的鱼才会被捕捞。`} />;
 }
 
 // ------------------------------------------------------------------ food web state
 export function WebReading() {
-  return <Reading what="食物网：每个节点是一个生物或物质库，箭头表示谁吃谁（物质从被吃者流向捕食者）。"
-    facts={[<>节点里的条形是该类群在分析时段的年均生物量，在同一营养级内相对比较：条越长，说明这个类群在当前运行中越重要。</>, <>悬停或点击节点会高亮它的食物和捕食者，可以追踪一条能量通路，例如 硅藻 → 中型浮游动物 → 鱼。</>]}
-    why={[<>同一营养级里哪个类群占优，决定了能量走哪条路：以硅藻和中型浮游动物为主的“经典食物链”把更多能量传给鱼；以超微型和微型浮游植物、微型浮游动物和细菌为主的“微食物环”中，能量在小生物之间多次周转、损耗更大。</>]}
-    how="从下往上是营养级：营养盐与碎屑 → 浮游植物 → 浮游动物 → 鱼与底栖动物。切换运行可以比较不同配置下各类群的相对大小。" />;
+  return <Reading what="食物网结构：每个节点代表一个生物或物质碳库，箭头表示摄食或物质转移方向（从被摄食者指向捕食者）。"
+    facts={[<>节点内的水平条表示该类群在分析时段的年均生物量（同一营养级内归一化比较）：条越长，该类群在当前营养级中的占比越高。</>, <>悬停或点击节点可高亮其上下游连接，追踪特定能量通路（如 硅藻 → 中型浮游动物 → 鱼类）。</>]}
+    why={[<>同一营养级内优势类群的变化会改变能量传递效率：以硅藻和中型浮游动物为主的经典食物链向高营养级传递效率较高；而以超微型/微型浮游植物、异养鞭毛虫和细菌为主的微食物环内部周转层级多，呼吸损耗更大。</>]}
+    how="自下而上按营养级排列：无机营养盐与碎屑 → 浮游植物 → 浮游动物 → 鱼类与底栖动物。切换运行可对比不同配置下各类群的相对生物量。" />;
 }
 
 // ------------------------------------------------------------------ indicator comparison
 const E2E_NAME: Record<string, string> = { macrobenthos: "大型底栖", fish1: "鱼 1", fish2: "鱼 2" };
 function htlText(spec: any) {
   const h = spec?.htl;
-  if (!h || h.kind === "none") return "只有低营养级";
+  if (!h || h.kind === "none") return "仅低营养级";
   if (h.kind === "mizer") return h.mizer?.feedback === false ? "MIZER 鱼类（单向，无反馈）" : "MIZER 鱼类（双向反馈）";
   const g = Object.entries(E2E_NAME).filter(([k]) => h.e2e?.[k]).map(([, n]) => n);
   return g.length ? `E2E：${g.join("、")}` : "E2E（未启用功能群）";
 }
 export function CompareReading({ t, runs }: { t: any; runs: any[] }) {
   if (runs.length < 2) {
-    return <div className="reading reading-cols"><h4>怎么读</h4><p>这里是所选运行在分析时段的年均指标。在左侧再勾选一个运行（第一个勾选的作为基准），就能看到相对变化和机制解释。</p></div>;
+    return <div className="reading reading-cols"><h4>怎么读</h4><p>当前展示所选运行在分析时段的年均指标。在左侧再勾选一次运行（第一个勾选的运行作为基准），即可查看相对变化与机制分析。</p></div>;
   }
   const last = runs.length - 1;
   const A = runs[0], B = runs[last];
@@ -405,35 +405,35 @@ export function CompareReading({ t, runs }: { t: any; runs: any[] }) {
   const pairKey = pairKeyOf({ spec: A.spec }, { spec: B.spec });
   const kA = configKind({ spec: A.spec }), kB = configKind({ spec: B.spec });
   const facts: ReactNode[] = [];
-  facts.push(<>以 <b>{A.label}</b>（{htlText(A.spec)}）为基准，<b>{B.label}</b>（{htlText(B.spec)}）。</>);
-  if (big.length) facts.push(<>变化最大的：{big.slice(0, 5).map((r: any, i: number) => <span key={r.key}>{i ? "，" : ""}{r.label.trim()} <b>{sp(r.pct[last])}</b></span>)}。</>);
-  if (small.length) facts.push(<>几乎不变（&lt; 3%）：{small.slice(0, 6).map((r: any) => r.label.trim()).join("、")}。</>);
+  facts.push(<>以 <b>{A.label}</b>（{htlText(A.spec)}）为基准，对比 <b>{B.label}</b>（{htlText(B.spec)}）。</>);
+  if (big.length) facts.push(<>变化最显著的指标：{big.slice(0, 5).map((r: any, i: number) => <span key={r.key}>{i ? "，" : ""}{r.label.trim()} <b>{sp(r.pct[last])}</b></span>)}。</>);
+  if (small.length) facts.push(<>变化较小（&lt; 3%）：{small.slice(0, 6).map((r: any) => r.label.trim()).join("、")}。</>);
   const co2 = rows.find((r: any) => r.key === "co2");
   if (co2 && finite(co2.values[0]) && finite(co2.values[last]) && co2.values[0] !== co2.values[last]) {
     const c0 = co2.values[0], c1 = co2.values[last];
     const nearZero = c0 * c1 < 0 || Math.min(Math.abs(c0), Math.abs(c1)) < 0.15 * Math.max(Math.abs(c0), Math.abs(c1));
-    facts.push(<>海气 CO₂ 通量从 {fmt(c0)} 变为 {fmt(c1)} {co2.units}（正值为海洋吸收），差 {fmt(c1 - c0)}{nearZero ? (c0 * c1 < 0 ? "；两个运行符号相反，百分比没有意义，请看差值" : "；其中一个运行接近 0，百分比会被放大，请看差值") : ""}。</>);
+    facts.push(<>海气 CO₂ 通量从 {fmt(c0)} 变为 {fmt(c1)} {co2.units}（正值表示海洋吸收），差值 {fmt(c1 - c0)}{nearZero ? (c0 * c1 < 0 ? "；两次运行符号相反，建议直接参考绝对差值" : "；其中一个运行接近 0，相对百分比会被放大，建议参考绝对差值") : ""}。</>);
   }
-  if (newIn.length) facts.push(<>基准中没有、比较运行中新出现的类群：{newIn.join("、")}（无法算百分比）。</>);
+  if (newIn.length) facts.push(<>基准运行中未包含、比较运行中新增的类群：{newIn.join("、")}。</>);
   const cas = cascadeText(chg);
   const why: ReactNode[] = [];
-  const intro = pairKey === "ltl>e2e" ? `基准只有低营养级；比较运行加入了 ${htlText(B.spec).replace("E2E：", "")}，它们的摄食、排泄和呼吸都反馈给宿主模型。` : kA === "e2e" && kB === "e2e" ? `两个运行的高营养级组成不同：基准是 ${htlText(A.spec)}，比较是 ${htlText(B.spec)}。差异来自多出来或少掉的那些功能群。` : PAIR_INTRO[pairKey];
+  const intro = pairKey === "ltl>e2e" ? `基准运行仅包含低营养级；比较运行加入了 ${htlText(B.spec).replace("E2E：", "")}，其摄食、排泄和呼吸均反馈至宿主模型。` : kA === "e2e" && kB === "e2e" ? `两次运行的高营养级配置不同：基准为 ${htlText(A.spec)}，比较运行为 ${htlText(B.spec)}，差异来自所增减的功能群。` : PAIR_INTRO[pairKey];
   if (intro) why.push(intro);
   if (cas) why.push(cas);
   for (const r of big.slice(0, 4)) {
     if (cas && /Z5|Z6|microzoo/.test(r.key)) continue; // already covered by the cascade sentence
     const m = mechanism(r.key, pairKey, r.pct[last], { chg }); if (m && !why.includes(m)) why.push(m);
   }
-  if (A.spec?.host && B.spec?.host && A.spec.host !== B.spec.host) why.unshift(`注意：两个运行的宿主模型不同（${A.spec.host} vs ${B.spec.host}），差异同时包含宿主本身的差别，不能只归因于高营养级。`);
+  if (A.spec?.host && B.spec?.host && A.spec.host !== B.spec.host) why.unshift(`注意：两次运行使用了不同的宿主模型（${A.spec.host} vs ${B.spec.host}），结果差异同时包含宿主模型本身的结构差别，不能完全归因于高营养级。`);
   return (
     <div className="reading reading-cols">
       <h4>这组对比说明了什么</h4>
       <ul>{facts.map((f, i) => <li key={i}>{f}</li>)}</ul>
-      {collapse.length > 0 && <p className="reading-warn">{collapse.map((r: any) => r.label.trim()).join("、")} 下降超过 90%，几乎消失。真实海洋中很少出现这种情况，通常说明高营养级的捕食参数在这个宿主中偏强，或该类群缺少避难所（例如没有最低生物量）。用于研究前，建议用“参数扫描”检查捕食参数，或对照已发表的同类结果。</p>}
+      {collapse.length > 0 && <p className="reading-warn">{collapse.map((r: any) => r.label.trim()).join("、")} 降幅超过 90%，接近耗竭。真实海域极少出现此类情况，通常表明高营养级捕食参数在当前宿主下偏强，或该类群缺少半饱和/低密度保护机制。建议通过“参数扫描”检查捕食率参数，或与文献结果核对。</p>}
       {why.length > 0 && <><h4>为什么</h4>{why.map((x, i) => <p key={i}>{x}</p>)}</>}
       <h4>怎么读</h4>
-      <p>所有指标都是分析时段的年平均；浮游生物和鱼是整根水柱的总量（深度积分）。百分比 = (比较 − 基准) / 基准。左侧第一个勾选的运行就是基准：例如先勾选“仅低营养级”，再勾选加入鱼类的运行，就能看到高营养级的作用。</p>
-      {runs.length > 2 && <p className="soft">勾选了 {runs.length} 个运行，以上文字比较第一个与最后一个；柱状图和表格包含全部运行。</p>}
+      <p>表中所有指标均为分析时段的年均值；浮游生物与鱼类为整根水柱的深度积分。百分比变化 = (比较 − 基准) / 基准。左侧第一个勾选的运行作为基准（例如先勾选“仅低营养级”，再勾选耦合鱼类的运行，即可评估高营养级反馈）。</p>
+      {runs.length > 2 && <p className="soft">当前勾选了 {runs.length} 次运行，以上文字对比第一个与最后一个运行；柱状图与表格展示全部所选运行。</p>}
     </div>
   );
 }

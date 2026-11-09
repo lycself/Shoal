@@ -41,14 +41,14 @@ export function siteNotes(lat: number, lon: number, depth?: number | null): { te
   const nwes = lat >= 48 && lat <= 62.5 && lon >= -12 && lon <= 13;
   const baltic = lat >= 53.5 && lat <= 66 && lon > 13 && lon <= 30;
   if (nwes) n.push({ text: "位于模型参数的标定海区（西北欧陆架）。" });
-  else if (baltic) n.push({ text: "波罗的海是 ERGOM 宿主的原生海区；ERSEM / ECOSMO 与高营养级参数来自北海，需要检验。" });
-  else n.push({ text: "标定海区以外：低营养级宿主是通用模型，可以直接使用；高营养级（E2E、MIZER）的参数来自北海，结论应与当地观测对照，并用参数扫描检验敏感度。", warn: true });
-  if (lat < 0) n.push({ text: "南半球：季节与北半球相反（7–8 月是冬季），读图说明会按南半球季节解释。" });
-  if (Math.abs(lat) < 23.5) n.push({ text: "热带：季节变化弱，“春季藻华—夏季层化”的典型温带图景不一定出现。" });
-  if (Math.abs(lat) > 60) n.push({ text: "高纬度：模型不含海冰，冬季冰覆盖的海区物理过程会有偏差。", warn: true });
-  if (depth != null && depth > 300) n.push({ text: `水深 ${depth.toFixed(0)} m：本软件面向陆架海（一般 < 200 m）。开阔大洋需要更多层数、更长预热，而且缺少水平输运的影响更大。`, warn: true });
-  if (depth != null && depth < 10) n.push({ text: `水深仅 ${depth.toFixed(0)} m：潮间带、海草和底栖附着藻等过程不在模型中。`, warn: true });
-  if (!nwes) n.push({ text: "潮流混合默认按北海中部设置；强潮海区（如东海、乔治浅滩）或弱潮海区（如波罗的海、地中海）请在“站点与物理”页左下的“模拟设置 → 潮流混合”里调整。" });
+  else if (baltic) n.push({ text: "波罗的海为 ERGOM 宿主的原生标定海区；ERSEM / ECOSMO 与高营养级参数率定自北海，需结合当地资料检验。" });
+  else n.push({ text: "位于标定海区以外：低营养级宿主为通用水柱模型，可直接使用；高营养级（E2E、MIZER）参数率定自北海，建议结合当地观测对照并通过参数扫描评估敏感性。", warn: true });
+  if (lat < 0) n.push({ text: "南半球站点：季节与北半球相反（7–8 月为冬季），结果页的读图说明会自动按南半球季节分析。" });
+  if (Math.abs(lat) < 23.5) n.push({ text: "热带海域：季节温差较小，不一定出现温带海域典型的“春季藻华—夏季层化”循环。" });
+  if (Math.abs(lat) > 60) n.push({ text: "高纬度海域：模型未包含海冰模块，冬季结冰海区的海气交换与混合过程可能存在偏差。", warn: true });
+  if (depth != null && depth > 300) n.push({ text: `水深 ${depth.toFixed(0)} m：本系统主要面向陆架浅海（一般 < 200 m）。深水大洋站点需增加垂向层数与预热年数，且受缺乏水平平流的影响更大。`, warn: true });
+  if (depth != null && depth < 10) n.push({ text: `水深仅 ${depth.toFixed(0)} m：模型未包含潮间带干出、海草床及底栖大型藻类等近岸极浅水过程。`, warn: true });
+  if (!nwes) n.push({ text: "潮流混合参数默认按北海中部设定；强潮海区（如东海、乔治浅滩）或弱潮海区（如波罗的海、地中海）可在“站点与物理 → 模拟设置 → 潮流混合”中调整。" });
   return n;
 }
 

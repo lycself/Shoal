@@ -21,8 +21,8 @@ export function ValidateTab({ pid, run }: { pid: string; run: any }) {
         {sp.loading ? <Loading /> : sd && (
           <>
             <Notice kind={sd.max_drift_pct == null ? "plain" : sd.max_drift_pct < 1 ? "info" : sd.max_drift_pct < 5 ? "warn" : "danger"} icon={sd.max_drift_pct != null && sd.max_drift_pct < 1 ? "pass" : "warning"}>
-              <b>{sd.verdict ?? "年份不足，无法判断"}</b>　最后两个完整年份之间，变化最大的变量变了 {fmt(sd.max_drift_pct)}%。反复使用同一年气象的模拟，应该在分析的那一年之前就稳定下来，否则结果还带着初始值的影子。
-              {sd.max_drift_pct != null && sd.max_drift_pct >= 1 && <> <a className="link" onClick={() => setPage("site")}>去“站点与物理”增加预热年数 →</a>（研究用途建议 10–20 年；高营养级比低营养级慢得多）</>}
+              <b>{sd.verdict ?? "年份不足，无法判断"}</b>　最后两个完整年份之间，变化最大的变量年均值相差 {fmt(sd.max_drift_pct)}%。采用同一年气象循环强迫时，模型应在进入分析年之前达到周期稳态，否则分析结果仍受初始条件影响。
+              {sd.max_drift_pct != null && sd.max_drift_pct >= 1 && <> <a className="link" onClick={() => setPage("site")}>前往“站点与物理”增加预热年数 →</a>（研究用途建议 10–20 年；高营养级收敛比低营养级慢得多）</>}
             </Notice>
             <div style={{ display: "grid", gridTemplateColumns: "minmax(0,1.4fr) minmax(0,1fr)", gap: 16, marginTop: 10 }}>
               <Plot height={360} data={sd.vars.map((x: any, i: number) => {
@@ -61,10 +61,10 @@ export function ValidateTab({ pid, run }: { pid: string; run: any }) {
               ]} layout={{ showlegend: true, legend: { orientation: "h", y: -0.12, x: 0, font: { size: 11 } }, margin: { l: 40, r: 30, t: 56, b: 10 },
                 polar: { sector: [0, 90], bgcolor: "rgba(0,0,0,0)", radialaxis: { range: [0, Math.max(1.6, ...vd.vars.map((x: any) => (x.stats.sd_ratio ?? 0) * 1.1))], title: { text: "σ模式 / σ观测" }, gridcolor: cssVar("--plot-grid") },
                   angularaxis: { direction: "clockwise", rotation: 90, tickvals: [0, 25.8, 45.6, 63.3, 72.5, 84.3, 90], ticktext: ["1", "0.9", "0.7", "0.45", "0.3", "0.1", "0"], gridcolor: cssVar("--plot-grid") } },
-                annotations: [{ text: "相关系数", x: 0.85, y: 0.95, xref: "paper", yref: "paper", showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } }], title: { text: "Taylor 图：点离★越近，模式越像观测", y: 0.99 } }} />
+                annotations: [{ text: "相关系数", x: 0.85, y: 0.95, xref: "paper", yref: "paper", showarrow: false, font: { size: 11, color: cssVar("--fg-muted") } }], title: { text: "Taylor 图：点离 ★ 越近，模拟越接近观测", y: 0.99 } }} />
               <div className="panel" style={{ overflow: "auto" }}>
                 <table className="table dense">
-                  <thead><tr><th>变量</th><th className="num">观测均值</th><th className="num">模式均值</th><th className="num" data-tip="模式均值减观测均值">偏差</th><th className="num" data-tip="均方根误差：逐月逐层差值的典型大小，越小越好">误差</th><th className="num" data-tip="相关系数 r：季节和垂向变化的形状像不像，1 最好">相关</th><th className="num" data-tip="模式与观测的变化幅度之比，1 最好">变幅比</th></tr></thead>
+                  <thead><tr><th>变量</th><th className="num">观测均值</th><th className="num">模式均值</th><th className="num" data-tip="模式均值减观测均值">偏差</th><th className="num" data-tip="均方根误差：逐月逐层差值的典型大小，越小越好">误差</th><th className="num" data-tip="相关系数 r：季节和垂向变化的形态相似度，越接近 1 越好">相关</th><th className="num" data-tip="模式与观测的标准差之比，越接近 1 越好">变幅比</th></tr></thead>
                   <tbody>{vd.vars.map((x: any) => (
                     <tr key={x.key}><td style={{ whiteSpace: "nowrap" }}>{x.label}<div className="sub">{x.units} · <span className="mono">{x.model_var}</span></div></td>
                       <td className="num">{fmt(x.stats.obs_mean)}</td><td className="num">{fmt(x.stats.model_mean)}</td>

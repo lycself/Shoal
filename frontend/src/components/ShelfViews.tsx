@@ -187,7 +187,7 @@ export function Shelf3DView({ study, results, boxes = [], configs = [] }: { stud
         <FigureReading metric={metric} label={meta[metric]?.label ?? metric} unit={meta[metric]?.units ?? ""} mode="value"
           pairs={points.map((p: any) => ({ lat: p.lat, lon: p.lon, depth: p.depth, a: p.value, other: r.points.find((q: any) => q.lat === p.lat && q.lon === p.lon)?.metrics }))}
           nameA={r.config_name} boxes={boxes} chg={{}} otherLabels={Object.fromEntries(Object.entries(meta).map(([k, m]: any) => [k, m.label]))} res={study.res} years={study.years}
-          howto="每根柱子是一根模拟水柱：柱子的高度是水深（垂向放大，倍数见图左下角），颜色是所选指标；周围的地形来自 ETOPO 2022。拖动旋转、滚轮缩放、右键平移。立体视图适合建立“陆架有多浅、哪里是深水槽”的直觉：对照颜色，可以看出指标与水深的关系。" />
+          howto="每根柱体代表一根一维模拟水柱：柱高表示水深（经垂向夸大，放大倍数见左下角），颜色表示所选指标；周边海底地形来自 ETOPO 2022。左键拖动旋转、滚轮缩放、右键平移。结合地形与柱体颜色，可以直观对比指标在浅滩、陆架平原与深水海槽之间的分布差异。" />
       </div>
     </div>
   );

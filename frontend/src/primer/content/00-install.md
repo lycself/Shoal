@@ -1,207 +1,173 @@
 ---
 id: 00-install
-title: 安装与设置：装好软件、接上 AI 助手、数据存在哪里
+title: 安装与设置：软件部署、数据目录与 AI 助手
 order: 1
-summary: 桌面版怎么下载、安装、第一次打开和更新；AI 助手怎么配置；项目数据存在哪里、怎么备份；开发者怎样从源码运行和打包。
+summary: 桌面版的安装、首次启动、自动更新与卸载，项目数据存储位置与迁移备份，AI 助手接口配置，以及源码编译与打包方法。
 ---
 
-# 安装与设置：装好软件、接上 AI 助手、数据存在哪里
+# 安装与设置：软件部署、数据目录与 AI 助手
 
-> **一句话**：大多数人只需要下载桌面版、双击安装；这一章把安装、第一次打开、更新、AI 助手、数据位置和从源码运行都讲清楚，遇到问题时回来查。
-
-**这一章你会明白**
-
-- 在 macOS、Windows、Linux 上怎样安装和第一次打开 Shoal；
-- Shoal 运行时在电脑上做了什么，怎样真正退出；
-- 怎样更新、卸载，项目数据存在哪里、怎样备份和搬到另一台电脑；
-- 怎样给 AI 助手接上一个大模型，包括本机运行的模型；
-- 开发者怎样从源码运行、编译计算内核和打包。
+本章整理了桌面版安装、首次运行安全提示、后台服务机制、项目数据目录、AI 助手配置以及从源码编译打包的完整说明，供安装配置或排查环境问题时查阅。
 
 ## 桌面版：下载与安装
 
-从项目的 [GitHub Releases 页面](https://github.com/lycself/Shoal/releases/latest) 下载对应系统的安装包。安装包里已经带好了编译好的计算内核和所有依赖，**不需要装 Python、编译器或任何科学计算软件**。
+普通用户可直接从 [GitHub Releases 页面](https://github.com/lycself/Shoal/releases/latest) 下载对应操作系统的安装包。安装包已内置编译好的 GOTM–FABM 计算内核及全部运行依赖，**无需单独安装 Python、Fortran 编译器或其他科学计算软件**。
 
-| 系统 | 下载哪个文件 | 怎么安装 |
+| 操作系统 | 安装包文件名 | 安装方式 |
 |---|---|---|
-| macOS（Apple 芯片：M1、M2…） | `Shoal-<版本>-macos-arm64.dmg` | 打开 dmg，把 Shoal 拖进“应用程序” |
+| macOS（Apple 芯片：M1 / M2 / M3 / M4） | `Shoal-<版本>-macos-arm64.dmg` | 打开 dmg 镜像，将 Shoal 拖入“应用程序”文件夹 |
 | macOS（Intel 芯片） | `Shoal-<版本>-macos-x64.dmg` | 同上 |
-| Windows 10 / 11 | `Shoal-<版本>-windows-x64-setup.exe` | 双击安装，不需要管理员权限 |
-| Linux（Ubuntu 22.04 及以上） | `Shoal-<版本>-linux-x64.tar.gz` | 解压后运行 `Shoal/Shoal`；运行 `./install-desktop-entry.sh` 可以把它加到应用菜单 |
+| Windows 10 / 11 | `Shoal-<版本>-windows-x64-setup.exe` | 双击运行安装程序，无需管理员权限 |
+| Linux（Ubuntu 22.04 及以上） | `Shoal-<版本>-linux-x64.tar.gz` | 解压后运行 `Shoal/Shoal`；执行 `./install-desktop-entry.sh` 可添加至系统应用菜单 |
 
-不确定自己的 Mac 是哪种芯片：点屏幕左上角的苹果菜单 → “关于本机”，“芯片”一栏写着 Apple M… 就是 Apple 芯片，写着 Intel 就是 Intel。
+若不确定 Mac 的处理器架构，可点击屏幕左上角苹果图标 →“关于本机”：显示“Apple M…”即为 Apple 芯片，显示“Intel”则选择 `x64` 版本。
 
-### 第一次打开会被系统拦一下
+### 首次打开的安全提示处理
 
-安装包没有购买苹果和微软的付费签名，所以第一次打开时系统会提示“无法验证开发者”。这不是软件有问题，处理一次以后就不会再出现：
+由于安装包未采用商业付费签名，首次启动时操作系统可能会弹出安全拦截提示，按以下步骤放行一次即可：
 
-- **macOS**：先双击一次（会被拦下），然后打开“系统设置 → 隐私与安全性”，在页面下方找到 Shoal，点“仍要打开”。也可以在“终端”里运行：
+- **macOS**：首次双击被拦截后，打开“系统设置 → 隐私与安全性”，滑至页面底部找到有关 Shoal 的提示，点击“仍要打开”。也可在终端中执行以下命令移除隔离属性：
 
-  ```
+  ```bash
   xattr -dr com.apple.quarantine /Applications/Shoal.app
   ```
 
-- **Windows**：在蓝色的“Windows 已保护你的电脑”窗口里点“更多信息”，再点“仍要运行”。
+- **Windows**：在弹出的“Windows 已保护你的电脑”窗口中点击“更多信息”，随后点击“仍要运行”。
 
-### Shoal 运行时在做什么
+### 后台运行与退出机制
 
-Shoal 由两部分组成：一个在后台运行的**计算服务**（负责下载数据、运行模型、读取结果），和你看到的**界面**（在浏览器窗口里显示）。所以：
+Shoal 由两部分组成：在后台运行的**本地计算服务**（负责下载强迫数据、调度 GOTM 模拟、读取 NetCDF 输出）以及在浏览器中呈现的**图形界面**。
 
-- 双击 Shoal 后，它先在后台启动计算服务，然后自动打开一个浏览器页面。
-- 托盘区（Windows 屏幕右下角、macOS 屏幕顶部的菜单栏）会出现 Shoal 的图标。
-- **关掉浏览器页面不会停止计算**，正在跑的模型会继续跑。点托盘图标里的“打开 Shoal”，或再双击一次 Shoal，就能回到页面。
-- 要真正退出，点托盘图标菜单里的“退出 Shoal”，或在[设置](app:settings)页底部点“退出 Shoal”。如果还有计算在运行，会先问你是否要停止它们。
+- 双击启动 Shoal 后，后台计算服务随即启动，并自动调用系统默认浏览器打开工作台页面。
+- 系统托盘（Windows 右下角任务栏、macOS 顶部菜单栏）会常驻 Shoal 图标。
+- **直接关闭浏览器窗口或标签页不会终止后台服务**，正在运行的模拟任务会继续执行。需要回到界面时，点击托盘图标菜单中的“打开 Shoal”（或再次双击应用图标）即可。
+- 若要彻底退出软件，请在托盘图标菜单中选择“退出 Shoal”，或在[设置](app:settings)页底部点击“退出 Shoal”。若当前仍有计算任务在运行，系统会先询问是否终止任务。
 
 ## 更新与卸载
 
-**更新**：Shoal 每隔几个小时会检查一次有没有新版本。有的话，页面顶部会出现提示；到“设置 → 软件版本与更新”点一下，它会下载新版本、校验文件是否完整，然后自动重启到新版本。没联网时只会在设置页显示一行提示，不影响使用。
+- **软件更新**：桌面版每隔数小时会自动检查一次版本更新。发现新版本时，页面顶部会出现更新提示；可在“设置 → 软件版本与更新”中一键下载、校验 SHA-256 并自动重启完成替换。离线环境下仅在设置页显示无法连接提示，不影响正常建模。
+- **卸载软件**：macOS 直接将“应用程序”中的 Shoal 移至废纸篓；Windows 在“设置 → 应用”中卸载；Linux 直接删除解压目录。**更新与卸载均不会改动你的项目与缓存数据**。
 
-**卸载**：macOS 把“应用程序”里的 Shoal 拖到废纸篓；Windows 在“设置 → 应用”里卸载；Linux 删除解压出来的文件夹。**更新和卸载都不会删除你的项目**，项目放在下面说的数据目录里。
+## 项目数据目录与备份
 
-## 项目数据存在哪里
+桌面版将所有用户数据存放在系统级应用数据目录下的 `workspace` 文件夹中：
 
-桌面版把所有数据放在系统的应用数据目录下的 `workspace` 文件夹：
-
-| 系统 | 位置 |
+| 操作系统 | 数据目录路径 |
 |---|---|
 | macOS | `~/Library/Application Support/Shoal/workspace` |
 | Windows | `%LOCALAPPDATA%\Shoal\workspace` |
 | Linux | `~/.local/share/shoal/workspace` |
 
-macOS 的 `~/Library` 在访达里默认隐藏：在访达里按 ⌘⇧G，粘贴上面的路径即可打开。Windows 在资源管理器的地址栏粘贴 `%LOCALAPPDATA%\Shoal` 回车。
+> **提示**：macOS 的 `~/Library` 默认隐藏，可在访达（Finder）中按 `⌘⇧G` 并粘贴上述路径直接前往；Windows 可在资源管理器地址栏粘贴 `%LOCALAPPDATA%\Shoal` 回车。
 
-`workspace` 里面有三个文件夹和一个文件：
+`workspace` 目录结构如下：
 
 ```
 workspace/
-    projects/      每个项目一个文件夹（见下）
-    cache/         下载过的 ERA5、WOA23、ETOPO 数据，同一地点再用时不用重下
-    trash/         删除的项目先移到这里，可以手动拖回 projects/ 恢复
-    settings.json  设置页里保存的内容
+    projects/      所有项目文件夹
+    cache/         已下载的 ERA5、WOA23、ETOPO 原始数据缓存（相同坐标复用时免重复下载）
+    trash/         已删除项目的暂存目录，移回 projects/ 即可恢复
+    settings.json  用户界面与并发设置
 ```
 
-一个项目文件夹长这样：
+单个项目目录内部结构如下：
 
 ```
 projects/<项目id>/
-    project.json      名称、站点、模拟时间、实验设计
-    site/             站点强迫文件：气象、WOA 剖面、site.json
-    configs/          食物网配置：宿主 + 高营养级模块 + 参数修改
-    experiments/      实验：一组按顺序排好的运行
-    runs/<运行id>/    gotm.yaml、fabm.yaml、result.nc、gotm.log
-    shelf/            三维陆架研究的设置与结果
+    project.json      项目名称、站点参数、模拟时间与实验设计元数据
+    site/             站点强迫文件（气象序列、WOA 剖面、site.json）
+    configs/          食物网配置 JSON（宿主模型、高营养级模块与参数覆盖）
+    experiments/      对照实验定义
+    runs/<运行id>/    单次运行的 gotm.yaml、fabm.yaml、result.nc 与 gotm.log
+    shelf/            三维陆架水柱集合的设置与汇总结果
 ```
 
-每次运行文件夹里的 `gotm.yaml`（物理设置）、`fabm.yaml`（生态模块和接线）和 `result.nc`（结果，NetCDF 格式）都是标准格式，可以用 Python（xarray）、MATLAB、Panoply、ncview 等工具直接打开，也可以把这个文件夹交给熟悉 GOTM 的同事，用他们自己的 GOTM 重算。
+每次运行生成的 `gotm.yaml`、`fabm.yaml` 和 `result.nc` 均为通用标准格式：`result.nc` 可直接用 Python（`xarray` / `netCDF4`）、MATLAB、Panoply 或 `ncview` 读取；整套运行目录也可直接交给其他安装了命令行版 GOTM 的研究者复现计算。
 
-**备份或换电脑**：退出 Shoal 后，把整个 `projects/` 文件夹（或其中某个项目）复制走；在新电脑上安装 Shoal、打开一次让它建好目录，再退出，把项目文件夹放进新电脑的 `projects/`，重新打开即可。`cache/` 可以不复制，缺什么会重新下载。
+**备份与跨设备迁移**：退出 Shoal 后，复制 `projects/` 目录下的项目文件夹；在另一台电脑上安装并启动一次 Shoal 以初始化目录，退出后将文件夹拷入新电脑的 `projects/` 目录即可。`cache/` 无需随迁，缺失的强迫数据会在构建站点时按需重新下载。
 
-## 网络与离线使用
+## 网络访问与离线模式
 
-只有两件事需要联网：**新建站点时下载公开数据**，和**检查更新**。具体会访问：
+软件仅在**构建新站点强迫数据**和**检查版本更新**时访问以下公开服务：
 
-| 用途 | 服务器 |
+| 用途 | 远程服务 |
 |---|---|
-| ERA5 逐小时气象 | Open-Meteo 的历史天气接口（archive-api.open-meteo.com） |
-| WOA23 气候态剖面 | 美国国家海洋和大气管理局（NOAA）的数据服务器 |
-| ETOPO 2022 水深 | NOAA 的 ERDDAP 数据服务 |
-| 软件更新 | GitHub |
+| ERA5 逐小时气象再分析 | Open-Meteo 历史气象接口（`archive-api.open-meteo.com`） |
+| WOA23 气候态月均剖面 | NOAA NCEI OPeNDAP 数据服务 |
+| ETOPO 2022 全球水深 | NOAA CoastWatch ERDDAP 数据服务 |
+| 版本检查与更新包下载 | GitHub Releases |
 
-下载过的数据会缓存，同一个站点以后不用再联网。没有网络时，新建项目对话框里勾选“没有网络：使用离线算例”，可以用自带的北海北部算例完成所有流程。运行模型、画图、读教程都不需要网络；AI 助手需要能访问你配置的那个大模型接口（本机模型除外）。
+同一站点的强迫数据下载一次后即保存在本地 `cache/` 中。若在无网络环境（如课堂演示或出海航次）下新建项目，可在新建对话框中勾选“没有网络：使用离线算例”，直接使用内置的北海北部 PROVESS 1998 算例数据完成全流程操作。
 
-如果学校或单位的网络要通过代理才能上网，站点下载可能失败。可以先换一个网络环境把站点建好（数据会缓存下来），之后就能离线使用。
+## 配置 AI 助手
 
-## 接上 AI 助手
+AI 助手支持接入任何**兼容 OpenAI Chat Completions 接口格式**的大模型服务（如 OpenAI、DeepSeek、通义千问、Moonshot，以及本地运行的 Ollama 或 LM Studio）。无需 AI 助手时可留空，不影响软件其余功能。
 
-AI 助手本身不带大模型，需要你提供一个**兼容 OpenAI 接口格式**的服务。很多服务都兼容这种格式，包括 OpenAI、DeepSeek、通义千问、Moonshot，以及在自己电脑上运行的 Ollama、LM Studio。
+在[设置](app:settings)页“AI 助手”区域填写以下三项：
 
-在[设置](app:settings)页的“AI 助手”一栏填写三项：
-
-| 项 | 填什么 | 例子 |
+| 配置项 | 说明 | 示例 |
 |---|---|---|
-| 接口地址 | 服务商提供的 API 地址（通常以 `/v1` 结尾） | `https://api.openai.com/v1`、`https://api.deepseek.com/v1` |
-| 模型 | 服务商的模型名 | `gpt-4o-mini`、`deepseek-chat`、`qwen-plus` |
-| API Key | 在服务商网站上申请的密钥 | 以 `sk-` 开头的一串字符 |
+| 接口地址 | 服务商提供的 API 根路径（通常以 `/v1` 结尾） | `https://api.openai.com/v1`、`https://api.deepseek.com/v1` |
+| 模型名称 | 所调用的模型标识符 | `gpt-4o-mini`、`deepseek-chat`、`qwen-plus` |
+| API Key | 服务商签发的访问密钥 | `sk-...` |
 
-填好后点“测试连接”，看到“连接成功”就可以了，记得点页面底部的“保存”。
+填写后点击“测试连接”确认通信正常，再点击页面底部的“保存”。
 
-**用本机模型（不需要密钥，数据不出电脑）**：安装 [Ollama](https://ollama.com)，在终端运行 `ollama pull qwen2.5:7b` 下载一个模型，然后把接口地址填 `http://localhost:11434/v1`，模型填 `qwen2.5:7b`，API Key 留空。本机模型回答较慢，读取项目和调用工具的能力也比大的在线模型弱，适合简单问答。
+**使用本地大模型（无需密钥，数据保留在本机）**：安装 [Ollama](https://ollama.com) 后，在终端执行 `ollama pull qwen2.5:7b` 拉取模型，随后将接口地址设为 `http://localhost:11434/v1`、模型设为 `qwen2.5:7b`，API Key 留空即可。
 
-**助手能做什么、不能做什么**：它能读取当前项目、配置和运行结果，检索入门教程，统计变量，启动模拟。它想修改配置时只会生成一份“修改提案”，显示要改哪些参数和理由，你点“应用”才会生效（设置里可以改成自动应用，不推荐）。它看到的是你发给它的问题和它调用工具读到的数据，这些内容会发送给你配置的那个大模型服务。
+**权限边界**：AI 助手可通过只读工具查询当前项目配置、读取模拟汇总指标、检索教程段落或启动模拟运行；当助手建议修改模型参数时，只会生成一份待确认的“修改提案”，必须由你点击“应用”后才会真正写入配置文件。
 
-## 常见问题
+## 常见环境问题
 
-| 现象 | 原因和办法 |
+| 现象 | 排查方式 |
 |---|---|
-| 双击没有反应，或页面显示“无法连接计算服务” | 计算服务可能还在启动，等几秒后刷新页面；仍不行就从托盘菜单退出 Shoal 再重新打开 |
-| 设置页显示“计算内核未就绪” | 桌面版重新安装一次；源码运行需要先编译内核（见下文） |
-| 页面打不开，提示端口被占用 | 另一个 Shoal 还在运行。用托盘菜单退出它，或重启电脑 |
-| 站点数据下载失败 | 检查网络和代理；稍后在站点页点“重新构建”；或改用离线算例 |
-| 运行很慢 | 在设置里把“同时运行的模型数”设成不超过物理核数；关掉其他占用处理器的程序；三维陆架研究可以先用粗一些的网格 |
-| 磁盘占用越来越大 | 在实验页的“全部运行记录”里删除不要的运行；三维陆架研究的结果较大，不要的可以删除 |
+| 启动后浏览器显示“无法连接计算服务” | 后台服务可能仍在初始化，稍候数秒刷新页面；若仍无响应，从托盘图标退出后重新启动 |
+| 设置页提示“计算内核未就绪” | 桌面版请重新安装；源码运行请先执行 `pnpm kernel` 编译内核 |
+| 站点数据下载超时或报错 | 检查网络或系统代理设置；稍后在站点页点击“重新构建”，或改用内置离线算例 |
+| 多任务运行缓慢 | 在设置页将“同时运行的模型数”调至不超过本机物理核心数；三维陆架研究建议先用较粗分辨率试算 |
+| 磁盘空间占用过大 | 在实验页“全部运行记录”中清理不再需要的运行记录或三维陆架研究输出 |
 
-## 从源码运行（开发者）
+## 从源码编译运行（面向开发者）
 
-想改代码、加模型或在服务器上运行时，可以从源码运行。支持 macOS、Linux（Ubuntu 等）和原生 Windows。
+如需修改前后端代码、扩展生态模块或在 Linux 服务器上无头部署，可直接从源码运行（支持 macOS、Linux 与 Windows）。
 
-### 需要准备
+### 依赖环境
 
-- **Python 3.11**（必须是 3.11）
-- **Node.js** 和 **pnpm**
-- 编译计算内核用的 **gfortran**、**NetCDF-Fortran**、**CMake**、**Git**
+- **Python 3.11**
+- **Node.js** 与 **pnpm**
+- Fortran 编译工具链：**gfortran**、**NetCDF-Fortran**、**CMake**、**Git**
 
-各系统安装编译工具的命令：
+各平台编译工具安装命令：
 
-| 系统 | 命令 |
+| 平台 | 安装命令 |
 |---|---|
-| macOS | `brew install gcc netcdf-fortran cmake git`（gcc 里带 gfortran） |
+| macOS | `brew install gcc netcdf-fortran cmake git` |
 | Ubuntu / Debian | `sudo apt install gfortran libnetcdff-dev cmake git` |
-| Windows | 安装 [MSYS2](https://www.msys2.org/)，打开“MSYS2 UCRT64”终端运行 `pacman -S --needed mingw-w64-ucrt-x86_64-gcc-fortran mingw-w64-ucrt-x86_64-netcdf-fortran mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make git`，再把 `C:\msys64\ucrt64\bin` 加进 Windows 的 PATH |
+| Windows | 安装 [MSYS2](https://www.msys2.org/)，在“MSYS2 UCRT64”终端执行 `pacman -S --needed mingw-w64-ucrt-x86_64-gcc-fortran mingw-w64-ucrt-x86_64-netcdf-fortran mingw-w64-ucrt-x86_64-cmake mingw-w64-ucrt-x86_64-make git`，并将 `C:\msys64\ucrt64\bin` 加入系统 `PATH` |
 
-### 步骤
+### 构建与启动步骤
 
-1. **建 Python 虚拟环境**：在仓库根目录，用 Python 3.11 运行 `python -m venv .venv`。
-2. **安装后端依赖**：macOS / Linux 运行 `.venv/bin/python -m pip install -r backend/requirements.txt`；Windows 运行 `.venv\Scripts\python -m pip install -r backend\requirements.txt`。国内可以在末尾加 `-i https://pypi.tuna.tsinghua.edu.cn/simple` 换成清华镜像。
-3. **安装前端依赖**：`pnpm install`。
-4. **检查环境**：`pnpm check:env`。它会逐项检查 `.venv`、Python 版本、依赖和编译工具，缺什么就给出本系统的安装命令。
-5. **编译计算内核**：`pnpm kernel`。第一次约 5–10 分钟。它会按锁定的版本下载 GOTM、FABM、ERSEM、FABM-MIZER 的源码，把 ERSEM、MIZER、E2E 鱼类模块（官方代码和按论文方程重写的对照版本）编进同一个 `gotm` 程序，结果放在 `kernel/install/`。
-6. **启动**：`pnpm dev`。它同时启动计算服务（端口 8765）和界面（端口 5173），用浏览器打开 `http://localhost:5173`。第一次启动会自动建一个离线演示项目。
+1. **创建 Python 虚拟环境**：在仓库根目录使用 Python 3.11 执行 `python -m venv .venv`。
+2. **安装后端依赖**：macOS / Linux 执行 `.venv/bin/python -m pip install -r backend/requirements.txt`；Windows 执行 `.venv\Scripts\python -m pip install -r backend\requirements.txt`（国内网络可附加 `-i https://pypi.tuna.tsinghua.edu.cn/simple`）。
+3. **安装前端依赖**：执行 `pnpm install`。
+4. **检查编译环境**：执行 `pnpm check:env`，脚本会逐项核对 Python 依赖与编译工具链。
+5. **编译计算内核**：执行 `pnpm kernel`（首次编译约需 5–10 分钟，自动拉取指定版本的 GOTM、FABM、ERSEM 与 FABM-MIZER 源码，连同官方与重写的 E2E 模块一并编译至 `kernel/install/`）。
+6. **启动开发服务**：执行 `pnpm dev`，同时启动后端 API（`:8765`）与前端开发服务器（`:5173`），浏览器访问 `http://localhost:5173`。源码运行模式下，数据默认保存在仓库根目录的 `workspace/` 下。
 
-源码运行时，项目数据放在仓库里的 `workspace/` 文件夹（不会提交到 Git）。
+### 环境变量与打包
 
-### 环境变量
-
-| 变量 | 作用 |
+| 环境变量 | 作用 |
 |---|---|
-| `SHOAL_PYTHON` | 指定 `pnpm kernel` 和 `pnpm dev` 用哪个 Python（默认是仓库根目录的 `.venv`） |
-| `SHOAL_WORKSPACE` | 把项目、缓存和设置放到别的文件夹 |
-| `SHOAL_KERNEL` | 使用别处编译好的内核（文件夹里要有 `bin/gotm` 和 `kernel.json`） |
-| `SHOAL_API_PORT` | 计算服务的端口（默认 8765） |
+| `SHOAL_PYTHON` | 指定 `pnpm kernel` 与 `pnpm dev` 使用的 Python 解释器路径（默认为 `.venv`） |
+| `SHOAL_WORKSPACE` | 自定义工作区目录路径 |
+| `SHOAL_KERNEL` | 指定外部已编译的内核目录（需包含 `bin/gotm` 与 `kernel.json`） |
+| `SHOAL_API_PORT` | 指定后端监听端口（默认 `8765`） |
 
-### 代码结构
+在本地构建当前平台的桌面安装包（需先完成 `pnpm kernel` 与 `pnpm build`）：
 
-| 文件夹 | 内容 |
-|---|---|
-| `backend/shoal/` | 计算服务（Python，FastAPI）：项目存储、站点数据下载、生成 GOTM 和 FABM 配置、运行队列、读取结果、AI 助手、三维陆架 |
-| `frontend/src/` | 界面（React）：各个页面、图表组件，以及本教程（`primer/content/` 里的 Markdown 文件和 `primer/labs.tsx` 里的交互实验） |
-| `kernel/` | 计算内核的编译脚本、按论文方程重写的鱼类模块、官方 ECOSMO E2E 源码，以及给官方代码打的物质收支修正补丁 |
-| `packaging/` | 打包桌面版的脚本和图标 |
-
-教程的每一章就是 `frontend/src/primer/content/` 里的一个 Markdown 文件，开头的 `order` 决定它在目录里的位置。发现教程有错，可以直接改这些文件。
-
-### 打包桌面版
-
-在当前系统上打安装包（需要先运行过 `pnpm kernel` 和 `pnpm build`）：
-
-```
+```bash
 .venv/bin/python -m pip install -r packaging/requirements.txt
 node scripts/venv.mjs packaging/build_app.py
 ```
 
-安装包会生成在 `dist/release/`。正式发布由 GitHub Actions 在 macOS（Apple 芯片和 Intel）、Windows、Linux 上自动编译、测试、打包，详见仓库的 README。
-
-## 容易误解的地方
-
-- **关掉浏览器不等于退出。** 计算服务还在后台运行，这样长时间的计算不会因为误关页面而中断。真正退出要用托盘菜单。
-- **卸载不会删除项目。** 项目在数据目录里，要彻底清除需要手动删除 `workspace` 文件夹。
-- **AI 助手不是必需的。** 不配置它，其他所有功能都能正常使用。
-- **离线算例不是“简化版”。** 它用的是同一个模型、同一套流程，只是站点数据来自 GOTM 自带的算例，适合在没有网络的课堂上演示。
+打包产物位于 `dist/release/`。教程章节源码位于 `frontend/src/primer/content/*.md`，交互实验组件位于 `frontend/src/primer/labs.tsx`。

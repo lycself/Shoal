@@ -149,7 +149,7 @@ function PlanModal({ pid, onClose, onCreated }: { pid: string; onClose: () => vo
             <div className="field"><label>垂向层数</label><input className="input num" type="number" value={f.nlev} onChange={(e) => set("nlev", +e.target.value)} /></div>
             <div className="field" style={{ gridColumn: "1 / -1" }}><label>潮流混合</label><Select value={String(f.tide_scale)} onChange={(v) => set("tide_scale", +v)}><option value="0">无潮</option><option value="0.5">弱</option><option value="1">中等（北海中部）</option><option value="2">强</option><option value="3">很强</option></Select></div>
           </div>
-          <div className="field"><label>配置（每个配置在所有水柱上各跑一遍，选两个可画差值图）</label>
+          <div className="field"><label>配置（每个配置在全部水柱上运行一次，勾选两个可绘制差值图）</label>
             <div className="panel" style={{ maxHeight: 200, overflow: "auto", padding: "4px 0" }}>
               {configs.data?.map((c) => (
                 <div key={c.id} className="row" style={{ padding: "4px 10px" }}>
@@ -250,11 +250,11 @@ function StudyView({ pid, sid, job, onDeleted, onChanged }: { pid: string; sid: 
       ) : (
         <>
           <Tabs value={view} onChange={setView} tabs={[
-            { id: "map", label: "空间分布", icon: "map", tip: "每个格点一根水柱，颜色表示所选指标；点击格点看详情" },
-            { id: "plates", label: "图版", icon: "files", tip: "两种配置并排对比的多面板图" },
-            { id: "regions", label: "区域统计", icon: "table", tip: "按海区或水深分区的平均值" },
-            { id: "3d", label: "三维视图", icon: "globe", tip: "立体地形和水柱，直观看出哪里浅、哪里深" },
-            { id: "ensemble", label: "逐月走势", icon: "pulse", tip: "每根水柱一条线，看各处的季节变化有多一致、按水深分区落在哪里" },
+            { id: "map", label: "空间分布", icon: "map", tip: "每个格点对应一根独立水柱，颜色表示所选指标；点击格点查看详情" },
+            { id: "plates", label: "图版", icon: "files", tip: "两种配置并排对比与差值分布的多面板图版" },
+            { id: "regions", label: "区域统计", icon: "table", tip: "按海区或水深带统计的面积加权平均值" },
+            { id: "3d", label: "三维视图", icon: "globe", tip: "结合海底地形与水柱高度展示指标的三维空间分布" },
+            { id: "ensemble", label: "逐月走势", icon: "pulse", tip: "汇总全部水柱的逐月序列，按水深带对比季节特征与空间离散度" },
           ]} />
           {cellSel && view === "map" && <CellPanel at={cellSel.at} point={cellSel.point} results={results} ci={ci} cj={cmp !== "value" ? cj : (results.length > 1 ? cj : undefined)} metric={metric.startsWith("monthly:") ? "fish_ww" : metric} boxes={boxes.data ?? []} onClose={() => setCellSel(null)} />}
           {view === "plates" && <div className="split-scroll" style={{ padding: 16 }}><ShelfPlates study={study} results={results} configs={cfgs.data ?? []} boxes={boxes.data ?? []} /></div>}

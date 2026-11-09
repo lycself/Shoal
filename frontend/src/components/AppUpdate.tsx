@@ -113,8 +113,8 @@ export function UpdateSection() {
       <div className="section-header"><Icon name="versions" /><h3>软件版本与更新</h3></div>
       <div className="section-desc">
         {info.desktop
-          ? "Shoal 每隔几小时在后台查一次 GitHub 上有没有新版本。查不到（比如没联网）也不影响使用。更新时会下载完整安装包，校验无误后自动替换并重新打开 Shoal，项目和数据都不受影响。"
-          : "现在是从源码运行（pnpm dev）。源码版本用 git pull 更新，然后重新编译内核、重启。"}
+          ? "桌面版会在后台定期检查 GitHub Releases 中的新版本（离线或无法连接时自动跳过，不影响正常使用）。更新时将下载完整安装包，校验通过后自动替换并重启 Shoal，已有的项目与数据均会保留。"
+          : "当前为源码开发模式（pnpm dev）。请通过 git pull 拉取更新，并根据需要重新编译 Fortran 内核后重启服务。"}
       </div>
       <div className="form">
         <span className="label">当前版本</span>

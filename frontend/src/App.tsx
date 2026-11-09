@@ -132,7 +132,7 @@ export default function App() {
       { label: "打开项目", icon: "folder-opened", disabled: !s.projects.length, submenu: s.projects.map((p) => ({ label: p.name, checked: p.id === project?.id, onClick: () => s.openProject(p.id) })) },
       { label: "项目概览", icon: "home", disabled: !project, onClick: () => setPage("home") },
       { label: "关闭项目", icon: "close", disabled: !project, onClick: () => { setPage("home"); s.openProject(null); } },
-      { label: "把当前项目移到回收站…", icon: "trash", disabled: !project, onClick: async () => {
+      { label: "移至回收站…", icon: "trash", disabled: !project, onClick: async () => {
         if (!project || !(await ask(`将项目“${project.name}”移到回收站（workspace/trash）？可以从那里手动恢复。`, { danger: true, ok: "移到回收站" }))) return;
         await api.del(`/projects/${project.id}`); s.toast("已移到回收站", "ok"); setPage("home"); await s.openProject(null); s.refreshProjects();
       } },
@@ -161,9 +161,9 @@ export default function App() {
       { label: "软件使用说明", icon: "book", onClick: () => setPage("primer", { chapter: "00-guide" }) },
       { label: "安装与设置", icon: "desktop-download", onClick: () => setPage("primer", { chapter: "00-install" }) },
       { label: "研究问题", icon: "note", submenu: [
-        { label: "对照实验怎么设计、怎么读", onClick: () => setPage("primer", { chapter: "13-designs" }) },
-        { label: "鱼的反馈要不要算：单向与双向", onClick: () => setPage("primer", { chapter: "09-paper1" }) },
-        { label: "鱼和底栖的影响，换宿主还一样吗", onClick: () => setPage("primer", { chapter: "10-paper2" }) },
+        { label: "如何设计与解读对照实验", onClick: () => setPage("primer", { chapter: "13-designs" }) },
+        { label: "高营养级反馈：单向与双向耦合", onClick: () => setPage("primer", { chapter: "09-paper1" }) },
+        { label: "鱼类与底栖的下行控制：多宿主对比", onClick: () => setPage("primer", { chapter: "10-paper2" }) },
       ] },
       { label: "键盘快捷键", icon: "keyboard", onClick: () => setDialog("keys") },
       { type: "separator" },
@@ -239,9 +239,9 @@ export default function App() {
       {dialog === "about" && (
         <Modal title="关于 Shoal" icon="info" onClose={() => setDialog(null)} width={560}>
           <div className="col" style={{ gap: 12 }}>
-            <div>浅海生态模拟工作台：把海水物理、营养盐、浮游生物和鱼放进同一个模型里一起算。计算内核为 GOTM–FABM，耦合 ERSEM / ECOSMO / ERGOM 低营养级模型与 FABM-MIZER / E2E 高营养级模块。</div>
+            <div>浅海端到端生态模拟工作台：耦合水柱物理、营养盐、浮游生物、大型底栖动物与鱼类。计算内核基于 GOTM–FABM，集成 ERSEM / ECOSMO / ERGOM 低营养级模型与 FABM-MIZER / E2E 高营养级模块。</div>
             <div className="small mono">Shoal {appInfo?.version ?? "…"}{appInfo?.desktop ? "（安装版）" : "（源码版）"} · {appInfo?.platform}</div>
-            <div className="small muted">名字的由来：shoal 在英语里既是“浅海、浅滩”，也是“鱼群”，正好是本软件模拟的地方和对象。</div>
+            <div className="small muted">名称释义：英语中 shoal 兼有“浅海、浅滩”与“鱼群”之意，对应本软件的研究区域与模拟对象。</div>
             {k && <div className="kv small">{[["GOTM", k.gotm], ["FABM", k.fabm], ["ERSEM", k.ersem], ["FABM-MIZER", k.mizer], ["E2E", k.e2e?.source === "official" ? "官方 ECOSMO E2E v2.0" : "按论文方程重写"], ["编译", k.built]].map(([a, b]) => <Fragment key={String(a)}><span className="k" key={a}>{a}</span><span className="v mono" key={a + "v"}>{b ?? "–"}</span></Fragment>)}</div>}
             <div className="small muted" style={{ lineHeight: 1.7 }}>
               参考文献：Powley et al. (2026) Prog. Oceanogr. 243, 103701 · Vijayakumaran et al. (2026) EGUsphere-2026-3078 · Burchard et al. (1999) GOTM · Bruggeman &amp; Bolding (2014) FABM · Butenschön et al. (2016) ERSEM。<br />

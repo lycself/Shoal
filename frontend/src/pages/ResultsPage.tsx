@@ -65,15 +65,15 @@ export default function ResultsPage() {
         <Tabs value={tab} onChange={setTab} left={<PanelToggle id="results" label="运行与变量列表" />} tabs={[
           { id: "compare", label: "指标对比", icon: "table", tip: "各运行的年平均指标，以及相对第一个勾选运行的变化" },
           { id: "plates", label: "图版", icon: "files", tip: "排好版、可直接放进报告的多面板图" },
-          { id: "hov", label: "时间–深度", icon: "symbol-color", tip: "横轴时间、纵轴深度、颜色表示浓度的图，一眼看出季节和分层" },
-          { id: "column", label: "水柱动画", icon: "play-circle", tip: "像放电影一样看一年里水柱从上到下的变化" },
-          { id: "series", label: "时间序列", icon: "graph-line", tip: "某个量随时间的变化，可以看年循环" },
-          { id: "profile", label: "垂向剖面", icon: "arrow-down", tip: "选几个月份，看从海面到海底的分布" },
-          { id: "spectrum", label: "粒径谱", icon: "graph-scatter", tip: "按鱼的个体大小看生物量分布（MIZER）", hidden: !hasMizer },
-          { id: "web", label: "食物网状态", icon: "type-hierarchy", tip: "谁吃谁，以及各类群的多少" },
-          { id: "validate", label: "验证与稳态", icon: "verified", tip: "预热够不够、与观测气候平均值比得怎么样" },
+          { id: "hov", label: "时间–深度", icon: "symbol-color", tip: "横轴时间、纵轴深度、颜色表示浓度的图，直观呈现季节演替与垂向分层" },
+          { id: "column", label: "水柱动画", icon: "play-circle", tip: "动态播放一年内水柱垂向结构与生物量的演变" },
+          { id: "series", label: "时间序列", icon: "graph-line", tip: "选定变量随时间的变化曲线与平均年循环" },
+          { id: "profile", label: "垂向剖面", icon: "arrow-down", tip: "对比选定月份从海面到海底的垂向分布" },
+          { id: "spectrum", label: "粒径谱", icon: "graph-scatter", tip: "按鱼类个体体重查看生物量密度分布（MIZER）", hidden: !hasMizer },
+          { id: "web", label: "食物网状态", icon: "type-hierarchy", tip: "各营养类群的生物量与捕食关系" },
+          { id: "validate", label: "验证与稳态", icon: "verified", tip: "检查预热是否收敛，并与 WOA23 观测气候态对比" },
         ]} />
-        {!selRuns.length ? <Empty icon="checklist" title="在左侧勾选至少一个运行" /> : (
+        {!selRuns.length ? <Empty icon="checklist" title="请在左侧勾选至少一次运行" /> : (
           <div className="split-main" style={{ minHeight: 0 }}>
             {tab === "compare" && <CompareTab pid={p.id} runs={selRuns} />}
             {tab === "plates" && <PlatesTab pid={p.id} runs={selRuns} start={start} />}

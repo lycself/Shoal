@@ -31,7 +31,7 @@ function Welcome({ onNew }: { onNew: () => void }) {
   return (
     <div className="page" style={{ maxWidth: 980, paddingTop: 56 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 12, fontSize: 30, fontWeight: 300, letterSpacing: "-0.02em", color: "var(--fg-strong)" }}><Logo size={38} />Shoal</div>
-      <div className="muted" style={{ marginBottom: 36 }}>浅海生态模拟工作台：从营养盐、浮游生物一直算到鱼，全球任意陆架海都能研究</div>
+      <div className="muted" style={{ marginBottom: 36 }}>浅海端到端生态模拟工作台：支持全球任意陆架海的一维水柱与区域集合实验</div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.2fr", gap: 48 }}>
         <div>
           <div className="eyebrow" style={{ marginBottom: 10 }}>开始</div>
@@ -96,7 +96,7 @@ function ProjectHub({ onNew }: { onNew: () => void }) {
       facts: done.length ? <>可分析 {done.length} 次运行：指标对比、时间–深度矩阵、年循环、差值、粒径谱、食物网差异</> : <>需要至少一次完成的运行</>,
       action: "打开" },
     { n: 5, page: "results", title: "模型验证与稳态检查", state: done.length ? "optional" : "todo",
-      facts: <>把模拟的温度、盐度、营养盐和多年观测平均值（WOA23）比一比；看预热够不够、结果是否已经稳定</>, action: "验证",
+      facts: <>对比模拟的温盐、营养盐与 WOA23 观测气候态；检查预热是否充分、跨年循环是否已收敛</>, action: "验证",
       onAction: () => { if (done[0]) setSelectedRuns([done[0].id]); setPage("results"); setTimeout(() => window.dispatchEvent(new CustomEvent("results-tab", { detail: "validate" })), 50); } },
     { n: 6, page: "shelf", title: "三维陆架（可选）", state: (shelves.data ?? []).some((s) => s.status === "done") ? "done" : (shelves.data ?? []).some((s) => s.status === "running") ? "busy" : "optional",
       facts: <>{shelves.data?.length ?? 0} 项陆架研究 · 水柱集合，空间分布图与区域统计</>, action: "打开" },
@@ -253,14 +253,14 @@ function NewProject({ onClose, initial }: { onClose: () => void; initial?: { lat
               <label key={k} className="host-row">
                 <input type="checkbox" aria-label={n} checked={hosts.includes(k)} onChange={() => setHosts(toggle(hosts, k))} />
                 <b>{n}</b>
-                <span className="grow">{HOST_INFO[k]?.what}<span className="soft small">　参数调自{HOST_INFO[k]?.tuned}</span></span>
+                <span className="grow">{HOST_INFO[k]?.what}<span className="soft small">　原始率定海区：{HOST_INFO[k]?.tuned}</span></span>
                 {!offline && advice.pick === k && <span className="tag">推荐</span>}
               </label>
             ))}
           </div>
           <p className="soft small" style={{ margin: "6px 0 0", lineHeight: 1.65 }}>
-            三个模型都可以用在全球任何海区：水温、混合和营养盐来自你选的站点数据，模型只描述生物怎么生长、被吃、死亡。
-            “参数调自”是指参数最初在哪片海对照观测调出来的，换到别的海区后，请在“验证”页对照观测检查。{!offline && advice.text}
+            三个宿主模型均可用于全球任意陆架站点（水温、混合和背景营养盐由站点数据驱动）。
+            更换研究海区后，建议在“验证与稳态”视图中对照气候态观测检查。{!offline && advice.text}
           </p>
           {needsMulti && <div className="reading-warn small" style={{ marginTop: 6 }}>“宿主模型对比”需要至少选择两个宿主。</div>}
           <div className="sec-title" style={{ marginTop: 16 }}><span className="step-n">4</span>项目名称</div>
@@ -275,17 +275,17 @@ const HOST_ORDER = ["ersem", "ecosmo", "ergom"];
 
 /** What each lower-trophic host is like, in one plain sentence, and where its parameters were tuned. */
 const HOST_INFO: Record<string, { what: string; tuned: string }> = {
-  ersem: { what: "过程最全：4 类浮游植物、3 类浮游动物、细菌、碳酸盐系统和海底沉积物。", tuned: "西北欧陆架" },
-  ecosmo: { what: "中等复杂：2 类浮游植物、2 类浮游动物，算得快。", tuned: "北海和波罗的海" },
-  ergom: { what: "最简洁：只有 1 类浮游动物，但缺氧、固氮蓝藻和富营养化刻画得好。", tuned: "波罗的海" },
+  ersem: { what: "过程最完整：4 类浮游植物、3 类浮游动物、细菌、碳酸盐系统和海底沉积物。", tuned: "西北欧陆架" },
+  ecosmo: { what: "中等复杂度：2 类浮游植物、2 类浮游动物，计算速度快。", tuned: "北海和波罗的海" },
+  ergom: { what: "结构精简：1 类浮游动物，擅长刻画缺氧、固氮蓝藻和富营养化。", tuned: "波罗的海" },
 };
 
 /** Which host to start with at a given place, and why (plain language). */
 function hostAdvice(lat: number, lon: number): { pick: string; text: string } {
   const baltic = lat >= 53.5 && lat <= 66 && lon > 13 && lon <= 30;
   const nwes = lat >= 48 && lat <= 62.5 && lon >= -12 && lon <= 13;
-  if (baltic) return { pick: "ergom", text: "这里是波罗的海，ERGOM 的参数就是在这里调的，可以先用它。" };
-  if (nwes) return { pick: "ersem", text: "这里在西北欧陆架，三个模型的参数都比较适用；鱼类模块也是在这里标定的。" };
-  return { pick: "ersem", text: "这个海区三个模型都没有专门调过参数。建议先用过程最全的 ERSEM；如果关心缺氧或富营养化（例如大河口外），可以加选 ERGOM。同时选两三个模型并勾选“结论是否依赖所用的低营养级模型”，看结论在不同模型下是否一致，这是在新海区检验结果是否可靠的好办法。" };
+  if (baltic) return { pick: "ergom", text: "当前站点位于波罗的海，ERGOM 的默认参数针对该海区率定，可优先选用。" };
+  if (nwes) return { pick: "ersem", text: "当前站点位于西北欧陆架，三个宿主的默认参数及鱼类模块均在此海区率定。" };
+  return { pick: "ersem", text: "该海区不在默认参数的原始率定范围内，建议优先选用过程最完整的 ERSEM；若关注缺氧或河口富营养化，可加选 ERGOM，并勾选“宿主模型对比”检验结论在不同宿主间的一致性。" };
 }
 

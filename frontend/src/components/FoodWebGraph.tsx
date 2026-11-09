@@ -287,7 +287,7 @@ export function FoodWebGraph({ graph, state, delta, onSelect, selected, height =
         {[["nutrient", "营养盐"], ["phyto", "浮游植物"], ["bacteria", "细菌"], ["zoo", "浮游动物"], ["fish", "鱼类"], ["benthos", "底栖"], ["organic", "有机物"]].map(([r, l]) => (
           <span key={r}><span className="swatch" style={{ background: color(r) }} />{l}</span>
         ))}
-        <span>线越粗，捕食者越偏爱这种食物 · {motion ? `流动的光点 = 能量从被吃者流向捕食者，${state ? "越密越快表示摄食压力（偏好 × 饵料生物量）越大" : "越密越快表示偏好越强"} · ` : ""}虚线 = 废物流 / 单向耦合{state ? " · 条形 = 年均生物量（同类相对）" : ""}</span>
+        <span>线宽表示摄食偏好权重 · {motion ? `流动粒子表示能量自被摄食者流向捕食者（${state ? "越密越快代表摄食压力越大" : "越密越快代表偏好权重越高"}） · ` : ""}虚线表示排泄碎屑流或单向耦合{state ? " · 节点内水平条表示年均生物量（同级相对比例）" : ""}</span>
       </div>
     </div>
   );

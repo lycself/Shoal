@@ -74,7 +74,7 @@ HOSTS: dict[str, Host] = {
         label="ERSEM",
         reference="Butenschön et al. (2016) GMD 9, 1293",
         template="ersem.yaml",
-        description="欧洲区域海洋生态系统模型：4 类浮游植物、3 类浮游动物、细菌、3 类溶解有机物与 3 粒级颗粒有机物，碳氮磷硅氧五元素，带底栖子模型。两篇文章都用到。",
+        description="欧洲区域海洋生态系统模型：包含 4 类浮游植物、3 类浮游动物、异养细菌、3 类溶解有机物与 3 粒级颗粒碎屑，核算碳、氮、磷、硅、氧五种元素并含底栖子模型，支持耦合 E2E 与 MIZER。",
         prey={
             "Pd": Prey("Pd", "硅藻 P1", "P1/c", "cnpsl", instance="P1", size=esd2mass(20, 200)),
             "Pn": Prey("Pn", "微型浮游植物 P2", "P2/c", "cnpl", instance="P2", size=esd2mass(2, 20)),
@@ -104,7 +104,7 @@ HOSTS: dict[str, Host] = {
         label="ECOSMO",
         reference="Daewel & Schrum (2013) J. Mar. Syst. 119-120",
         template="ecosmo.yaml",
-        description="ECOSMO II：硅藻、鞭毛藻（可选蓝藻）、小型与中型浮游动物、碎屑、溶解有机物与沉积物，氮磷硅循环，以碳当量（mg C）为单位。参数最初在北海和波罗的海标定，ECOSMO E2E 的原始宿主；作为通用过程模型可用于其他海区。",
+        description="ECOSMO II：包含硅藻、鞭毛藻（可选蓝藻）、微型与中型浮游动物、颗粒碎屑、溶解有机物与沉积物库，核算氮、磷、硅循环并以碳当量（mg C）为单位，是 ECOSMO E2E 的原生宿主模型。",
         prey={
             "Pf": Prey("Pf", "鞭毛藻 fla", "ECO/fla", "c"),
             "Pd": Prey("Pd", "硅藻 dia", "ECO/dia", "c"),
@@ -131,7 +131,7 @@ HOSTS: dict[str, Host] = {
         label="ERGOM",
         reference="Neumann (2000) J. Mar. Syst. 25; Neumann et al. (2002)",
         template="ergom.yaml",
-        description="生态区域海洋模型：硅藻、鞭毛藻、固氮蓝藻，单一浮游动物，碎屑与絮状沉积层，氮磷循环与缺氧过程，以氮为通货。参数最初在波罗的海标定（当地业务化预报模型）；作为通用过程模型可用于其他海区。",
+        description="波罗的海生态区域海洋模型：包含硅藻、鞭毛藻、固氮蓝藻、单一浮游动物、颗粒碎屑与絮状沉积层，核算氮、磷循环与底层缺氧过程，以氮为基本核算单位。",
         prey={
             "Pd": Prey("Pd", "硅藻 pp", "ergom/pp", "c", c_scale=MGC_PER_MMOLN),
             "Pf": Prey("Pf", "鞭毛藻 ff", "ergom/ff", "c", c_scale=MGC_PER_MMOLN),

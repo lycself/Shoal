@@ -110,7 +110,7 @@ function SimSettings() {
       <div style={{ padding: "4px 16px 16px" }}>
         <div className="form tight" style={{ gridTemplateColumns: "98px minmax(0,1fr)", marginTop: 8 }}>
           {/* the mode switch is a form row too, so it lines up with the fields below it */}
-          <span className="label">气象怎么用</span>
+          <span className="label">气象驱动</span>
           <span className="control"><Seg value={s.mode} options={[["repeat", "重复同一年"], ["period", "真实年份"]]} onChange={(v) => set("mode", v)} /><span /></span>
           {s.mode === "repeat" ? <>{num("repeat_year", "强迫年", "年")}{num("years", "分析年数", "年", { min: 1 })}</> : (
             <>
@@ -180,7 +180,7 @@ function MeteoChart({ m }: { m: any }) {
   });
   return (
     <div className="col" style={{ gap: 8 }}>
-      <div className="muted small">这里画的是 ERA5 气象再分析数据：细线是每天的值，粗线是前后 30 天的平均，用来看季节变化。风把海水搅匀；阳光和气温决定海面得到或失去多少热量。两者一起决定水柱什么时候分层、春季藻华什么时候出现。</div>
+      <div className="muted small">ERA5 逐日气象再分析数据（细线为逐日值，粗线为 30 天滑动平均）。风速决定表层风生混合强度，短波辐射与气温决定海面净热通量，共同控制水柱层化与春季水华的启动时间。</div>
       <Plot height={fillH(620, 200)} data={data} layout={(px: [number, number]) => ({ ...layout, annotations: placers.flatMap((f) => f(px)) })} />
     </div>
   );
@@ -203,7 +203,7 @@ function WoaView({ w, depth }: { w: any; depth?: number }) {
       <div className="row">
         <Select value={v} onChange={setV}>{Object.entries(meta).filter(([k]) => w[k]).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</Select>
         <Seg value={mode} options={[["section", "月 × 深度", "symbol-color"], ["profiles", "逐月剖面", "graph-line"]]} onChange={setMode} />
-        <span className="soft small grow">World Ocean Atlas 2023 的多年月平均剖面。模拟从它开始，之后也一直被它轻轻“拉住”（松弛），弥补一维模型没有海流补给的缺陷。</span>
+        <span className="soft small grow">World Ocean Atlas 2023（WOA23）多年月平均气候态剖面，用于提供模型初始场及积分过程中的气候态松弛（补偿一维模型缺失的水平平流输运）。</span>
       </div>
       {mode === "section" ? (
         <Plot height={fillH(460)} data={[{ type: "heatmap", x: MONTHS, y: w.depth, z, colorscale: colorscaleFor(meta[v][2], dark), colorbar: { title: { text: meta[v][1], side: "right" }, thickness: 12, len: 0.9 }, hovertemplate: "%{x} %{y} m<br>%{z:.3f}<extra></extra>", zsmooth: "best" },
@@ -225,7 +225,7 @@ function GridView({ depth, nlev }: { depth: number; nlev: number }) {
   const centers = Array.from({ length: nlev }, (_, i) => (i + 0.5) * h);
   return (
     <div className="col" style={{ gap: 10 }}>
-      <div className="muted small">模型把水柱从海面到海底分成 {nlev} 层（每层约 {h.toFixed(2)} m）。层分得越细，越能看清温跃层和次表层的叶绿素高值，但计算更慢。一般每层 1 m 左右就够了。</div>
+      <div className="muted small">水柱从海面到海底等厚划分为 {nlev} 层（每层约 {h.toFixed(2)} m）。加密分层有助于分辨温跃层与次表层叶绿素最大值，但会相应增加计算耗时；一般陆架水柱每层 1 m 左右即可。</div>
       <Plot height={fillH(460)} data={[
         { type: "bar", orientation: "h", y: centers, x: centers.map(() => h), marker: { color: "rgba(10,102,194,.25)", line: { color: "rgba(10,102,194,.8)", width: 0.6 } }, width: centers.map(() => h * 0.92), hovertemplate: "层中心 %{y:.2f} m<br>厚度 %{x:.2f} m<extra></extra>" },
       ]} layout={{ yaxis: { autorange: "reversed", title: { text: "深度 (m)" }, range: [depth, 0] }, xaxis: { title: { text: "层厚 (m)" }, range: [0, h * 1.08] }, showlegend: false, bargap: 0 }} />

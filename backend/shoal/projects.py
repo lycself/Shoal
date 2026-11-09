@@ -93,31 +93,31 @@ DESIGNS = {
     "baseline": {
         "label": "单个低营养级模型", "hosts": "any",
         "question": "站点的物理与低营养级生态是什么样的？",
-        "description": "只运行所选宿主的低营养级模型，作为起点；之后可以在食物网编辑器中添加高营养级。",
+        "description": "仅运行所选宿主的低营养级模型，作为基准对照；后续可在食物网配置页中接入高营养级模块。",
         "runs_per_host": 1, "ref": "",
     },
     "topdown": {
         "label": "高营养级的下行控制", "hosts": "any",
-        "question": "鱼和底栖动物对浮游生物有多大影响？",
-        "description": "每个宿主 5 个对照：仅低营养级 / 加大型底栖 / 加鱼类 / 鱼类+底栖（完整）/ 只提高浮游动物死亡率 20%（看鱼的作用能不能用“浮游动物多死一点”来代替）。",
+        "question": "鱼类和底栖动物对浮游生物有多大影响？",
+        "description": "每个宿主包含 5 组对照配置：仅低营养级 / 耦合大型底栖 / 耦合鱼类 / 鱼类+底栖（完整耦合）/ 仅将浮游动物死亡率上调 20%（检验上调闭合死亡率能否替代显式鱼类捕食）。",
         "runs_per_host": 5, "ref": PAPER2 + " §3.3",
     },
     "hosts": {
         "label": "宿主模型对比", "hosts": "multi",
-        "question": "结论是否依赖所用的低营养级模型？",
-        "description": "同一套功能群高营养级（鱼 1、鱼 2、大型底栖）分别接入所选的每个宿主，比较响应是否一致。需要选两个以上宿主。",
+        "question": "模拟结论是否依赖所选用的低营养级宿主模型？",
+        "description": "将同一套功能群高营养级（鱼 1、鱼 2、大型底栖动物）分别耦合至所选的各个宿主模型，对比各宿主的生态响应是否一致（需至少选择两个宿主）。",
         "runs_per_host": 1, "ref": PAPER2 + " §3.5",
     },
     "coupling": {
         "label": "耦合方式：单向 vs 双向", "hosts": "ersem",
-        "question": "鱼的反馈会改变浮游生物和鱼本身吗？",
-        "description": "ERSEM 宿主上的粒径谱鱼类群落（MIZER）：基线 / 单向（鱼不影响浮游生物）/ 双向（捕食、排泄、呼吸反馈）。",
+        "question": "高营养级反馈会如何改变浮游生物与鱼类群落？",
+        "description": "在 ERSEM 宿主上耦合 MIZER 粒径谱鱼类群落：对比仅低营养级基线、单向耦合（鱼类不反馈影响浮游生物）与双向耦合（摄食、排泄与呼吸完整反馈）。",
         "runs": 3, "ref": PAPER1 + " §2.3",
     },
     "framework": {
         "label": "高营养级表示方式：功能群 vs 粒径谱", "hosts": "ersem",
-        "question": "用功能群还是粒径谱表示鱼，结论有何不同？",
-        "description": "同一个 ERSEM 水柱上分别接入功能群（E2E：鱼 1、鱼 2、大型底栖）和粒径谱（MIZER，100 个粒径级），并与无鱼基线比较。",
+        "question": "采用功能群还是粒径谱表征鱼类，模拟结果有何差异？",
+        "description": "在同一 ERSEM 水柱上分别接入功能群模块（E2E：鱼 1、鱼 2、大型底栖）与粒径谱模块（MIZER，100 个体重档），并与无鱼基线对比。",
         "runs": 3, "ref": f"{PAPER1}; {PAPER2}",
     },
 }
@@ -141,19 +141,19 @@ def design_contents(designs: list[str], hosts: list[str]) -> tuple[list[dict], l
         zoo = 0.8 if h == "ecosmo" else 1.0  # ECOSMO's zooplankton closure is lowered when fish are coupled
         ref = DESIGNS["topdown"]["ref"]
         return {
-            "ltl": cfg(f"{h}_ltl", f"{L} 仅低营养级", "没有鱼类和大型底栖动物，作为基线", {"host": h, "htl": {"kind": "none"}}, ref),
-            "mb": cfg(f"{h}_mb", f"{L} + 大型底栖", "只耦合大型底栖功能群", {"host": h, "htl": {"kind": "e2e", "e2e": {"macrobenthos": True, "fish1": False, "fish2": False}}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
-            "fish": cfg(f"{h}_fish", f"{L} + 鱼类", "两个鱼类功能群（浮游食性、底栖/鱼食性），没有大型底栖", {"host": h, "htl": {"kind": "e2e", "e2e": {"macrobenthos": False, "fish1": True, "fish2": True}}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
-            "control": cfg(f"{h}_control", f"{L} + 鱼类 + 底栖（完整）", "两个鱼类功能群和大型底栖动物，最完整的配置", {"host": h, "htl": {"kind": "e2e"}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
-            "zoo120": cfg(f"{h}_zoo120", f"{L} 浮游动物死亡率 +20%", "没有鱼，只把浮游动物死亡率提高 20%：用“多死一点”代替鱼的捕食", {"host": h, "htl": {"kind": "none"}, "ltl": {"zoo_mortality_factor": 1.2}}, ref),
+            "ltl": cfg(f"{h}_ltl", f"{L} 仅低营养级", "不含鱼类和大型底栖动物，作为低营养级基线", {"host": h, "htl": {"kind": "none"}}, ref),
+            "mb": cfg(f"{h}_mb", f"{L} + 大型底栖", "仅耦合大型底栖动物功能群", {"host": h, "htl": {"kind": "e2e", "e2e": {"macrobenthos": True, "fish1": False, "fish2": False}}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
+            "fish": cfg(f"{h}_fish", f"{L} + 鱼类", "耦合两个鱼类功能群（浮游食性、底栖/鱼食性），不含大型底栖动物", {"host": h, "htl": {"kind": "e2e", "e2e": {"macrobenthos": False, "fish1": True, "fish2": True}}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
+            "control": cfg(f"{h}_control", f"{L} + 鱼类 + 底栖（完整）", "同时耦合两个鱼类功能群与大型底栖动物功能群", {"host": h, "htl": {"kind": "e2e"}, "ltl": {"zoo_mortality_factor": zoo}}, ref),
+            "zoo120": cfg(f"{h}_zoo120", f"{L} 浮游动物死亡率 +20%", "不含鱼类，仅将浮游动物闭合死亡率提高 20%，用于同显式鱼类捕食对照", {"host": h, "htl": {"kind": "none"}, "ltl": {"zoo_mortality_factor": 1.2}}, ref),
         }
 
     def mizer_cfgs() -> dict[str, str]:
         ref = DESIGNS["coupling"]["ref"]
         return {
-            "baseline": cfg("ersem_ltl", "ERSEM 仅低营养级", "没有鱼类和大型底栖动物，作为基线", {"host": "ersem", "htl": {"kind": "none"}}, ref),
-            "offline": cfg("mizer_offline", "ERSEM + MIZER 单向", "鱼由浮游生物驱动，但鱼的捕食不影响浮游生物（feedback: false）", {"host": "ersem", "htl": {"kind": "mizer", "mizer": {"feedback": False}}}, ref),
-            "twoway": cfg("mizer_twoway", "ERSEM + MIZER 双向", "鱼的捕食、排泄与呼吸反馈给 ERSEM；中型浮游动物的种内捕食与基础死亡由鱼的捕食取代", {"host": "ersem", "htl": {"kind": "mizer", "mizer": {"feedback": True}}, "ltl": {"z4_cannibalism": False, "z4_basal_mortality": False}}, ref),
+            "baseline": cfg("ersem_ltl", "ERSEM 仅低营养级", "不含鱼类和大型底栖动物，作为低营养级基线", {"host": "ersem", "htl": {"kind": "none"}}, ref),
+            "offline": cfg("mizer_offline", "ERSEM + MIZER 单向", "鱼类由浮游生物饵料驱动，但摄食不消耗浮游生物（feedback: false）", {"host": "ersem", "htl": {"kind": "mizer", "mizer": {"feedback": False}}}, ref),
+            "twoway": cfg("mizer_twoway", "ERSEM + MIZER 双向", "鱼类的摄食、排泄与呼吸完整反馈至 ERSEM，并关闭中型浮游动物原有的种内捕食与基础死亡闭合项", {"host": "ersem", "htl": {"kind": "mizer", "mizer": {"feedback": True}}, "ltl": {"z4_cannibalism": False, "z4_basal_mortality": False}}, ref),
         }
 
     for d in designs:
@@ -162,7 +162,7 @@ def design_contents(designs: list[str], hosts: list[str]) -> tuple[list[dict], l
             continue
         if d == "baseline":
             for h in hosts:
-                k = cfg(f"{h}_ltl", f"{HOST_NAME[h]} 仅低营养级", "没有鱼类和大型底栖动物，作为基线", {"host": h, "htl": {"kind": "none"}}, "")
+                k = cfg(f"{h}_ltl", f"{HOST_NAME[h]} 仅低营养级", "不含鱼类和大型底栖动物，作为低营养级基线", {"host": h, "htl": {"kind": "none"}}, "")
                 experiments.append({"name": f"{HOST_NAME[h]} 低营养级", "description": D["question"], "paper": "", "items": [{"key": k, "label": configs[k]["name"]}]})
         elif d == "topdown":
             for h in hosts:
