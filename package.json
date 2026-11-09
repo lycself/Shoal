@@ -1,7 +1,7 @@
 {
   "name": "shoal",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Shoal — shelf-sea end-to-end ecosystem modelling workbench (GOTM + FABM + ERSEM/ECOSMO/ERGOM + MIZER/E2E) with visualization",
   "scripts": {
     "dev": "concurrently -k -n api,web -c cyan,magenta \"pnpm:dev:api\" \"pnpm:dev:web\"",
